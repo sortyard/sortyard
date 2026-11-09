@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/workspace.schema.json",
+  "title": "Workspace",
+  "description": "Workspace / Organisation: the tenancy boundary inside an installation (§3.1). v1 runs a single workspace, but every other object carries workspace_id from day one.",
+  "x-sortyard-design-ref": "§3.1",
+  "x-sortyard-store": "state",
+  "type": "object",
+  "required": ["id", "installation_id", "name"],
+  "properties": {
+    "id": {"$ref": "common.schema.json#/$defs/id"},
+    "installation_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "name": {"type": "string", "minLength": 1},
+    "slug": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+    "created_at": {"$ref": "common.schema.json#/$defs/timestamp"},
+    "updated_at": {"$ref": "common.schema.json#/$defs/timestamp"}
+  },
+  "additionalProperties": false,
+  "examples": [{"id": "ws-noncelogic", "installation_id": "inst-noncelogic", "name": "NonceLogic", "slug": "noncelogic"}]
+}
