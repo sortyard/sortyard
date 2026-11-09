@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/repo.schema.json",
+  "title": "Repo",
+  "description": "A first-class repository (§3.2): connection status, webhook health, runner pool, branch protection posture, last observed HEAD, and explicit role + aliases[] so codename vs product-name drift cannot break automation.",
+  "x-sortyard-design-ref": "§3.2",
+  "x-sortyard-store": "state",
+  "type": "object",
+  "allOf": [{"$ref": "common.schema.json#/$defs/object_base"}],
+  "required": ["project_id", "url", "default_branch", "role"],
+  "properties": {
+    "project_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "url": {"$ref": "common.schema.json#/$defs/uri"},
+    "default_branch": {"type": "string", "minLength": 1},
+    "role": {"$ref": "common.schema.json#/$defs/repo_role"},
+    "aliases": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "connection_status": {"enum": ["connected", "degraded", "disconnected"]},
+    "webhook_health": {"enum": ["healthy", "failing", "absent"]},
+    "runner_pool": {"type": "string"},
+    "branch_protection": {
+      "type": "object",
+      "properties": {
+        "required_checks": {"type": "array", "items": {"type": "string"}},
+        "require_review": {"type": "boolean"},
+        "allow_force_push": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "last_observed_head": {
+      "type": "object",
+      "required": ["sha", "observed_at"],
+      "properties": {
+        "sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "observed_at": {"$ref": "common.schema.json#/$defs/timestamp"}
+      },
+      "additionalProperties": false
+    },
+    "mirror_ref": {"$ref": "common.schema.json#/$defs/ref"}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "repo-rove", "workspace_id": "ws-noncelogic", "project_id": "proj-rove",
+    "url": "https://github.com/noncelogic/rove", "default_branch": "main", "role": "product",
+    "aliases": ["rove-app"], "connection_status": "connected", "webhook_health": "healthy",
+    "runner_pool": "aks-self-hosted", "mirror_ref": "mirror-rove"
+  }]
+}
