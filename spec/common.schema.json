@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/common.schema.json",
+  "title": "Sortyard common definitions",
+  "description": "Shared building blocks for every Sortyard domain object: identifiers, references, timestamps, content hashes, the tenancy field and the definition/state base shapes (design §3, §5.1). Not an object itself.",
+  "x-sortyard-design-ref": "§3",
+  "$defs": {
+    "id": {
+      "description": "Stable identifier of an object. Opaque to clients.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$"
+    },
+    "ref": {
+      "description": "Reference to another object by its id.",
+      "$ref": "#/$defs/id"
+    },
+    "versioned_ref": {
+      "description": "Reference to an immutable version of a definition (pinning, §5.1a).",
+      "type": "object",
+      "required": ["id", "version"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "version": {"$ref": "#/$defs/version"}
+      },
+      "additionalProperties": false
+    },
+    "timestamp": {"type": "string", "format": "date-time"},
+    "duration_seconds": {"type": "integer", "minimum": 0},
+    "version": {
+      "description": "Definition version label. Versions are immutable once materialised (§5.1).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "content_hash": {
+      "description": "Content hash; definitions and context packets are content-addressed (§5.1c, §3.7a).",
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "secret_ref": {
+      "description": "Pointer to a Secret object (secret.schema.json). Never a value (§3.7a).",
+      "$ref": "#/$defs/id"
+    },
+    "uri": {"type": "string", "format": "uri"},
+    "labels": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    },
+    "actor": {
+      "description": "Who did something: a human operator, an agent (service account), the system, or a sensor.",
+      "type": "object",
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {"enum": ["operator", "agent", "system", "sensor"]},
+        "id": {"$ref": "#/$defs/id"}
+      },
+      "additionalProperties": false
+    },
+    "scope": {
+      "description": "Where a policy or definition applies (§3.6).",
+      "enum": ["global", "project", "workflow", "stage"]
+    },
+    "priority_tier": {"enum": ["urgent", "high", "normal", "low"]},
+    "repo_role": {"enum": ["product", "gtm", "infra"]},
+    "absent_state": {
+      "description": "Named behaviour when the thing cannot run or its input is absent (§1.6; mandatory for eval gates).",
+      "type": "object",
+      "required": ["behaviour"],
+      "properties": {
+        "behaviour": {"enum": ["refuse", "warn", "record", "skip_recorded"]},
+        "reason_code": {"type": "string"},
+        "description": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "object_base": {
+      "description": "Fields every workspace-scoped object carries. workspace_id exists from day one (§3.1).",
+      "type": "object",
+      "required": ["id", "workspace_id"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "workspace_id": {"$ref": "#/$defs/ref"},
+        "created_at": {"$ref": "#/$defs/timestamp"},
+        "updated_at": {"$ref": "#/$defs/timestamp"}
+      }
+    },
+    "definition_base": {
+      "description": "Definitions live in git and are materialised into the DB as immutable, content-hashed versions (§5.1).",
+      "allOf": [{"$ref": "#/$defs/object_base"}],
+      "required": ["version"],
+      "properties": {
+        "version": {"$ref": "#/$defs/version"},
+        "content_hash": {"$ref": "#/$defs/content_hash"},
+        "source": {
+          "description": "Where the version was materialised from (§5.1: git mode or DB-only mode).",
+          "enum": ["git", "db"]
+        }
+      }
+    }
+  }
+}
