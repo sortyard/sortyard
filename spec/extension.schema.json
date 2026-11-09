@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/extension.schema.json",
+  "title": "Extension",
+  "description": "The plugin unit (§3.7a), registered in the Extension Registry, versioned, enable/disable per project. Kinds: Skill (SKILL.md + assets with frontmatter contract), Integration (connector proven locally against doc-derived fixtures — not a live production test), Sensor (scheduled observer that files findings as Tasks, always outside the pipeline, never executes a task), and archetype/workflow/eval packs.",
+  "x-sortyard-design-ref": "§3.7a, §3.7b",
+  "x-sortyard-store": "definition",
+  "type": "object",
+  "allOf": [
+    {"$ref": "common.schema.json#/$defs/definition_base"},
+    {"if": {"properties": {"kind": {"const": "skill"}}, "required": ["kind"]},
+     "then": {"required": ["skill"], "properties": {"integration": false, "sensor": false}}},
+    {"if": {"properties": {"kind": {"const": "integration"}}, "required": ["kind"]},
+     "then": {"required": ["integration"], "properties": {"skill": false, "sensor": false}}},
+    {"if": {"properties": {"kind": {"const": "sensor"}}, "required": ["kind"]},
+     "then": {"required": ["sensor"], "properties": {"skill": false, "integration": false}}},
+    {"if": {"properties": {"kind": {"enum": ["archetype_pack", "workflow_pack", "eval_pack"]}}, "required": ["kind"]},
+     "then": {"required": ["contents"], "properties": {"skill": false, "integration": false, "sensor": false}}}
+  ],
+  "required": ["kind", "name", "registry"],
+  "properties": {
+    "kind": {"enum": ["skill", "integration", "sensor", "archetype_pack", "workflow_pack", "eval_pack"]},
+    "name": {"type": "string", "minLength": 1},
+    "registry": {
+      "type": "object",
+      "required": ["kind", "location"],
+      "properties": {
+        "kind": {"description": "git-backed in v1; OCI/HTTP later.", "enum": ["git", "oci", "http"]},
+        "location": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "enabled_projects": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/ref"}, "uniqueItems": true},
+    "skill": {
+      "type": "object",
+      "required": ["path", "frontmatter"],
+      "properties": {
+        "path": {"description": "Path to SKILL.md.", "type": "string"},
+        "frontmatter": {
+          "type": "object",
+          "required": ["kind", "required"],
+          "properties": {
+            "kind": {"type": "string"},
+            "required": {"type": "boolean"},
+            "depends_on": {"type": "array", "items": {"type": "string"}}
+          },
+          "additionalProperties": true
+        },
+        "lazy": {"description": "Situational skills stay lazy.", "type": "boolean", "default": false}
+      },
+      "additionalProperties": false
+    },
+    "integration": {
+      "type": "object",
+      "required": ["system", "contract"],
+      "properties": {
+        "system": {"type": "string"},
+        "contract": {
+          "type": "object",
+          "required": ["kind", "docs_read", "proven_against"],
+          "properties": {
+            "kind": {"enum": ["mcp", "api"]},
+            "docs_read": {"type": "boolean"},
+            "proven_against": {"const": "doc_derived_fixtures"}
+          },
+          "additionalProperties": false
+        },
+        "credential_refs": {"description": "User-supplied at runtime via the secrets store.", "type": "array", "items": {"$ref": "common.schema.json#/$defs/secret_ref"}}
+      },
+      "additionalProperties": false
+    },
+    "sensor": {
+      "type": "object",
+      "required": ["schedule", "observes"],
+      "properties": {
+        "schedule": {"description": "Cron expression.", "type": "string"},
+        "observes": {"type": "string"},
+        "files_findings_as": {"const": "task", "default": "task"},
+        "outside_pipeline": {"const": true, "default": true},
+        "may_execute_tasks": {"const": false, "default": false}
+      },
+      "additionalProperties": false
+    },
+    "contents": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/versioned_ref"}}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "skill-tdd", "workspace_id": "ws-noncelogic", "version": "1.2.0", "kind": "skill", "name": "tdd",
+    "registry": {"kind": "git", "location": "github.com/sortyard/extensions"},
+    "enabled_projects": ["proj-rove"],
+    "skill": {"path": "skills/tdd/SKILL.md", "frontmatter": {"kind": "practice", "required": false}}
+  }, {
+    "id": "sensor-deploy-health", "workspace_id": "ws-noncelogic", "version": "1.0.0", "kind": "sensor", "name": "deploy health",
+    "registry": {"kind": "git", "location": "github.com/sortyard/extensions"},
+    "sensor": {"schedule": "*/15 * * * *", "observes": "deployed head vs main"}
+  }]
+}
