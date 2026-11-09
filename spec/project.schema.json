@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/project.schema.json",
+  "title": "Project",
+  "description": "A product being built (§3.2). Pins an archetype version and inherits archetype updates explicitly (diff + accept).",
+  "x-sortyard-design-ref": "§3.2",
+  "x-sortyard-store": "state",
+  "type": "object",
+  "allOf": [{"$ref": "common.schema.json#/$defs/object_base"}],
+  "required": ["name", "archetype", "repos", "tracker", "state"],
+  "properties": {
+    "name": {"type": "string", "minLength": 1},
+    "archetype": {
+      "description": "Pinned archetype version.",
+      "$ref": "common.schema.json#/$defs/versioned_ref"
+    },
+    "repos": {
+      "description": "Repo objects belonging to the project; each Repo carries URL, default branch and role.",
+      "type": "array",
+      "items": {"$ref": "common.schema.json#/$defs/ref"}
+    },
+    "tracker": {
+      "description": "Tracker pointer: internal by default; an external tracker is optional (§8).",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {"enum": ["internal", "external"]},
+        "integration_ref": {"$ref": "common.schema.json#/$defs/ref"},
+        "external_project": {"type": "string"}
+      },
+      "additionalProperties": false,
+      "if": {"properties": {"kind": {"const": "external"}}},
+      "then": {"required": ["integration_ref", "external_project"]}
+    },
+    "delivery_config_ref": {"$ref": "common.schema.json#/$defs/ref"},
+    "quality_bar_ref": {"$ref": "common.schema.json#/$defs/ref"},
+    "sequencing_policy_ref": {"$ref": "common.schema.json#/$defs/ref"},
+    "prioritization_policy_ref": {"$ref": "common.schema.json#/$defs/ref"},
+    "state": {
+      "description": "Lifecycle discovery → active → maintain → archived, plus the source's project-definition state. See NOTES.md (Project lifecycle).",
+      "enum": ["discovery", "project-definition", "active", "maintain", "archived"]
+    }
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "proj-rove", "workspace_id": "ws-noncelogic", "name": "Rove",
+    "archetype": {"id": "arch-saas-product", "version": "1.0.0"},
+    "repos": ["repo-rove"], "tracker": {"kind": "internal"}, "state": "active"
+  }]
+}
