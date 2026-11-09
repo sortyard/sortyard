@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/chain.schema.json",
+  "title": "Chain",
+  "description": "Chain / Run: one task's passage through a workflow (§3.3), the ordered StageRuns. Pins the workflow version it started on and runs it to completion (§5.1a). Chains advance automatically; stalls are explicit Escalation objects. Revision rounds cap at four.",
+  "x-sortyard-design-ref": "§3.3, §5.1",
+  "x-sortyard-store": "state",
+  "type": "object",
+  "allOf": [{"$ref": "common.schema.json#/$defs/object_base"}],
+  "required": ["task_id", "workflow", "state", "stage_runs"],
+  "properties": {
+    "task_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "workflow": {"description": "Pinned workflow version.", "$ref": "common.schema.json#/$defs/versioned_ref"},
+    "state": {"enum": ["running", "stalled", "succeeded", "failed", "handed_back", "cancelled"]},
+    "current_stage": {"type": "string"},
+    "stage_runs": {
+      "description": "StageRun ids in execution order.",
+      "type": "array", "items": {"$ref": "common.schema.json#/$defs/ref"}
+    },
+    "revision_round": {"type": "integer", "minimum": 0, "maximum": 4},
+    "escalations": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/ref"}},
+    "lane_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "started_at": {"$ref": "common.schema.json#/$defs/timestamp"},
+    "finished_at": {"$ref": "common.schema.json#/$defs/timestamp"}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "chain-287-1", "workspace_id": "ws-noncelogic", "task_id": "task-harness-287",
+    "workflow": {"id": "wf-job", "version": "1.0.0"}, "state": "running", "current_stage": "build",
+    "stage_runs": ["sr-287-build-1"], "revision_round": 0, "lane_id": "lane-conductor-harness",
+    "started_at": "2026-11-08T12:00:00Z"
+  }]
+}
