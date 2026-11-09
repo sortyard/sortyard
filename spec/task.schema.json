@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/task.schema.json",
+  "title": "Task",
+  "description": "The unit of work (§3.3), absorbing today's Plane work item and meta-harness task block into one object. The outcome states what, not how; verification lives in workflows/evals, so there is deliberately no acceptance-test field. Hand-back is a decision with a mandatory reason and evidence, never a label.",
+  "x-sortyard-design-ref": "§3.3",
+  "x-sortyard-store": "state",
+  "type": "object",
+  "allOf": [
+    {"$ref": "common.schema.json#/$defs/object_base"},
+    {"if": {"properties": {"state": {"const": "blocked"}}, "required": ["state"]},
+     "then": {"required": ["blocked_reason"]}},
+    {"if": {"properties": {"state": {"const": "handed_back"}}, "required": ["state"]},
+     "then": {"required": ["handback_reason", "handback_evidence"]}},
+    {"if": {"properties": {"state": {"const": "in_progress"}}, "required": ["state"]},
+     "then": {"required": ["stage"]}}
+  ],
+  "required": ["project_id", "title", "outcome", "origin", "priority", "state"],
+  "properties": {
+    "project_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "title": {"type": "string", "minLength": 1},
+    "outcome": {"description": "Outcome statement: what, not how.", "type": "string", "minLength": 1},
+    "body": {"description": "Spec/body.", "type": "string"},
+    "depends_on": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/ref"}, "uniqueItems": true},
+    "parent_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "children": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/ref"}, "uniqueItems": true},
+    "milestone_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "sequence": {
+      "description": "Explicit order inside the milestone (§3.3a.1); pickup reads it.",
+      "type": "integer", "minimum": 0
+    },
+    "board_sequence": {
+      "description": "Board sequence number, the age tie-break key (§3.5).",
+      "type": "integer", "minimum": 0
+    },
+    "priority": {
+      "type": "object",
+      "required": ["tier"],
+      "properties": {
+        "tier": {"$ref": "common.schema.json#/$defs/priority_tier"},
+        "urgent": {
+          "description": "urgent_flag key of the PrioritizationPolicy; urgent bypasses lane caps. See NOTES.md (urgent flag vs urgent tier).",
+          "type": "boolean", "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "labels": {"$ref": "common.schema.json#/$defs/labels"},
+    "origin": {"enum": ["human", "sensor", "grooming", "eval-finding", "chain"]},
+    "needs": {
+      "description": "Capabilities/credentials the work requires. A needs-blocked task stays visible; it is simply not eligible (HARNESS-238).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "name"],
+        "properties": {
+          "kind": {"enum": ["capability", "credential", "integration", "secret", "estate_precondition"]},
+          "name": {"type": "string", "minLength": 1},
+          "ref": {"$ref": "common.schema.json#/$defs/ref"},
+          "discharged": {"type": "boolean", "default": false}
+        },
+        "additionalProperties": false
+      }
+    },
+    "lane_id": {"description": "Assignee lane.", "$ref": "common.schema.json#/$defs/ref"},
+    "workflow": {"$ref": "common.schema.json#/$defs/versioned_ref"},
+    "design_ref": {"$ref": "common.schema.json#/$defs/ref"},
+    "state": {
+      "enum": ["backlog", "todo", "claimed", "in_progress", "in_review", "merging", "done",
+               "blocked", "handed_back", "cancelled"]
+    },
+    "stage": {"description": "Current workflow stage while in_progress.", "type": "string"},
+    "chain_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "blocked_reason": {"type": "string", "minLength": 1},
+    "handback_reason": {"type": "string", "minLength": 1},
+    "handback_evidence": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+    "self_heal_id": {"$ref": "common.schema.json#/$defs/ref"}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "task-harness-287", "workspace_id": "ws-noncelogic", "project_id": "proj-harness",
+    "title": "Freeze the domain model", "outcome": "Every §3 object has a JSON Schema in git.",
+    "depends_on": [], "milestone_id": "ms-phase-0", "sequence": 2, "board_sequence": 287,
+    "priority": {"tier": "high", "urgent": false}, "labels": ["sortyard"], "origin": "human",
+    "needs": [], "lane_id": "lane-conductor-harness", "state": "todo"
+  }, {
+    "id": "task-rove-12", "workspace_id": "ws-noncelogic", "project_id": "proj-rove",
+    "title": "Fix login redirect", "outcome": "Users land on their dashboard after login.",
+    "priority": {"tier": "normal"}, "origin": "sensor", "state": "handed_back",
+    "handback_reason": "CI log unreadable from the worker",
+    "handback_evidence": ["stage-run sr-91 transcript"], "self_heal_id": "sh-4"
+  }]
+}
