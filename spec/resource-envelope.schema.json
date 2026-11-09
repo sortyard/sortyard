@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/resource-envelope.schema.json",
+  "title": "ResourceEnvelope",
+  "description": "The bounded-blast-radius part of every ExecutionBinding (§3.7b): CPU/memory requests and limits on the Job (and its sidecars), a wall-clock deadline whose expiry kills the Job, and a heavy/light classification that admission caps read. An embedded value object of ExecutionBinding; it has no identity of its own.",
+  "x-sortyard-design-ref": "§3.7b",
+  "x-sortyard-store": "state",
+  "type": "object",
+  "required": ["class", "requests", "limits", "deadline_seconds"],
+  "properties": {
+    "class": {"enum": ["heavy", "light"]},
+    "requests": {"$ref": "#/$defs/resources"},
+    "limits": {"$ref": "#/$defs/resources"},
+    "deadline_seconds": {"type": "integer", "minimum": 1},
+    "sidecars": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "requests", "limits"],
+        "properties": {
+          "name": {"type": "string"},
+          "requests": {"$ref": "#/$defs/resources"},
+          "limits": {"$ref": "#/$defs/resources"}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "resources": {
+      "type": "object",
+      "required": ["cpu", "memory"],
+      "properties": {
+        "cpu": {"description": "Kubernetes CPU quantity.", "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?m?$"},
+        "memory": {"description": "Kubernetes memory quantity.", "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?(Ki|Mi|Gi|Ti|K|M|G|T)?$"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "examples": [{
+    "class": "heavy",
+    "requests": {"cpu": "2", "memory": "4Gi"}, "limits": {"cpu": "4", "memory": "6Gi"},
+    "deadline_seconds": 5400,
+    "sidecars": [{"name": "docker", "requests": {"cpu": "1", "memory": "2Gi"}, "limits": {"cpu": "4", "memory": "8Gi"}}]
+  }]
+}
