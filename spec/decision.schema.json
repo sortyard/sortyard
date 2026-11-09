@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/decision.schema.json",
+  "title": "Decision",
+  "description": "A first-class work type implementing the no-tap doctrine (§3.3): a question for the operator, a recorded default and a decide_by time. Silence past decide_by applies the default and closes the item unattended. Workflows branch on a Decision; they never block on a person.",
+  "x-sortyard-design-ref": "§3.3",
+  "x-sortyard-store": "state",
+  "type": "object",
+  "allOf": [
+    {"$ref": "common.schema.json#/$defs/object_base"},
+    {"if": {"properties": {"state": {"enum": ["answered", "defaulted"]}}, "required": ["state"]},
+     "then": {"required": ["resolution", "resolved_at"]}},
+    {"if": {"properties": {"state": {"const": "answered"}}, "required": ["state"]},
+     "then": {"required": ["answered_by"]}}
+  ],
+  "required": ["project_id", "question", "default", "decide_by", "state"],
+  "properties": {
+    "project_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "task_id": {"description": "Task or chain the decision steers, if any.", "$ref": "common.schema.json#/$defs/ref"},
+    "chain_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "question": {"type": "string", "minLength": 1},
+    "options": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "default": {"description": "The recorded default, applied when decide_by passes in silence.", "type": "string", "minLength": 1},
+    "decide_by": {"$ref": "common.schema.json#/$defs/timestamp"},
+    "state": {"enum": ["open", "answered", "defaulted"]},
+    "resolution": {"type": "string", "minLength": 1},
+    "answered_by": {"$ref": "common.schema.json#/$defs/actor"},
+    "answer_channel": {"enum": ["ui", "integration_comment", "api"]},
+    "resolved_at": {"$ref": "common.schema.json#/$defs/timestamp"}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "dec-7", "workspace_id": "ws-noncelogic", "project_id": "proj-harness",
+    "question": "Bundle Plane, fork it, or build the board natively?",
+    "options": ["bundle", "fork", "native"], "default": "native",
+    "decide_by": "2026-11-10T14:00:00Z", "state": "open"
+  }]
+}
