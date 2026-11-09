@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/event.schema.json",
+  "title": "Event",
+  "description": "One entry of the append-only Event Ledger, the system's spine (§3.8): every transition, decision, eval verdict, merge and deploy observation is an Event {ts, actor, object, transition, facts, refs}. OpenTelemetry export is a projection of the ledger.",
+  "x-sortyard-design-ref": "§3.8",
+  "x-sortyard-store": "state",
+  "type": "object",
+  "allOf": [{"$ref": "common.schema.json#/$defs/object_base"}],
+  "required": ["seq", "ts", "actor", "object", "transition", "facts", "refs"],
+  "properties": {
+    "seq": {"description": "Monotonic ledger position (append-only).", "type": "integer", "minimum": 0},
+    "ts": {"$ref": "common.schema.json#/$defs/timestamp"},
+    "actor": {"$ref": "common.schema.json#/$defs/actor"},
+    "object": {
+      "type": "object",
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {"description": "Domain object kind, e.g. task, chain, stage_run, decision.", "type": "string", "minLength": 1},
+        "id": {"$ref": "common.schema.json#/$defs/id"}
+      },
+      "additionalProperties": false
+    },
+    "transition": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "from": {"type": ["string", "null"]},
+        "to": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "facts": {"type": "object"},
+    "refs": {"type": "array", "items": {"type": "string"}}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "evt-991", "workspace_id": "ws-noncelogic", "seq": 991, "ts": "2026-11-08T12:00:00Z",
+    "actor": {"kind": "system", "id": "conductor"},
+    "object": {"kind": "task", "id": "task-harness-287"},
+    "transition": {"name": "claim", "from": "todo", "to": "claimed"},
+    "facts": {"lane": "lane-conductor-harness"}, "refs": ["decision-log:dl-5521"]
+  }]
+}
