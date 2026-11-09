@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/eval.schema.json",
+  "title": "Eval",
+  "description": "A named, versioned check (§3.8): subject, method, criteria, a mandatory absent-state, a posture (advisory by default; the standing battery never gates) and the resource rule — one heavy eval at a time per host, and eval conditions must not manufacture what they measure.",
+  "x-sortyard-design-ref": "§3.8",
+  "x-sortyard-store": "definition",
+  "type": "object",
+  "allOf": [{"$ref": "common.schema.json#/$defs/definition_base"}],
+  "required": ["name", "subject", "method", "criteria", "absent_state", "posture"],
+  "properties": {
+    "name": {"type": "string", "minLength": 1},
+    "subject": {"enum": ["stage_output", "chain", "product"]},
+    "method": {"enum": ["deterministic", "agent-judge", "human"]},
+    "criteria": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+    "absent_state": {"$ref": "common.schema.json#/$defs/absent_state"},
+    "posture": {"enum": ["advisory", "gating"], "default": "advisory"},
+    "heavy": {"description": "Heavy evals run one at a time per host.", "type": "boolean", "default": false},
+    "pack_id": {"description": "Eval pack (Extension) this eval ships in.", "$ref": "common.schema.json#/$defs/ref"}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "eval-deploy-green", "workspace_id": "ws-noncelogic", "version": "1.0.0", "name": "deployed head is green",
+    "subject": "product", "method": "deterministic", "criteria": ["current head has a green deploy"],
+    "absent_state": {"behaviour": "record", "reason_code": "no_deploy_observed"}, "posture": "advisory"
+  }]
+}
