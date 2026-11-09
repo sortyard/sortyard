@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/scorecard-battery.schema.json",
+  "title": "ScorecardBattery",
+  "description": "Today's standing eval instrument as a first-class eval pack (§3.8): scored at verify time, advisory and never gating; evidence assembled mechanically from chain facts; taste never machine-graded; supports source-excluded grading; a lone delivery is unscored until a comparable baseline corpus exists.",
+  "x-sortyard-design-ref": "§3.8",
+  "x-sortyard-store": "definition",
+  "type": "object",
+  "allOf": [{"$ref": "common.schema.json#/$defs/definition_base"}],
+  "required": ["name", "evals", "baseline_corpus"],
+  "properties": {
+    "name": {"type": "string", "minLength": 1},
+    "evals": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/versioned_ref"}, "minItems": 1},
+    "scored_at": {"const": "verify", "default": "verify"},
+    "posture": {"const": "advisory", "default": "advisory"},
+    "evidence_assembly": {"const": "mechanical_from_chain_facts", "default": "mechanical_from_chain_facts"},
+    "taste_machine_graded": {"const": false, "default": false},
+    "grading_mode": {"enum": ["coupled", "source_excluded"], "default": "source_excluded"},
+    "baseline_corpus": {
+      "type": "object",
+      "required": ["state"],
+      "properties": {
+        "state": {"enum": ["none", "partial", "comparable"]},
+        "ref": {"type": "string"},
+        "size": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "unscored_without_baseline": {"const": true, "default": true}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "battery-standing", "workspace_id": "ws-noncelogic", "version": "1.0.0", "name": "standing scorecard battery",
+    "evals": [{"id": "eval-deploy-green", "version": "1.0.0"}], "grading_mode": "source_excluded",
+    "baseline_corpus": {"state": "partial", "size": 12}
+  }]
+}
