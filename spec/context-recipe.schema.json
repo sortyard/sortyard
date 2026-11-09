@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/context-recipe.schema.json",
+  "title": "ContextRecipe",
+  "description": "Defines, per project/worktype/role, which domain objects, documents and skills an agent's context packet includes, in what order, with what token budget (§3.7a Context Assembly). Built from an allowlist, never retrieval over a vault. Every StageRun records the exact packet (hash + content ref); the goldfish test is a checkable property.",
+  "x-sortyard-design-ref": "§3.7a, §3.7b",
+  "x-sortyard-store": "definition",
+  "type": "object",
+  "allOf": [{"$ref": "common.schema.json#/$defs/definition_base"}],
+  "required": ["worktype", "role", "items", "token_budget"],
+  "properties": {
+    "project_id": {"description": "Omitted for an installation-wide recipe.", "$ref": "common.schema.json#/$defs/ref"},
+    "worktype": {"description": "Workflow (and optionally stage) this recipe serves.", "type": "string", "minLength": 1},
+    "role": {"$ref": "common.schema.json#/$defs/versioned_ref"},
+    "items": {
+      "description": "Allowlist in inclusion order.",
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["kind", "ref"],
+        "properties": {
+          "kind": {"enum": ["domain_object", "document", "skill"]},
+          "ref": {"type": "string", "minLength": 1},
+          "required": {"type": "boolean", "default": true},
+          "max_tokens": {"type": "integer", "minimum": 0}
+        },
+        "additionalProperties": false
+      }
+    },
+    "token_budget": {"type": "integer", "minimum": 1},
+    "goldfish_test": {"description": "Packet + referenced dossier must suffice for a zero-context agent.", "type": "boolean", "default": true}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "ctx-feature-build", "workspace_id": "ws-noncelogic", "version": "1.0.0",
+    "worktype": "feature/build", "role": {"id": "role-implementer", "version": "1.0.0"},
+    "items": [{"kind": "domain_object", "ref": "task"}, {"kind": "document", "ref": "design_ref"}, {"kind": "skill", "ref": "skill-tdd"}],
+    "token_budget": 60000
+  }]
+}
