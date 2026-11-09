@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/milestone.schema.json",
+  "title": "Milestone",
+  "description": "Ordered grouping of tasks (§3.3). Milestones run in an explicit per-project order and tasks carry an explicit sequence inside their milestone (§3.3a.1). An unsequenced milestone behind a finished one is shaping debt.",
+  "x-sortyard-design-ref": "§3.3, §3.3a",
+  "x-sortyard-store": "state",
+  "type": "object",
+  "allOf": [{"$ref": "common.schema.json#/$defs/object_base"}],
+  "required": ["project_id", "name", "sequence", "state"],
+  "properties": {
+    "project_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "name": {"type": "string", "minLength": 1},
+    "description": {"type": "string"},
+    "sequence": {"description": "Milestone order within the project.", "type": "integer", "minimum": 0},
+    "tasks": {
+      "description": "Task ids in their explicit sequence order.",
+      "type": "array", "items": {"$ref": "common.schema.json#/$defs/ref"}, "uniqueItems": true
+    },
+    "sequenced": {"description": "False marks shaping debt surfaced by grooming.", "type": "boolean"},
+    "state": {"enum": ["planned", "active", "done"]}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "ms-phase-0", "workspace_id": "ws-noncelogic", "project_id": "proj-harness",
+    "name": "Sortyard Phase 0", "sequence": 1, "tasks": ["task-harness-286", "task-harness-287"],
+    "sequenced": true, "state": "active"
+  }]
+}
