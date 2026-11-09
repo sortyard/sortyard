@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/execution-binding.schema.json",
+  "title": "ExecutionBinding",
+  "description": "The resolved, verified answer for a (task, stage) pair, produced before the conductor may claim (§3.7b): right workflow, right context, right skills, right place, all dependencies brought to bear, and a bounded blast radius (ResourceEnvelope). An incomplete binding makes the task ineligible with a specific reason code; the task stays visible.",
+  "x-sortyard-design-ref": "§3.7b",
+  "x-sortyard-store": "state",
+  "type": "object",
+  "allOf": [
+    {"$ref": "common.schema.json#/$defs/object_base"},
+    {"if": {"properties": {"state": {"const": "bound"}}, "required": ["state"]},
+     "then": {"required": ["context", "place", "resource_envelope"], "properties": {"unbound_reasons": {"maxItems": 0}}}},
+    {"if": {"properties": {"state": {"const": "unbound"}}, "required": ["state"]},
+     "then": {"required": ["unbound_reasons"], "properties": {"unbound_reasons": {"minItems": 1}}}}
+  ],
+  "required": ["task_id", "stage", "state", "workflow", "role", "computed_at"],
+  "properties": {
+    "task_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "stage": {"type": "string", "minLength": 1},
+    "state": {"enum": ["bound", "unbound"]},
+    "unbound_reasons": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code"],
+        "properties": {
+          "code": {
+            "enum": ["no_approved_design_ref", "skill_not_installed", "mirror_stale", "credential_pool_empty",
+                     "dependency_has_no_artifact", "dependency_not_done", "parent_in_backlog",
+                     "need_not_discharged", "secret_ref_unresolvable", "estate_precondition_missing",
+                     "context_packet_failed"]
+          },
+          "subject": {"description": "Named subject, e.g. skill@version or dependency task id.", "type": "string"},
+          "detail": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "workflow": {"$ref": "common.schema.json#/$defs/versioned_ref"},
+    "role": {"$ref": "common.schema.json#/$defs/versioned_ref"},
+    "context": {
+      "type": "object",
+      "required": ["recipe", "packet_hash"],
+      "properties": {
+        "recipe": {"$ref": "common.schema.json#/$defs/versioned_ref"},
+        "packet_hash": {"$ref": "common.schema.json#/$defs/content_hash"},
+        "packet_ref": {"type": "string"},
+        "provenance_checked": {"type": "boolean"},
+        "goldfish_passed": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "skills": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "version", "installed", "enabled"],
+        "properties": {
+          "id": {"$ref": "common.schema.json#/$defs/id"},
+          "version": {"$ref": "common.schema.json#/$defs/version"},
+          "installed": {"type": "boolean"},
+          "enabled": {"type": "boolean"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "place": {
+      "type": "object",
+      "required": ["lane_id", "cluster", "namespace", "agent", "model", "mirror"],
+      "properties": {
+        "lane_id": {"$ref": "common.schema.json#/$defs/ref"},
+        "cluster": {"type": "string"},
+        "namespace": {"type": "string"},
+        "agent": {"$ref": "common.schema.json#/$defs/versioned_ref"},
+        "worker_image": {"type": "string"},
+        "harness": {"enum": ["claude-code", "codex", "hermes", "custom"]},
+        "model": {"type": "string"},
+        "effort": {"enum": ["low", "medium", "high", "xhigh", "max"]},
+        "budget_key_ref": {"$ref": "common.schema.json#/$defs/secret_ref"},
+        "credential_pool_ref": {"$ref": "common.schema.json#/$defs/ref"},
+        "credential_refs": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/secret_ref"}},
+        "workdir": {"description": "Isolated per-job workdir.", "type": "string"},
+        "mirror": {
+          "type": "object",
+          "required": ["mirror_id", "fresh", "observed_at"],
+          "properties": {
+            "mirror_id": {"$ref": "common.schema.json#/$defs/ref"},
+            "fresh": {"type": "boolean"},
+            "head": {"type": "string"},
+            "observed_at": {"$ref": "common.schema.json#/$defs/timestamp"}
+          },
+          "additionalProperties": false
+        },
+        "replica_definition": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "dependencies": {
+      "type": "object",
+      "properties": {
+        "depends_on": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["task_id", "done", "artifacts"],
+            "properties": {
+              "task_id": {"$ref": "common.schema.json#/$defs/ref"},
+              "done": {"type": "boolean"},
+              "artifacts": {"type": "array", "items": {"type": "string"}}
+            },
+            "additionalProperties": false
+          }
+        },
+        "parent_not_in_backlog": {"type": "boolean"},
+        "design_ref": {
+          "type": "object",
+          "required": ["id", "approved"],
+          "properties": {"id": {"$ref": "common.schema.json#/$defs/ref"}, "approved": {"type": "boolean"}},
+          "additionalProperties": false
+        },
+        "needs_discharged": {"type": "array", "items": {"type": "string"}},
+        "secret_refs": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/secret_ref"}},
+        "estate_preconditions": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/ref"}}
+      },
+      "additionalProperties": false
+    },
+    "resource_envelope": {"$ref": "resource-envelope.schema.json"},
+    "conductor_pass_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "computed_at": {"$ref": "common.schema.json#/$defs/timestamp"}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "eb-287-build", "workspace_id": "ws-noncelogic", "task_id": "task-harness-287", "stage": "build",
+    "state": "bound", "unbound_reasons": [],
+    "workflow": {"id": "wf-job", "version": "1.0.0"}, "role": {"id": "role-implementer", "version": "1.0.0"},
+    "context": {"recipe": {"id": "ctx-feature-build", "version": "1.0.0"},
+                "packet_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+                "goldfish_passed": true},
+    "skills": [],
+    "place": {"lane_id": "lane-conductor-harness", "cluster": "k3s-azure-01", "namespace": "sortyard-jobs",
+              "agent": {"id": "agent-claude-build", "version": "1.0.0"}, "harness": "claude-code",
+              "model": "claude-opus-5-5", "credential_pool_ref": "pool-claude", "workdir": "/work/runs/cond-287",
+              "mirror": {"mirror_id": "mirror-harness", "fresh": true, "observed_at": "2026-11-08T11:59:00Z"}},
+    "dependencies": {"depends_on": [], "parent_not_in_backlog": true},
+    "resource_envelope": {"class": "heavy", "requests": {"cpu": "2", "memory": "4Gi"}, "limits": {"cpu": "4", "memory": "6Gi"}, "deadline_seconds": 5400},
+    "computed_at": "2026-11-08T12:00:00Z"
+  }, {
+    "id": "eb-rove-12-build", "workspace_id": "ws-noncelogic", "task_id": "task-rove-12", "stage": "build",
+    "state": "unbound", "unbound_reasons": [{"code": "skill_not_installed", "subject": "skill-playwright@2.1.0"}],
+    "workflow": {"id": "wf-feature", "version": "1.0.0"}, "role": {"id": "role-implementer", "version": "1.0.0"},
+    "computed_at": "2026-11-08T12:00:00Z"
+  }]
+}
