@@ -18,8 +18,27 @@ jobs:
   python:
     name: lint, typecheck, test
     runs-on: ubuntu-latest
+    # The migration + ledger tests (tests/test_migrations.py) need a real Postgres; they are
+    # required here, never skipped.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       SORTYARD_REQUIRE_HELM: "1"
+      SORTYARD_REQUIRE_POSTGRES: "1"
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -29,7 +48,11 @@ jobs:
         with:
           version: v3.16.3
       - name: Install
-        run: pip install -e '.[dev]'
+        run: |
+          pip install -e '.[dev]'
+          command -v psql || (sudo apt-get update && sudo apt-get install -y postgresql-client)
+      - name: Generated models match the schemas
+        run: python -m sortyard.models.codegen --check
       - name: Lint
         run: |
           ruff check .

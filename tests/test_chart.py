@@ -74,7 +74,15 @@ def test_deploys_postgres_with_persistent_storage() -> None:
 
 def test_deploys_nothing_else_yet() -> None:
     kinds = sorted(d["kind"] for d in render())
-    assert kinds == ["Deployment", "Secret", "Service", "Service", "StatefulSet"]
+    assert kinds == [
+        "ConfigMap",
+        "Deployment",
+        "Job",
+        "Secret",
+        "Service",
+        "Service",
+        "StatefulSet",
+    ]
 
 
 def test_external_postgres_drops_the_bundled_one() -> None:
@@ -92,6 +100,10 @@ def test_external_postgres_drops_the_bundled_one() -> None:
     env = {e["name"]: e for e in deploy["spec"]["template"]["spec"]["containers"][0]["env"]}
     assert env["SORTYARD_DATABASE_HOST"]["value"] == "db.example"
     assert env["SORTYARD_DATABASE_PASSWORD"]["valueFrom"]["secretKeyRef"]["name"] == "pg"
+    (job,) = by_kind(docs, "Job")
+    job_env = {e["name"]: e for e in job["spec"]["template"]["spec"]["containers"][0]["env"]}
+    assert job_env["PGHOST"]["value"] == "db.example"
+    assert job_env["PGPASSWORD"]["valueFrom"]["secretKeyRef"]["name"] == "pg"
 
 
 def test_image_defaults_to_the_chart_app_version() -> None:
@@ -105,3 +117,42 @@ def test_app_version_matches_the_package() -> None:
     from sortyard import __version__
 
     assert yaml.safe_load((CHART / "Chart.yaml").read_text())["appVersion"] == __version__
+
+
+MIGRATIONS = CHART / "migrations"
+
+
+def test_migrations_run_as_a_hook_job_on_install_and_upgrade() -> None:
+    docs = render()
+    (job,) = by_kind(docs, "Job")
+    assert job["metadata"]["name"] == "sy-sortyard-migrate"
+    annotations = job["metadata"]["annotations"]
+    assert set(annotations["helm.sh/hook"].split(",")) == {"post-install", "post-upgrade"}
+    assert "before-hook-creation" in annotations["helm.sh/hook-delete-policy"]
+    pod = job["spec"]["template"]["spec"]
+    assert pod["restartPolicy"] == "Never"
+    (container,) = pod["containers"]
+    assert container["image"].startswith("postgres:")
+    assert container["command"] == ["sh", "/migrations/migrate.sh", "/migrations"]
+    env = {e["name"]: e for e in container["env"]}
+    assert env["PGHOST"]["value"] == "sy-sortyard-postgres"
+    assert env["PGPORT"]["value"] == "5432"
+    assert env["PGDATABASE"]["value"] == "sortyard"
+    assert env["PGUSER"]["value"] == "sortyard"
+    assert env["PGPASSWORD"]["valueFrom"]["secretKeyRef"] == {
+        "name": "sy-sortyard-postgres",
+        "key": "password",
+    }
+    (mount,) = container["volumeMounts"]
+    assert mount["mountPath"] == "/migrations"
+    (volume,) = pod["volumes"]
+    assert volume["configMap"]["name"] == "sy-sortyard-migrations"
+
+
+def test_the_job_ships_every_migration_verbatim() -> None:
+    (cm,) = by_kind(render(), "ConfigMap")
+    assert cm["metadata"]["name"] == "sy-sortyard-migrations"
+    files = {p.name: p.read_text() for p in MIGRATIONS.iterdir()}
+    assert "migrate.sh" in files
+    assert any(name.endswith(".sql") for name in files)
+    assert cm["data"] == files
