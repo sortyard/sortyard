@@ -1,0 +1,82 @@
+{{- /*
+Schema migrations (design §4: "upgrades = chart version bumps with DB migrations as Jobs").
+The SQL files and their runner ship in this ConfigMap, byte for byte from migrations/; the Job
+runs them with the Postgres image's psql after every install and upgrade. Helm waits for the
+Job; its previous run is replaced when the next one starts, so its logs stay readable until then.
+*/ -}}
+{{- $fullname := include "sortyard.fullname" . }}
+{{- $selector := dict "root" . "component" "migrate" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-migrations
+  labels:
+    {{- include "sortyard.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrate
+data:
+  {{- (.Files.Glob "migrations/*").AsConfig | nindent 2 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $fullname }}-migrate
+  labels:
+    {{- include "sortyard.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrate
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: {{ .Values.migrations.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.migrations.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "sortyard.labels" . | nindent 8 }}
+        app.kubernetes.io/component: migrate
+    spec:
+      restartPolicy: Never
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        # The postgres user of the (alpine) Postgres image.
+        runAsUser: 70
+      containers:
+        - name: migrate
+          image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}"
+          imagePullPolicy: {{ .Values.postgres.image.pullPolicy }}
+          command: ["sh", "/migrations/migrate.sh", "/migrations"]
+          env:
+            - name: PGHOST
+              value: {{ include "sortyard.postgres.host" . | quote }}
+            - name: PGPORT
+              value: {{ include "sortyard.postgres.port" . | quote }}
+            - name: PGDATABASE
+              value: {{ .Values.postgres.database | quote }}
+            - name: PGUSER
+              value: {{ .Values.postgres.auth.username | quote }}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sortyard.postgres.secretName" . }}
+                  key: password
+            - name: SORTYARD_MIGRATE_WAIT_SECONDS
+              value: {{ .Values.migrations.waitSeconds | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            {{- toYaml .Values.migrations.resources | nindent 12 }}
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+              readOnly: true
+      volumes:
+        - name: migrations
+          configMap:
+            name: {{ $fullname }}-migrations

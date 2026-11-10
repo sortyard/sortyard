@@ -49,3 +49,18 @@ postgres:
       memory: 256Mi
     limits:
       memory: 1Gi
+
+# The schema migration Job: applies charts/sortyard/migrations/ with the psql of the
+# postgres.image above (also when postgres.enabled=false) after every install and upgrade.
+migrations:
+  # How long the Job waits for Postgres to accept connections (a fresh install starts both
+  # together).
+  waitSeconds: 300
+  backoffLimit: 3
+  activeDeadlineSeconds: 900
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi

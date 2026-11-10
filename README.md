@@ -7,8 +7,9 @@ decided in [`DECISIONS.md`](DECISIONS.md) (SY-DEC-001); the frozen domain model 
 contract are in [`spec/`](spec/).
 
 This repository is at the **Phase 1 skeleton**: the six services exist as entry points, the
-API service answers health/readiness/info, and the chart installs the API plus Postgres. No
-domain behaviour yet — see [`MILESTONES.md`](MILESTONES.md) for what lands next.
+API service answers health/readiness/info, and the chart installs the API plus Postgres with
+the §3 domain schema and the event ledger migrated in. No domain behaviour yet — see
+[`MILESTONES.md`](MILESTONES.md) for what lands next.
 
 ## Quickstart — a running, empty Sortyard on a local cluster
 
@@ -26,7 +27,9 @@ kind create cluster --name sortyard
 docker build -t ghcr.io/sortyard/sortyard:0.1.0 .
 kind load docker-image ghcr.io/sortyard/sortyard:0.1.0 --name sortyard
 
-# 3. Install: the API service + Postgres, configured by charts/sortyard/values.yaml.
+# 3. Install: the API service + Postgres, configured by charts/sortyard/values.yaml. Helm
+#    returns once the migration Job has created the schema in the empty database
+#    (its log: kubectl logs job/sortyard-migrate).
 helm install sortyard charts/sortyard
 kubectl rollout status statefulset/sortyard-postgres --timeout=180s
 kubectl rollout status deployment/sortyard-api --timeout=180s
@@ -53,8 +56,40 @@ ruff check . && ruff format --check .   # lint
 mypy                                     # strict typecheck
 pytest                                   # tests/ (chart tests need helm on PATH)
 pytest spec                              # the Phase 0 schema + OpenAPI tests
+python -m sortyard.models.codegen --check   # generated models match spec/ (CI fails on drift)
 sortyard-api                             # serves on :8080; SORTYARD_DATABASE_HOST/PORT locate Postgres
 ```
+
+The migration and ledger tests (`tests/test_migrations.py`) run against a real Postgres and
+are skipped without one. Point them at any server you may create databases on, using the
+standard libpq variables (each run creates and drops its own database):
+
+```sh
+docker run -d --name sortyard-pg -e POSTGRES_PASSWORD=pw -p 5432:5432 postgres:16-alpine
+PGHOST=localhost PGUSER=postgres PGPASSWORD=pw pytest tests/test_migrations.py   # needs psql
+```
+
+## Data model
+
+The §3 domain objects are frozen as JSON Schemas in [`spec/`](spec/), and everything else is
+derived from them:
+
+- **Python models** — `sortyard.models` holds one frozen dataclass per object (and per nested
+  shape), generated into `src/sortyard/models/_generated.py` by `python -m
+  sortyard.models.codegen`. Never edit that file: change the schema, regenerate, commit both.
+  `Model.from_dict()` / `to_dict()` convert to and from the schema's JSON form;
+  `sortyard.models.MODELS` maps each schema file to its model.
+- **Postgres** — [`charts/sortyard/migrations/`](charts/sortyard/migrations/) holds numbered SQL
+  migrations, applied in order by `migrate.sh`, which the chart runs as a Job after every
+  install and upgrade. Each §3 object has a table in the `sortyard` schema whose `doc` JSONB
+  column is the object exactly as its schema defines it; the other columns are generated from
+  `doc`. Definitions are keyed by `(id, version)` and are immutable; everything else by `id`.
+  A released migration is never edited: the runner refuses one whose file changed.
+- **Event ledger** — `sortyard.event` is append-only (UPDATE, DELETE and TRUNCATE are refused;
+  the same holds for the DecisionLog and AuditLog). `SELECT sortyard.append_event(doc)` assigns
+  the event its `seq` and is idempotent: the same event appended twice records once, while
+  reusing an id for different content is refused. `sortyard.object_history(kind, id)` returns
+  one object's events in ledger order.
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the same checks on every pull
 request and every push to `main`, plus `helm lint`/`helm template` and a container build.
@@ -64,7 +99,9 @@ request and every push to `main`, plus `helm lint`/`helm template` and a contain
 | Path | What |
 |---|---|
 | `src/sortyard/services/` | The six services (§4), one console script each: `sortyard-api`, `sortyard-conductor`, `sortyard-context-assembler`, `sortyard-eval-runner`, `sortyard-sensor-runner`, `sortyard-integrator`. All but the API are stubs that start, log and idle. |
-| `charts/sortyard/` | The Helm chart: API Deployment + Service, Postgres StatefulSet + Service + Secret. |
+| `src/sortyard/models/` | The §3 data models, generated from `spec/` (`codegen.py` is the generator). |
+| `charts/sortyard/` | The Helm chart: API Deployment + Service, Postgres StatefulSet + Service + Secret, the migration Job. |
+| `charts/sortyard/migrations/` | The SQL migrations (§3 tables + event ledger) and `migrate.sh`, the Job's runner. |
 | `Dockerfile` | One image for every service; the Deployment's `command` picks the entry point. |
 | `spec/` | Phase 0: the §3 JSON Schemas and the OpenAPI spec, with their tests. |
 | `tests/` | Tests for the package, chart, CI and this quickstart. |

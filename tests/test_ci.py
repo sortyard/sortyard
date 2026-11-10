@@ -47,3 +47,14 @@ def test_runs_lint_typecheck_tests_chart_and_image() -> None:
 
 def test_chart_tests_are_required_in_ci_not_skipped() -> None:
     assert "SORTYARD_REQUIRE_HELM" in WORKFLOW.read_text()
+
+
+def test_database_tests_run_against_a_real_postgres_in_ci() -> None:
+    python = load()["jobs"]["python"]
+    assert python["services"]["postgres"]["image"].startswith("postgres:")
+    assert python["env"]["SORTYARD_REQUIRE_POSTGRES"] == "1"
+    assert python["env"]["PGHOST"]
+
+
+def test_ci_fails_when_generated_models_drift_from_the_schemas() -> None:
+    assert "python -m sortyard.models.codegen --check" in all_run_lines()
