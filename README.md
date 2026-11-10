@@ -68,6 +68,7 @@ request and every push to `main`, plus `helm lint`/`helm template` and a contain
 | `Dockerfile` | One image for every service; the Deployment's `command` picks the entry point. |
 | `spec/` | Phase 0: the §3 JSON Schemas and the OpenAPI spec, with their tests. |
 | `tests/` | Tests for the package, chart, CI and this quickstart. |
+| `docs/goldfish/` | Goldfish reports: a zero-context agent runs the documented install and files every point of friction (Phase 1: [`phase-1-install-smoke.md`](docs/goldfish/phase-1-install-smoke.md)). |
 
 ## Project charter
 
