@@ -21,3 +21,16 @@ def test_quickstart_reaches_a_running_empty_system() -> None:
         "pip install -e '.[dev]'",
     ):
         assert step in quickstart, step
+
+
+def test_runbook_starts_and_stops_the_shadow_conductor() -> None:
+    readme = (ROOT / "README.md").read_text()
+    assert "## Shadow conductor" in readme
+    runbook = readme.split("## Shadow conductor", 1)[1].split("\n## ", 1)[0]
+    for step in (
+        "--set shadow.enabled=true",
+        "--set shadow.enabled=false",
+        "kubectl logs -f deployment/sortyard-shadow-conductor",
+        "sortyard.decision_log",
+    ):
+        assert step in runbook, step

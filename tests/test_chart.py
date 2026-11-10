@@ -156,3 +156,78 @@ def test_the_job_ships_every_migration_verbatim() -> None:
     assert "migrate.sh" in files
     assert any(name.endswith(".sql") for name in files)
     assert cm["data"] == files
+
+
+SHADOW_SNAPSHOT = ("--set", "shadow.enabled=true", "--set", "shadow.snapshot=http://cp/board.json")
+
+
+def shadow_deployment(docs: list[dict[str, Any]]) -> dict[str, Any]:
+    (deploy,) = [d for d in by_kind(docs, "Deployment") if "shadow" in d["metadata"]["name"]]
+    return deploy
+
+
+def test_shadow_conductor_is_off_by_default() -> None:
+    names = [d["metadata"]["name"] for d in by_kind(render(), "Deployment")]
+    assert names == ["sy-sortyard-api"]
+
+
+def test_shadow_conductor_runs_one_read_only_replica() -> None:
+    deploy = shadow_deployment(render(*SHADOW_SNAPSHOT))
+    assert deploy["metadata"]["name"] == "sy-sortyard-shadow-conductor"
+    assert deploy["spec"]["replicas"] == 1
+    assert deploy["spec"]["strategy"]["type"] == "Recreate"
+    pod = deploy["spec"]["template"]["spec"]
+    # No Kubernetes credentials: it touches nothing in the cluster.
+    assert pod["automountServiceAccountToken"] is False
+    (container,) = pod["containers"]
+    assert container["command"] == ["sortyard-conductor", "--shadow", "--interval", "300"]
+    env = {e["name"]: e for e in container["env"]}
+    assert env["SORTYARD_SHADOW_SOURCE"]["value"] == "snapshot"
+    assert env["SORTYARD_SHADOW_SNAPSHOT"]["value"] == "http://cp/board.json"
+    assert env["SORTYARD_DATABASE_HOST"]["value"] == "sy-sortyard-postgres"
+    assert "secretKeyRef" in env["SORTYARD_DATABASE_PASSWORD"]["valueFrom"]
+
+
+def test_shadow_conductor_reads_plane_with_a_read_only_key_and_mounted_lanes() -> None:
+    deploy = shadow_deployment(
+        render(
+            "--set",
+            "shadow.enabled=true",
+            "--set",
+            "shadow.source=plane",
+            "--set",
+            "shadow.plane.url=https://plane.example",
+            "--set",
+            "shadow.plane.workspace=noncelogic",
+            "--set",
+            "shadow.plane.projects={p1,p2}",
+            "--set",
+            "shadow.plane.apiKeySecret=plane-read",
+            "--set",
+            "shadow.lanes.configMap=conductor-config",
+        )
+    )
+    pod = deploy["spec"]["template"]["spec"]
+    (container,) = pod["containers"]
+    env = {e["name"]: e for e in container["env"]}
+    assert env["SORTYARD_SHADOW_PLANE_PROJECTS"]["value"] == "p1,p2"
+    assert env["SORTYARD_SHADOW_PLANE_API_KEY"]["valueFrom"]["secretKeyRef"] == {
+        "name": "plane-read",
+        "key": "api-key",
+    }
+    assert env["SORTYARD_SHADOW_LANES"]["value"] == "/lanes/products.json"
+    (mount,) = container["volumeMounts"]
+    assert mount == {"name": "lanes", "mountPath": "/lanes", "readOnly": True}
+    (volume,) = pod["volumes"]
+    assert volume["configMap"]["name"] == "conductor-config"
+
+
+def test_shadow_conductor_refuses_to_render_without_an_input_path() -> None:
+    assert HELM is not None
+    proc = subprocess.run(
+        [HELM, "template", "sy", str(CHART), "--set", "shadow.enabled=true"],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode != 0
+    assert "shadow.snapshot is required" in proc.stderr
