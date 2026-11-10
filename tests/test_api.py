@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import socket
 import threading
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Iterator
@@ -15,15 +16,42 @@ from sortyard import __version__
 from sortyard.services import SERVICES, api
 
 
-def free_port() -> int:
+@pytest.fixture
+def refused_port() -> Iterator[int]:
+    """A port this test owns that refuses connections: bound but never listening.
+
+    Holding the socket open for the whole test stops any other process claiming the port,
+    so a connection to it is reliably refused.
+    """
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         port: int = s.getsockname()[1]
-        return port
+        yield port
+
+
+def recv_exactly(conn: socket.socket, n: int, timeout: float) -> bytes | None:
+    """Read exactly ``n`` bytes, tolerating TCP splitting them; None on EOF or deadline."""
+    deadline = time.monotonic() + timeout
+    buf = b""
+    while len(buf) < n:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return None
+        conn.settimeout(remaining)
+        try:
+            chunk = conn.recv(n - len(buf))
+        except (TimeoutError, OSError):
+            return None
+        if not chunk:
+            return None
+        buf += chunk
+    return buf
 
 
 class FakePostgres:
     """Answers the Postgres SSLRequest the way a real server without TLS does: one byte, 'N'."""
+
+    REQUEST_TIMEOUT_SECONDS = 5.0
 
     def __init__(self) -> None:
         self.sock = socket.socket()
@@ -39,7 +67,8 @@ class FakePostgres:
             except OSError:
                 return
             with conn:
-                if conn.recv(8) == api.SSL_REQUEST:
+                request = recv_exactly(conn, len(api.SSL_REQUEST), self.REQUEST_TIMEOUT_SECONDS)
+                if request == api.SSL_REQUEST:
                     conn.sendall(b"N")
 
     def close(self) -> None:
@@ -74,16 +103,35 @@ def postgres() -> Iterator[FakePostgres]:
     pg.close()
 
 
-def test_healthz_is_ok_without_a_database() -> None:
-    base, server = serve(free_port())
+def test_fake_postgres_answers_an_ssl_request_split_across_segments(
+    postgres: FakePostgres,
+) -> None:
+    with socket.create_connection(("127.0.0.1", postgres.port), timeout=5) as conn:
+        conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        for byte in api.SSL_REQUEST:
+            conn.sendall(bytes([byte]))
+            time.sleep(0.01)
+        assert conn.recv(1) == b"N"
+
+
+def test_recv_exactly_reports_early_eof() -> None:
+    a, b = socket.socketpair()
+    with a, b:
+        b.sendall(api.SSL_REQUEST[:3])
+        b.close()
+        assert recv_exactly(a, len(api.SSL_REQUEST), 1.0) is None
+
+
+def test_healthz_is_ok_without_a_database(refused_port: int) -> None:
+    base, server = serve(refused_port)
     try:
         assert get(f"{base}/healthz") == (200, {"status": "ok"})
     finally:
         server.shutdown()
 
 
-def test_readyz_refuses_when_postgres_is_unreachable() -> None:
-    base, server = serve(free_port())
+def test_readyz_refuses_when_postgres_is_unreachable(refused_port: int) -> None:
+    base, server = serve(refused_port)
     try:
         status, body = get(f"{base}/readyz")
         assert status == 503
@@ -113,8 +161,8 @@ def test_readyz_refuses_a_listener_that_is_not_postgres() -> None:
         silent.close()
 
 
-def test_info_names_the_version_and_services() -> None:
-    base, server = serve(free_port())
+def test_info_names_the_version_and_services(refused_port: int) -> None:
+    base, server = serve(refused_port)
     try:
         status, body = get(f"{base}/v1/info")
         assert status == 200
@@ -123,8 +171,8 @@ def test_info_names_the_version_and_services() -> None:
         server.shutdown()
 
 
-def test_unknown_path_is_404() -> None:
-    base, server = serve(free_port())
+def test_unknown_path_is_404(refused_port: int) -> None:
+    base, server = serve(refused_port)
     try:
         status, body = get(f"{base}/nope")
         assert status == 404
