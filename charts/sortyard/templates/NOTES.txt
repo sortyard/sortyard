@@ -1,0 +1,10 @@
+Sortyard {{ .Chart.AppVersion }} is installing in namespace {{ .Release.Namespace }}.
+
+Wait for the API to report ready (it waits on Postgres):
+
+  kubectl -n {{ .Release.Namespace }} rollout status deploy/{{ include "sortyard.fullname" . }}-api
+
+Then reach it:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "sortyard.fullname" . }}-api 8080:{{ .Values.api.service.port }}
+  curl http://localhost:8080/readyz

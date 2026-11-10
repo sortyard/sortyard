@@ -1,0 +1,9 @@
+apiVersion: v2
+name: sortyard
+description: Sortyard delivery harness — API service + Postgres (Phase 1 skeleton).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://sortyard.ai
+sources:
+  - https://github.com/sortyard/sortyard
