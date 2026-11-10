@@ -446,9 +446,20 @@ def test_an_unreachable_input_records_nothing(
     db: Database, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     assert db.migrate().returncode == 0
+    requested: list[str] = []
+
+    def unreachable(
+        self: sources.ReadOnlyHttp, method: str, url: str, headers: Any = None
+    ) -> bytes:
+        requested.append(url)
+        raise sources.SourceError(f"GET {url}: connection refused")
+
+    # Deterministic outage: no real socket, so host state cannot change the outcome.
+    monkeypatch.setattr(sources.ReadOnlyHttp, "request", unreachable)
     with caplog.at_level("WARNING"):
         # --once reports the failed pass; the long-running loop logs it and tries next cycle.
-        assert run_shadow(db, monkeypatch, "http://127.0.0.1:9/board.json") == 1
+        assert run_shadow(db, monkeypatch, "http://board.invalid/board.json") == 1
+    assert requested == ["http://board.invalid/board.json"]
     assert "input path unavailable" in caplog.text
     assert db.value("SELECT count(*) FROM sortyard.decision_log") == "0"
 
