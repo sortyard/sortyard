@@ -96,12 +96,21 @@ def empty_db() -> Iterator[Database]:
     yield from fresh_database()
 
 
-@pytest.fixture(scope="module")
-def db() -> Iterator[Database]:
+@pytest.fixture
+def migrated_db() -> Iterator[Database]:
+    """A fresh database of its own, migrated and holding no rows."""
     for database in fresh_database():
         proc = database.migrate()
         assert proc.returncode == 0, proc.stderr
         yield database
+
+
+@pytest.fixture
+def db(migrated_db: Database) -> Database:
+    """A fresh migrated database seeded with the installation and workspace that every
+    workspace-scoped row points at, so each test stands alone in any order."""
+    seed(migrated_db)
+    return migrated_db
 
 
 def insert(db: Database, kind: str, doc: dict[str, Any]) -> dict[str, Any]:
@@ -117,6 +126,13 @@ def insert(db: Database, kind: str, doc: dict[str, Any]) -> dict[str, Any]:
         f"INSERT INTO sortyard.{table(kind)} (doc) VALUES (:'doc'::jsonb)", {"doc": json.dumps(doc)}
     )
     return doc
+
+
+def seed(db: Database) -> None:
+    """Insert the prerequisite rows (the §3 installation and workspace examples)."""
+    for kind in FIRST:
+        for example in schema(kind)["examples"]:
+            insert(db, kind, models.MODELS[kind].from_dict(copy.deepcopy(example)).to_dict())
 
 
 @requires_postgres
@@ -178,7 +194,10 @@ def test_a_failing_migration_leaves_no_trace(empty_db: Database, tmp_path: pathl
 
 
 @requires_postgres
-def test_every_section_3_example_round_trips_through_postgres(db: Database) -> None:
+def test_every_section_3_example_round_trips_through_postgres(migrated_db: Database) -> None:
+    db = migrated_db
+    # Unseeded: this test inserts the prerequisites itself, in dependency order.
+    assert db.value("SELECT count(*) FROM sortyard.workspace") == "0"
     for kind, example in ordered_examples():
         model = models.MODELS[kind]
         expected = insert(db, kind, model.from_dict(copy.deepcopy(example)).to_dict())
