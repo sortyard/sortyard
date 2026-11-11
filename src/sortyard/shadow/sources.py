@@ -6,21 +6,37 @@ GET, and files are opened for reading only. The shadow therefore needs only read
 (a read-only Plane API key; a read-only mount of the lane registry) — and holds nothing that
 could claim, move, comment on or merge anything.
 
-- ``SnapshotSource`` — a board-view document (see ``board``) from a file or an http(s) URL:
-  drive.py's board view as exported by the production control plane, or any equivalent.
+- ``SnapshotSource`` — board views (see ``board``) from a file, a directory or an http(s)
+  URL: drive.py's board view as exported by the production control plane, or any equivalent.
+  To record *every* production pass the location is a **pass feed** that retains passes the
+  shadow has not read yet: ``{"passes": [board view, ...]}`` (or a JSON list), oldest first,
+  or a directory with one board-view ``*.json`` per pass (recorded in file-name order). Each
+  pass in a feed names its ``production_pass_id``; the shadow records every one it has not
+  recorded before, however many arrived since its last read. A single board view still works
+  but only observes the pass that is current when it is read.
 - ``PlaneSource`` — the board straight from Plane's REST API (what plane_sync and drive.py
   read), joined with the conductor's lane registry (``products.json`` of the
-  ``conductor-config`` ConfigMap) and, optionally, the task_ready gating output.
+  ``conductor-config`` ConfigMap) and, optionally, the task_ready gating output. Plane only
+  shows the board as it is *now*, so this source is triggered by the production conductor's
+  pass log: each new production pass id it lists triggers one board read, recorded under
+  that id. When several passes arrived since the last poll only the newest can still be
+  observed; the older ones are returned as *unobserved* so they are recorded as explicit
+  gaps rather than disappearing.
+
+HTTP redirects never carry a credential to another origin and never downgrade https to
+http: ``ReadOnlyHttp`` refuses such redirects instead of following them.
 """
 
 from __future__ import annotations
 
 import datetime
 import json
+import os
 import urllib.parse
 import urllib.request
-from collections.abc import Mapping, Sequence
-from typing import Any, Protocol
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field
+from typing import IO, Any, Protocol
 
 from sortyard.shadow.board import (
     PRIORITIES,
@@ -42,26 +58,91 @@ class SourceError(RuntimeError):
     """The input path could not be read (unreachable, refused, malformed)."""
 
 
+@dataclass(frozen=True)
+class Pending:
+    """What one poll of the input path yields: the production passes not recorded yet.
+
+    ``snapshots`` — passes the shadow observed, oldest first, each to be decided and recorded;
+    ``unobserved`` — production pass ids that happened but whose board can no longer be read
+    (recorded as gaps, never silently dropped).
+    """
+
+    snapshots: list[QueueSnapshot] = field(default_factory=list)
+    unobserved: list[str] = field(default_factory=list)
+
+
 class Source(Protocol):
     def read(self) -> QueueSnapshot: ...
+
+    def pending(self, is_recorded: Callable[[str], bool]) -> Pending: ...
 
 
 def now() -> str:
     return datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+# Request headers that carry a credential: never sent to an origin other than the one the
+# caller addressed.
+CREDENTIAL_HEADERS = frozenset({"authorization", "proxy-authorization", "cookie", "x-api-key"})
+
+
+def _origin(url: str) -> tuple[str, str, int | None]:
+    parts = urllib.parse.urlsplit(url)
+    scheme = parts.scheme.lower()
+    try:
+        port = parts.port
+    except ValueError as exc:
+        raise SourceError(f"{url}: {exc}") from exc
+    return scheme, (parts.hostname or "").lower(), port or {"http": 80, "https": 443}.get(scheme)
+
+
+class _GuardedRedirects(urllib.request.HTTPRedirectHandler):
+    """Follow a redirect only if it neither leaks a credential nor downgrades the transport.
+
+    urllib's default handler copies every request header onto the redirected request,
+    whatever its destination; this one refuses (``SourceError``) a redirect that
+    - leaves http(s) altogether,
+    - goes from https to plain http (credential or not: the read would no longer be
+      authenticated by TLS), or
+    - goes to another origin (scheme, host, port) while the request carries a credential.
+    """
+
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: IO[bytes],
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> urllib.request.Request | None:
+        old, new = _origin(req.full_url), _origin(newurl)
+        refusal = None
+        if new[0] not in ("http", "https"):
+            refusal = f"redirect to a non-http(s) URL {newurl}"
+        elif old[0] == "https" and new[0] != "https":
+            refusal = f"redirect downgrades https to http ({newurl})"
+        elif new != old and any(k.lower() in CREDENTIAL_HEADERS for k, _ in req.header_items()):
+            refusal = f"redirect would send the credential to another origin ({newurl})"
+        if refusal:
+            fp.close()
+            raise SourceError(f"GET {req.full_url}: refused {code} {refusal}")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 class ReadOnlyHttp:
-    """The only HTTP client the shadow has: GET or nothing."""
+    """The only HTTP client the shadow has: GET or nothing; redirects guarded."""
 
     def __init__(self, timeout: float = 20.0) -> None:
         self.timeout = timeout
+        self._opener = urllib.request.build_opener(_GuardedRedirects())
 
     def request(self, method: str, url: str, headers: Mapping[str, str] | None = None) -> bytes:
         if method != "GET":
             raise ReadOnlyViolation(f"the shadow conductor is read-only; refused {method} {url}")
         req = urllib.request.Request(url, headers=dict(headers or {}), method="GET")
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            with self._opener.open(req, timeout=self.timeout) as resp:
                 body: bytes = resp.read()
                 return body
         except OSError as exc:  # URLError, HTTPError, timeouts
@@ -119,34 +200,109 @@ def parse_lanes(doc: Any) -> list[Lane]:
     return lanes
 
 
+def _is_url(location: str) -> bool:
+    return urllib.parse.urlsplit(location).scheme in ("http", "https")
+
+
+def _feed_entries(doc: Any) -> list[Any] | None:
+    """The passes of a pass feed (``{"passes": [...]}`` or a list), or None for a single
+    board view."""
+    if isinstance(doc, list):
+        return doc
+    if isinstance(doc, Mapping) and isinstance(doc.get("passes"), list):
+        return list(doc["passes"])
+    return None
+
+
 class SnapshotSource:
-    """A board-view document (``board`` module docstring) from a file path or http(s) URL;
-    ``gating``, when given, overrides the document's own task_ready section."""
+    """Board views from a file path, a directory or an http(s) URL (module docstring).
+
+    ``gating``, when given, overrides a single board view's own task_ready section. It is
+    refused for a pass feed: today's gating output joined onto earlier passes would record
+    decisions production never faced — each pass in a feed carries its own gating.
+    """
 
     def __init__(self, location: str, gating: str | None = None) -> None:
         self.location = location
         self.gating = gating
         self.http = ReadOnlyHttp()
+        # Whether the last read was a single board view (only the current pass observable).
+        self.single_view = False
+
+    def _documents(self) -> tuple[list[Any], bool]:
+        if not _is_url(self.location) and os.path.isdir(self.location):
+            names = sorted(n for n in os.listdir(self.location) if n.endswith(".json"))
+            return [read_json(os.path.join(self.location, n)) for n in names], True
+        doc = read_json(self.location, self.http)
+        entries = _feed_entries(doc)
+        return ([doc], False) if entries is None else (entries, True)
+
+    def read_passes(self) -> list[QueueSnapshot]:
+        """Every pass the location currently holds, oldest first."""
+        docs, feed = self._documents()
+        self.single_view = not feed
+        if feed and self.gating:
+            raise SourceError(
+                f"{self.location}: a pass feed carries each pass's own gating;"
+                " SORTYARD_SHADOW_GATING applies to a single board view only"
+            )
+        gating = parse_gating(read_json(self.gating, self.http)) if self.gating else None
+        snaps = []
+        for n, doc in enumerate(docs):
+            where = f"{self.location} pass {n}" if feed else self.location
+            if isinstance(doc, dict):
+                doc.setdefault("taken_at", now())
+                doc.setdefault("source", self.location)
+            try:
+                snap = QueueSnapshot.from_dict(doc)
+            except SnapshotError as exc:
+                raise SourceError(f"{where}: {exc}") from exc
+            if feed and not snap.production_pass_id:
+                raise SourceError(f"{where}: every pass in a pass feed needs a production_pass_id")
+            if gating is not None:
+                snap = QueueSnapshot.build(
+                    taken_at=snap.taken_at,
+                    items=snap.items,
+                    lanes=snap.lanes,
+                    gating=gating,
+                    source=snap.source,
+                    production_pass_id=snap.production_pass_id,
+                )
+            snaps.append(snap)
+        return snaps
 
     def read(self) -> QueueSnapshot:
-        doc = read_json(self.location, self.http)
-        if isinstance(doc, dict):
-            doc.setdefault("taken_at", now())
-            doc.setdefault("source", self.location)
-        try:
-            snap = QueueSnapshot.from_dict(doc)
-        except SnapshotError as exc:
-            raise SourceError(f"{self.location}: {exc}") from exc
-        if self.gating:
-            snap = QueueSnapshot.build(
-                taken_at=snap.taken_at,
-                items=snap.items,
-                lanes=snap.lanes,
-                gating=parse_gating(read_json(self.gating, self.http)),
-                source=snap.source,
-                production_pass_id=snap.production_pass_id,
-            )
-        return snap
+        """The newest pass."""
+        snaps = self.read_passes()
+        if not snaps:
+            raise SourceError(f"{self.location}: no passes")
+        return snaps[-1]
+
+    def pending(self, is_recorded: Callable[[str], bool]) -> Pending:
+        """Every pass not recorded yet — all unread passes of a feed, in order."""
+        return Pending(
+            snapshots=[
+                s
+                for s in self.read_passes()
+                if not (s.production_pass_id and is_recorded(s.production_pass_id))
+            ]
+        )
+
+
+def parse_pass_log(doc: Any) -> list[str]:
+    """The production conductor's pass log, oldest first: ``{"passes": [...]}`` or a list,
+    each entry a pass id or ``{"production_pass_id": ...}``."""
+    entries = _feed_entries(doc)
+    if entries is None:
+        raise SourceError('the production pass log must be {"passes": [...]} or a JSON list')
+    ids: list[str] = []
+    for entry in entries:
+        pid = entry.get("production_pass_id") if isinstance(entry, Mapping) else entry
+        if not isinstance(pid, str) or not pid:
+            raise SourceError(f"production pass log: no pass id in {entry!r}")
+        if pid not in ids:
+            ids.append(pid)
+    return ids
 
 
 def _results(doc: Any) -> list[Mapping[str, Any]]:
@@ -158,7 +314,8 @@ def _results(doc: Any) -> list[Mapping[str, Any]]:
 
 class PlaneSource:
     """The board from Plane's REST API (``X-API-Key``; GET only), with the lane registry and
-    optional task_ready gating output joined in."""
+    optional task_ready gating output joined in; each read is triggered by a new pass in the
+    production conductor's pass log (``passes``, file path or URL)."""
 
     PAGE_SIZE = 100
 
@@ -171,6 +328,7 @@ class PlaneSource:
         api_key: str,
         lanes_path: str,
         gating: str | None = None,
+        passes: str | None = None,
     ) -> None:
         self.base = base_url.rstrip("/")
         self.workspace = workspace_slug
@@ -178,6 +336,7 @@ class PlaneSource:
         self.headers = {"X-API-Key": api_key, "Accept": "application/json"}
         self.lanes_path = lanes_path
         self.gating = gating
+        self.passes = passes
         self.http = ReadOnlyHttp()
 
     def _get(self, path: str, query: Mapping[str, str] | None = None) -> Any:
@@ -231,7 +390,7 @@ class PlaneSource:
             )
         return items
 
-    def read(self) -> QueueSnapshot:
+    def read(self, production_pass_id: str | None = None) -> QueueSnapshot:
         taken_at = now()
         items = [i for pid in self.project_ids for i in self._project_items(pid)]
         lanes = parse_lanes(read_json(self.lanes_path, self.http))
@@ -243,6 +402,17 @@ class PlaneSource:
                 lanes=lanes,
                 gating=gating,
                 source=f"plane {self.base} {self.workspace}",
+                production_pass_id=production_pass_id,
             )
         except SnapshotError as exc:
             raise SourceError(str(exc)) from exc
+
+    def pending(self, is_recorded: Callable[[str], bool]) -> Pending:
+        """New production passes: the board is read once, for the newest; any older new ones
+        can no longer be observed and are reported as such."""
+        if not self.passes:
+            raise SourceError("plane source: the production pass log (passes) is required")
+        new = [p for p in parse_pass_log(read_json(self.passes, self.http)) if not is_recorded(p)]
+        if not new:
+            return Pending()
+        return Pending(snapshots=[self.read(production_pass_id=new[-1])], unobserved=new[:-1])

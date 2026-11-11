@@ -78,22 +78,29 @@ the board view, the lane registry (`products.json`) and the task_ready gating ou
 **read-only** (GET only; it holds no write credential and no Kubernetes token), computes what
 it would claim and refuse, and appends that to the DecisionLog (`sortyard.decision_log`, plus
 `shadow_would_claim` / `shadow_would_skip` / `shadow_pass` events in the ledger). It never
-claims, merges, comments or writes anywhere but its own database. A board view naming its
-`production_pass_id` is recorded once per production pass.
+claims, merges, comments or writes anywhere but its own database. Each production pass
+(`production_pass_id`) is recorded once.
 
-Two input sources (`charts/sortyard/values.yaml`, `shadow.*`): `snapshot` — a board-view
-document by URL or path (format: `src/sortyard/shadow/board.py`), e.g. drive.py's board view
-exported by the production control plane; `plane` — the board straight from Plane's REST API
-with a read-only API key, plus the lane registry mounted from a ConfigMap.
+Two input sources (`charts/sortyard/values.yaml`, `shadow.*`; formats in
+`src/sortyard/shadow/sources.py`): `snapshot` — a **pass feed** by URL or path
+(`{"passes": [board view, ...]}`, or a directory with one board view per pass) that retains
+passes until the shadow has read them, e.g. drive.py's board views exported by the
+production control plane; every pass not yet recorded is recorded on the next read, however
+many arrived in between (a single board view also works, but only sees the pass current at
+read time). `plane` — the board straight from Plane's REST API with a read-only API key,
+plus the lane registry mounted from a ConfigMap, read once per new pass in the production
+conductor's pass log (`shadow.plane.passes`); passes superseded before the shadow could read
+the board are recorded as `shadow_pass_unobserved` gaps. Redirects that would carry the API
+key to another origin, or downgrade https to http, are refused.
 
 Runbook:
 
 ```sh
-# Start (board view by URL):
-helm upgrade sortyard charts/sortyard --reuse-values --set shadow.enabled=true --set shadow.snapshot=<board-view URL>
+# Start (pass feed by URL):
+helm upgrade sortyard charts/sortyard --reuse-values --set shadow.enabled=true --set shadow.snapshot=<pass-feed URL>
 # Start (Plane): secret with a READ-ONLY key, then point the shadow at the board + lane registry.
 kubectl create secret generic plane-read --from-literal=api-key=<read-only Plane API key>
-helm upgrade sortyard charts/sortyard --reuse-values --set shadow.enabled=true --set shadow.source=plane --set shadow.plane.url=<Plane URL> --set shadow.plane.workspace=<slug> --set 'shadow.plane.projects={<project id>}' --set shadow.plane.apiKeySecret=plane-read --set shadow.lanes.configMap=<ConfigMap holding products.json>
+helm upgrade sortyard charts/sortyard --reuse-values --set shadow.enabled=true --set shadow.source=plane --set shadow.plane.url=<Plane URL> --set shadow.plane.workspace=<slug> --set 'shadow.plane.projects={<project id>}' --set shadow.plane.apiKeySecret=plane-read --set shadow.lanes.configMap=<ConfigMap holding products.json> --set shadow.plane.passes=<pass-log URL> --set shadow.interval=15
 # Watch it:
 kubectl logs -f deployment/sortyard-shadow-conductor
 kubectl exec statefulset/sortyard-postgres -- psql -U sortyard sortyard -c "SELECT conductor_pass_id, decision, task_id, doc->'reason_codes' FROM sortyard.decision_log ORDER BY recorded_at DESC, (doc->'inputs'->>'preview_position')::int LIMIT 20"

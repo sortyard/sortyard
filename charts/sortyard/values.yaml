@@ -74,8 +74,11 @@ shadow:
   interval: 300
   # Workspace the DecisionLog entries are scoped to (created if missing).
   workspace: ws-shadow
-  # snapshot: a board-view document (file or http(s) URL; see sortyard.shadow.board).
-  # plane: the board from Plane's REST API, joined with the lane registry below.
+  # snapshot: a pass feed {"passes": [board view, ...]} retaining unread passes, a directory
+  #   of board views (one per pass), or a single board view (file or http(s) URL; see
+  #   sortyard.shadow.sources). Only a feed/directory records every production pass.
+  # plane: the board from Plane's REST API, joined with the lane registry below; one read per
+  #   new pass in the production pass log (use a short interval, e.g. 15).
   source: snapshot
   snapshot: ""
   # Optional task_ready gating output (file or http(s) URL).
@@ -87,6 +90,8 @@ shadow:
     projects: []
     # Name of a Secret with key `api-key`: a READ-ONLY Plane API key.
     apiKeySecret: ""
+    # The production conductor's pass log (file or http(s) URL): {"passes": [{"production_pass_id": ...}]}.
+    passes: ""
   # The lane registry (the conductor's products.json), mounted read-only from a ConfigMap.
   lanes:
     configMap: ""

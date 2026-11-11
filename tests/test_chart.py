@@ -205,6 +205,8 @@ def test_shadow_conductor_reads_plane_with_a_read_only_key_and_mounted_lanes() -
             "shadow.plane.apiKeySecret=plane-read",
             "--set",
             "shadow.lanes.configMap=conductor-config",
+            "--set",
+            "shadow.plane.passes=http://cp/passes.json",
         )
     )
     pod = deploy["spec"]["template"]["spec"]
@@ -216,6 +218,8 @@ def test_shadow_conductor_reads_plane_with_a_read_only_key_and_mounted_lanes() -
         "key": "api-key",
     }
     assert env["SORTYARD_SHADOW_LANES"]["value"] == "/lanes/products.json"
+    # Plane reads are triggered by the production conductor's pass log.
+    assert env["SORTYARD_SHADOW_PASSES"]["value"] == "http://cp/passes.json"
     (mount,) = container["volumeMounts"]
     assert mount == {"name": "lanes", "mountPath": "/lanes", "readOnly": True}
     (volume,) = pod["volumes"]

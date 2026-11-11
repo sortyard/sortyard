@@ -8,12 +8,17 @@ conductor is still the structure-only stub: real claims are Phase 3.
 
 Shadow configuration (environment):
   SORTYARD_SHADOW_SOURCE        snapshot (default) | plane
-  SORTYARD_SHADOW_SNAPSHOT      snapshot: board-view document, file path or http(s) URL
+  SORTYARD_SHADOW_SNAPSHOT      snapshot: a pass feed ({"passes": [board view, ...]}), a
+                                directory of board views (one per pass) or a single board
+                                view; file path or http(s) URL. Only a feed or directory
+                                retains passes between reads, so only they record every pass
   SORTYARD_SHADOW_PLANE_URL     plane: base URL of the Plane instance
   SORTYARD_SHADOW_PLANE_WORKSPACE   plane: workspace slug
   SORTYARD_SHADOW_PLANE_PROJECTS    plane: comma-separated project ids
   SORTYARD_SHADOW_PLANE_API_KEY     plane: a READ-ONLY API key
   SORTYARD_SHADOW_LANES         plane: lane registry (products.json), file path or URL
+  SORTYARD_SHADOW_PASSES        plane: the production conductor's pass log, file path or URL;
+                                each new pass id in it triggers one board read
   SORTYARD_SHADOW_GATING        optional: task_ready gating output, file path or URL
   SORTYARD_SHADOW_WORKSPACE     workspace the DecisionLog is scoped to (default ws-shadow)
   SORTYARD_DATABASE_HOST/PORT/NAME/USER/PASSWORD   the shadow's own database (libpq PG*
@@ -59,6 +64,7 @@ def source_from_env(env: Mapping[str, str]) -> Any:
             api_key=env["SORTYARD_SHADOW_PLANE_API_KEY"],
             lanes_path=env["SORTYARD_SHADOW_LANES"],
             gating=gating,
+            passes=env["SORTYARD_SHADOW_PASSES"],
         )
     raise ValueError(f"SORTYARD_SHADOW_SOURCE must be 'snapshot' or 'plane', not {kind!r}")
 
@@ -95,40 +101,72 @@ def provisional_installation(env: Mapping[str, str]) -> dict[str, Any]:
     }
 
 
+_warned_single_view = False
+
+
 def shadow_pass(env: Mapping[str, str]) -> bool:
-    """One shadow pass: read, decide, record. False when it could not complete."""
+    """One shadow poll: record every production pass not recorded yet. False when it could
+    not complete."""
     import psycopg
     import psycopg.conninfo
 
-    from sortyard.shadow import evaluate, ledger, sources
+    from sortyard.shadow import sources
 
     try:
         source = source_from_env(env)
-        snapshot = source.read()
-    except (sources.SourceError, KeyError, ValueError) as exc:
+    except (KeyError, ValueError) as exc:
         log.warning("shadow: input path unavailable, nothing recorded: %s", exc)
         return False
-    policy = evaluate.ClaimPolicy()
-    decisions = evaluate.evaluate(snapshot, policy)
     workspace = env.get("SORTYARD_SHADOW_WORKSPACE", "ws-shadow")
     try:
         conninfo = psycopg.conninfo.make_conninfo(**connect_kwargs(env))
         with psycopg.connect(conninfo, autocommit=True) as conn:
-            ledger.ensure_workspace(conn, workspace, provisional_installation(env))
-            pass_id = ledger.record_pass(
-                conn,
-                workspace_id=workspace,
-                snapshot=snapshot,
-                policy=policy,
-                decisions=decisions,
-                ts=sources.now(),
-            )
+            try:
+                return _ingest(conn, source, workspace, env)
+            except sources.SourceError as exc:
+                log.warning("shadow: input path unavailable, nothing recorded: %s", exc)
+                return False
     except psycopg.Error as exc:
         log.warning("shadow: could not record the pass: %s", exc)
         return False
-    if pass_id is None:
-        log.info("shadow: pass for %s already recorded", snapshot.production_pass_id)
-    else:
+
+
+def _ingest(conn: Any, source: Any, workspace: str, env: Mapping[str, str]) -> bool:
+    from sortyard.shadow import evaluate, ledger, sources
+
+    global _warned_single_view
+    pending = source.pending(lambda pid: ledger.is_recorded(conn, pid))
+    if getattr(source, "single_view", False) and not _warned_single_view:
+        _warned_single_view = True
+        log.warning(
+            "shadow: %s is a single board view; production passes between reads are not"
+            " observed — point SORTYARD_SHADOW_SNAPSHOT at a pass feed to record every pass",
+            source.location,
+        )
+    ledger.ensure_workspace(conn, workspace, provisional_installation(env))
+    for production_pass_id in pending.unobserved:
+        ledger.record_unobserved(
+            conn,
+            workspace_id=workspace,
+            production_pass_id=production_pass_id,
+            reason="superseded before the shadow read the board",
+            ts=sources.now(),
+        )
+        log.warning("shadow: production pass %s happened but was not observed", production_pass_id)
+    policy = evaluate.ClaimPolicy()
+    for snapshot in pending.snapshots:
+        decisions = evaluate.evaluate(snapshot, policy)
+        pass_id = ledger.record_pass(
+            conn,
+            workspace_id=workspace,
+            snapshot=snapshot,
+            policy=policy,
+            decisions=decisions,
+            ts=sources.now(),
+        )
+        if pass_id is None:
+            log.info("shadow: pass for %s already recorded", snapshot.production_pass_id)
+            continue
         claims = [d.item_id for d in decisions if d.claimed]
         log.info(
             "shadow: pass %s: would claim %s; refused %d (snapshot %s)",

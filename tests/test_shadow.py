@@ -179,8 +179,16 @@ def test_description_level_dependencies(text: str, expected: list[str]) -> None:
 # --- the input path: read-only ---------------------------------------------------------------
 
 
+class Redirect:
+    """A route that answers ``302 Location: <location>``."""
+
+    def __init__(self, location: str) -> None:
+        self.location = location
+
+
 class FakeUpstream:
-    """An HTTP upstream that serves fixed JSON by path and records every request it sees."""
+    """An HTTP upstream that serves fixed JSON (or a ``Redirect``) by path and records every
+    request it sees."""
 
     def __init__(self, routes: dict[str, Any]) -> None:
         self.routes = routes
@@ -201,7 +209,14 @@ class FakeUpstream:
                     self.send_response(405 if self.command != "GET" else 404)
                     self.end_headers()
                     return
-                body = json.dumps(upstream.routes[key]).encode()
+                route = upstream.routes[key]
+                if isinstance(route, Redirect):
+                    self.send_response(302)
+                    self.send_header("Location", route.location)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                body = json.dumps(route).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(body)))
@@ -251,6 +266,98 @@ def test_the_http_client_refuses_anything_but_get() -> None:
     for method in ("POST", "PUT", "PATCH", "DELETE"):
         with pytest.raises(sources.ReadOnlyViolation):
             client.request(method, "http://127.0.0.1:9/")
+
+
+API_KEY = {"X-API-Key": "read-key"}
+
+
+def test_a_credential_never_follows_a_redirect_to_another_origin() -> None:
+    elsewhere = FakeUpstream({"/board.json": board_view()})
+    origin = FakeUpstream({"/board.json": Redirect(f"{elsewhere.url}/board.json")})
+    try:
+        with pytest.raises(sources.SourceError, match="credential to another origin"):
+            sources.ReadOnlyHttp().get_json(f"{origin.url}/board.json", API_KEY)
+        assert elsewhere.requests == []  # the other origin never saw the request, nor the key
+
+        # Without a credential the same redirect is harmless and followed.
+        assert sources.ReadOnlyHttp().get_json(f"{origin.url}/board.json")["items"]
+        assert [headers.get("x-api-key") for _, _, headers in elsewhere.requests] == [None]
+    finally:
+        origin.close()
+        elsewhere.close()
+
+
+def test_a_credential_follows_a_same_origin_redirect() -> None:
+    up = FakeUpstream({"/old.json": Redirect("/board.json"), "/board.json": board_view()})
+    try:
+        assert sources.ReadOnlyHttp().get_json(f"{up.url}/old.json", API_KEY)["items"]
+    finally:
+        up.close()
+    assert [(path, headers.get("x-api-key")) for _, path, headers in up.requests] == [
+        ("/old.json", "read-key"),
+        ("/board.json", "read-key"),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("url", "location", "refusal"),
+    [
+        ("https://plane.example/a", "http://plane.example/a", "downgrades https to http"),
+        ("https://plane.example/a", "http://elsewhere.example/a", "downgrades https to http"),
+        ("https://plane.example/a", "https://plane.example:8443/a", "another origin"),
+        ("https://plane.example/a", "https://evil.example/a", "another origin"),
+        ("http://plane.example/a", "file:///etc/passwd", "non-http"),
+    ],
+)
+def test_unsafe_redirects_are_refused(url: str, location: str, refusal: str) -> None:
+    import io
+    import urllib.request
+
+    handler = sources._GuardedRedirects()
+    req = urllib.request.Request(url, headers=API_KEY)
+    fp = io.BytesIO()
+    with pytest.raises(sources.SourceError, match=refusal):
+        handler.redirect_request(req, fp, 302, "Found", {}, location)
+    assert fp.closed
+    # An https -> http downgrade is refused even without a credential.
+    if "downgrade" in refusal:
+        with pytest.raises(sources.SourceError, match=refusal):
+            handler.redirect_request(
+                urllib.request.Request(url), io.BytesIO(), 302, "Found", {}, location
+            )
+
+
+def feed(*pass_ids: str) -> dict[str, Any]:
+    """A pass feed retaining these production passes, oldest first; each pass's board differs
+    (pass n has ROVE-1..n-1 finished) so the decisions are pass-specific."""
+    passes = []
+    for n, pid in enumerate(pass_ids):
+        view = board_view(production_pass_id=pid, taken_at=f"2026-11-10T12:0{n}:00Z")
+        for entry in view["items"]:
+            if entry["id"] == "ROVE-1" and n:
+                entry.update(state="Done", state_group="completed")
+        passes.append(view)
+    return {"passes": passes}
+
+
+def test_a_pass_feed_yields_every_pass_not_yet_recorded(tmp_path: pathlib.Path) -> None:
+    path = tmp_path / "feed.json"
+    path.write_text(json.dumps(feed("p1", "p2", "p3")))
+    pending = sources.SnapshotSource(str(path)).pending(lambda pid: pid == "p1")
+    assert [s.production_pass_id for s in pending.snapshots] == ["p2", "p3"]
+    assert pending.unobserved == []
+
+
+def test_a_pass_feed_needs_pass_ids_and_its_own_gating(tmp_path: pathlib.Path) -> None:
+    path = tmp_path / "feed.json"
+    path.write_text(json.dumps({"passes": [board_view()]}))
+    with pytest.raises(sources.SourceError, match="production_pass_id"):
+        sources.SnapshotSource(str(path)).read_passes()
+    path.write_text(json.dumps(feed("p1")))
+    gating = tmp_path / "gating.json"
+    gating.write_text("{}")
+    with pytest.raises(sources.SourceError, match="own gating"):
+        sources.SnapshotSource(str(path), gating=str(gating)).read_passes()
 
 
 PLANE_PROJECT = "10d493fb-4cef-4ef1-ab70-a0aefca87d59"
@@ -468,3 +575,94 @@ def test_without_shadow_the_conductor_is_still_the_stub(caplog: pytest.LogCaptur
     with caplog.at_level("INFO"):
         assert conductor.main(["--once"]) == 0
     assert "conductor: stub service started" in caplog.text
+
+
+@requires_postgres
+def test_passes_arriving_between_shadow_reads_are_all_recorded(
+    db: Database, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """Production passes 1 -> 2 -> 3 happen; the shadow reads after 1 and after 3. Pass 2 is
+    retained by the feed and recorded on the second read, in production order."""
+    assert db.migrate().returncode == 0
+    path = tmp_path / "feed.json"
+    path.write_text(json.dumps(feed("drive-pass-1")))
+    assert run_shadow(db, monkeypatch, str(path)) == 0
+    path.write_text(json.dumps(feed("drive-pass-1", "drive-pass-2", "drive-pass-3")))
+    assert run_shadow(db, monkeypatch, str(path)) == 0
+
+    recorded = db.value(
+        "SELECT string_agg(doc->'facts'->>'production_pass_id', ',' ORDER BY seq)"
+        " FROM sortyard.event WHERE doc->'transition'->>'name' = 'shadow_pass'"
+    )
+    assert recorded == "drive-pass-1,drive-pass-2,drive-pass-3"
+    for n, view in enumerate(feed("drive-pass-1", "drive-pass-2", "drive-pass-3")["passes"]):
+        snap = board.QueueSnapshot.from_dict(view)
+        hashes = db.value(
+            "SELECT string_agg(DISTINCT doc->'inputs'->>'queue_snapshot_hash', ',')"
+            " FROM sortyard.decision_log WHERE conductor_pass_id = :'p'",
+            {"p": f"shadow-drive-pass-{n + 1}"},
+        )
+        assert hashes == snap.content_hash()
+
+    # A directory of board views (one file per pass) is a pass feed too.
+    spool = tmp_path / "spool"
+    spool.mkdir()
+    for n, view in enumerate(feed("d1", "d2", "d3", "d4")["passes"]):
+        (spool / f"{n:04d}.json").write_text(json.dumps(view))
+    assert run_shadow(db, monkeypatch, str(spool)) == 0
+    recorded = db.value(
+        "SELECT string_agg(doc->'facts'->>'production_pass_id', ',' ORDER BY seq)"
+        " FROM sortyard.event WHERE doc->'transition'->>'name' = 'shadow_pass'"
+        " AND doc->'facts'->>'production_pass_id' LIKE 'd_'"
+    )
+    assert recorded == "d1,d2,d3,d4"
+
+
+@requires_postgres
+def test_plane_mode_is_triggered_per_production_pass(
+    db: Database, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """Plane only shows the board as it is now: each new production pass triggers one read,
+    recorded under that pass's id; passes superseded before a read are recorded as gaps."""
+    assert db.migrate().returncode == 0
+    up = FakeUpstream(plane_routes())
+    lanes = tmp_path / "products.json"
+    lanes.write_text(json.dumps({"sortyard": {"lanes": 1}}))
+    log = tmp_path / "passes.json"
+    monkeypatch.setenv("SORTYARD_DATABASE_NAME", db.name)
+    monkeypatch.setenv("SORTYARD_SHADOW_WORKSPACE", "ws-shadow-test")
+    monkeypatch.setenv("SORTYARD_SHADOW_SOURCE", "plane")
+    monkeypatch.setenv("SORTYARD_SHADOW_PLANE_URL", up.url)
+    monkeypatch.setenv("SORTYARD_SHADOW_PLANE_WORKSPACE", "noncelogic")
+    monkeypatch.setenv("SORTYARD_SHADOW_PLANE_PROJECTS", PLANE_PROJECT)
+    monkeypatch.setenv("SORTYARD_SHADOW_PLANE_API_KEY", "read-key")
+    monkeypatch.setenv("SORTYARD_SHADOW_LANES", str(lanes))
+    monkeypatch.setenv("SORTYARD_SHADOW_PASSES", str(log))
+    try:
+        log.write_text(json.dumps({"passes": [{"production_pass_id": "drive-pass-1"}]}))
+        assert conductor.main(["--shadow", "--once"]) == 0
+        reads = len(up.requests)
+        assert reads > 0
+        # No new production pass: no board read, nothing recorded.
+        assert conductor.main(["--shadow", "--once"]) == 0
+        assert len(up.requests) == reads
+        log.write_text(json.dumps({"passes": ["drive-pass-1", "drive-pass-2", "drive-pass-3"]}))
+        assert conductor.main(["--shadow", "--once"]) == 0
+    finally:
+        up.close()
+    assert up.methods() == {"GET"}
+    passes = db.value(
+        "SELECT string_agg(doc->'facts'->>'production_pass_id' || ':' ||"
+        " (doc->'transition'->>'name'), ',' ORDER BY seq)"
+        " FROM sortyard.event WHERE doc->'object'->>'kind' = 'conductor_pass'"
+    )
+    assert passes == (
+        "drive-pass-1:shadow_pass,drive-pass-2:shadow_pass_unobserved,drive-pass-3:shadow_pass"
+    )
+    assert (
+        db.value(
+            "SELECT string_agg(DISTINCT conductor_pass_id, ',' ORDER BY conductor_pass_id)"
+            " FROM sortyard.decision_log"
+        )
+        == "shadow-drive-pass-1,shadow-drive-pass-3"
+    )

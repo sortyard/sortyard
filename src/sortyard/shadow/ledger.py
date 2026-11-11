@@ -11,9 +11,13 @@ One pass is written in one transaction:
   ``shadow_pass``) carrying the full snapshot, the ordered would-claims and the refusals — the
   record the claim comparison (SORTYARD-9) diffs against the production conductor's pass.
 
+A production pass the shadow knows happened but could not observe (its board is gone — see
+``sources.PlaneSource``) is recorded as one ``shadow_pass_unobserved`` event under the same
+pass id, so the comparison sees the gap instead of a silently missing pass.
+
 Every write is marked ``mode: shadow`` and goes only to the ``sortyard`` schema. A pass tied
-to a production conductor pass is recorded once: seeing the same production pass again is a
-no-op.
+to a production conductor pass is recorded once (observed or not): seeing the same production
+pass again is a no-op.
 """
 
 from __future__ import annotations
@@ -32,11 +36,62 @@ ACTOR = {"kind": "system", "id": "shadow-conductor"}
 _NOT_ID = re.compile(r"[^A-Za-z0-9._:/-]+")
 
 
+def _shadow_id(base: str) -> str:
+    return "shadow-" + _NOT_ID.sub("-", base).strip("-")[:150]
+
+
 def pass_id_for(snapshot: QueueSnapshot) -> str:
     """The shadow pass id: derived from the production pass when the input names one (so each
     production pass is recorded once), otherwise from the read time and snapshot hash."""
-    base = snapshot.production_pass_id or f"{snapshot.taken_at}-{snapshot.content_hash()[7:19]}"
-    return "shadow-" + _NOT_ID.sub("-", base).strip("-")[:150]
+    if snapshot.production_pass_id:
+        return _shadow_id(snapshot.production_pass_id)
+    return _shadow_id(f"{snapshot.taken_at}-{snapshot.content_hash()[7:19]}")
+
+
+def is_recorded(conn: psycopg.Connection[Any], production_pass_id: str) -> bool:
+    """Whether this production pass is already in the ledger (observed or unobserved)."""
+    pass_event_id = f"evt-{_shadow_id(production_pass_id)}"
+    seen = conn.execute("SELECT 1 FROM sortyard.event WHERE id = %s", [pass_event_id])
+    return seen.fetchone() is not None
+
+
+def record_unobserved(
+    conn: psycopg.Connection[Any],
+    *,
+    workspace_id: str,
+    production_pass_id: str,
+    reason: str,
+    ts: str,
+) -> str | None:
+    """Record a production pass the shadow could not observe; None if already recorded."""
+    pass_id = _shadow_id(production_pass_id)
+    pass_event_id = f"evt-{pass_id}"
+    with conn.transaction():
+        conn.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", [pass_event_id])
+        if is_recorded(conn, production_pass_id):
+            return None
+        conn.execute(
+            "SELECT sortyard.append_event(%s)",
+            [
+                Jsonb(
+                    {
+                        "id": pass_event_id,
+                        "workspace_id": workspace_id,
+                        "ts": ts,
+                        "actor": ACTOR,
+                        "object": {"kind": "conductor_pass", "id": pass_id},
+                        "transition": {"name": "shadow_pass_unobserved"},
+                        "facts": {
+                            "mode": "shadow",
+                            "production_pass_id": production_pass_id,
+                            "reason": reason,
+                        },
+                        "refs": [],
+                    }
+                )
+            ],
+        )
+    return pass_id
 
 
 def ensure_workspace(

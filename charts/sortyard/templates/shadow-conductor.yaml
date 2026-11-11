@@ -60,6 +60,8 @@ spec:
                   key: api-key
             - name: SORTYARD_SHADOW_LANES
               value: {{ printf "/lanes/%s" $s.lanes.key | quote }}
+            - name: SORTYARD_SHADOW_PASSES
+              value: {{ required "shadow.plane.passes is required (the production conductor's pass log)" $s.plane.passes | quote }}
             {{- else }}
             {{- fail "shadow.source must be snapshot or plane" }}
             {{- end }}
