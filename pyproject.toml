@@ -10,7 +10,8 @@ readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
-dependencies = []
+# psycopg: the services' Postgres driver (the shadow conductor writes the DecisionLog).
+dependencies = ["psycopg[binary]>=3.1"]
 
 [project.optional-dependencies]
 dev = [

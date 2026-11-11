@@ -1,0 +1,106 @@
+{{- if .Values.shadow.enabled }}
+{{- $name := printf "%s-shadow-conductor" (include "sortyard.fullname" .) }}
+{{- $selector := dict "root" . "component" "shadow-conductor" }}
+{{- $s := .Values.shadow }}
+# The shadow conductor: read-only against the production input path; its only writes are
+# DecisionLog entries + ledger events in this release's Postgres. One replica (single writer);
+# no Kubernetes API token (it touches nothing in the cluster).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "sortyard.labels" . | nindent 4 }}
+    app.kubernetes.io/component: shadow-conductor
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "sortyard.selector" $selector | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sortyard.labels" . | nindent 8 }}
+        app.kubernetes.io/component: shadow-conductor
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: shadow-conductor
+          image: {{ include "sortyard.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["sortyard-conductor", "--shadow", "--interval", {{ $s.interval | quote }}]
+          env:
+            - name: SORTYARD_SHADOW_SOURCE
+              value: {{ $s.source | quote }}
+            - name: SORTYARD_SHADOW_WORKSPACE
+              value: {{ $s.workspace | quote }}
+            {{- if eq $s.source "snapshot" }}
+            - name: SORTYARD_SHADOW_SNAPSHOT
+              value: {{ required "shadow.snapshot is required when shadow.source=snapshot" $s.snapshot | quote }}
+            {{- else if eq $s.source "plane" }}
+            - name: SORTYARD_SHADOW_PLANE_URL
+              value: {{ required "shadow.plane.url is required" $s.plane.url | quote }}
+            - name: SORTYARD_SHADOW_PLANE_WORKSPACE
+              value: {{ required "shadow.plane.workspace is required" $s.plane.workspace | quote }}
+            - name: SORTYARD_SHADOW_PLANE_PROJECTS
+              value: {{ required "shadow.plane.projects is required" $s.plane.projects | join "," | quote }}
+            - name: SORTYARD_SHADOW_PLANE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "shadow.plane.apiKeySecret is required" $s.plane.apiKeySecret }}
+                  key: api-key
+            - name: SORTYARD_SHADOW_LANES
+              value: {{ printf "/lanes/%s" $s.lanes.key | quote }}
+            - name: SORTYARD_SHADOW_PASSES
+              value: {{ required "shadow.plane.passes is required (the production conductor's pass log)" $s.plane.passes | quote }}
+            {{- else }}
+            {{- fail "shadow.source must be snapshot or plane" }}
+            {{- end }}
+            {{- with $s.gating }}
+            - name: SORTYARD_SHADOW_GATING
+              value: {{ . | quote }}
+            {{- end }}
+            - name: SORTYARD_NAMESPACE
+              value: {{ .Release.Namespace | quote }}
+            - name: SORTYARD_DATABASE_HOST
+              value: {{ include "sortyard.postgres.host" . | quote }}
+            - name: SORTYARD_DATABASE_PORT
+              value: {{ include "sortyard.postgres.port" . | quote }}
+            - name: SORTYARD_DATABASE_NAME
+              value: {{ .Values.postgres.database | quote }}
+            - name: SORTYARD_DATABASE_USER
+              value: {{ .Values.postgres.auth.username | quote }}
+            - name: SORTYARD_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sortyard.postgres.secretName" . }}
+                  key: password
+          {{- if eq $s.source "plane" }}
+          volumeMounts:
+            - name: lanes
+              mountPath: /lanes
+              readOnly: true
+          {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            {{- toYaml $s.resources | nindent 12 }}
+      {{- if eq $s.source "plane" }}
+      volumes:
+        - name: lanes
+          configMap:
+            name: {{ required "shadow.lanes.configMap is required when shadow.source=plane" $s.lanes.configMap }}
+      {{- end }}
+{{- end }}

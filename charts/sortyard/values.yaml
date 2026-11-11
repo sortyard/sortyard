@@ -64,3 +64,42 @@ migrations:
       memory: 32Mi
     limits:
       memory: 128Mi
+
+# The shadow conductor (design §8 Phase 1): `sortyard-conductor --shadow` reads the production
+# conductor's input path READ-ONLY and records what it would claim/refuse in the DecisionLog.
+# Off by default; it needs the input path configured. Runbook: README "Shadow conductor".
+shadow:
+  enabled: false
+  # Seconds between passes; drive.py's cadence is ~5 minutes.
+  interval: 300
+  # Workspace the DecisionLog entries are scoped to (created if missing).
+  workspace: ws-shadow
+  # snapshot: a pass feed {"passes": [board view, ...]} retaining unread passes, a directory
+  #   of board views (one per pass), or a single board view (file or http(s) URL; see
+  #   sortyard.shadow.sources). Only a feed/directory records every production pass.
+  # plane: the board from Plane's REST API, joined with the lane registry below; every new
+  #   pass in the production pass log is replayed from the inputs it retained.
+  source: snapshot
+  snapshot: ""
+  # Optional task_ready gating output (file or http(s) URL).
+  gating: ""
+  plane:
+    url: ""
+    workspace: ""
+    # Plane project ids to read.
+    projects: []
+    # Name of a Secret with key `api-key`: a READ-ONLY Plane API key.
+    apiKeySecret: ""
+    # The production conductor's pass log (file or http(s) URL), retaining each pass's inputs:
+    # {"passes": [{"production_pass_id": ..., "inputs": {"issues": {<project id>: [...]}, "gating": {...}}}]}.
+    passes: ""
+  # The lane registry (the conductor's products.json), mounted read-only from a ConfigMap.
+  lanes:
+    configMap: ""
+    key: products.json
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      memory: 256Mi

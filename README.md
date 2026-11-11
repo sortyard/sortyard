@@ -8,8 +8,9 @@ contract are in [`spec/`](spec/).
 
 This repository is at the **Phase 1 skeleton**: the six services exist as entry points, the
 API service answers health/readiness/info, and the chart installs the API plus Postgres with
-the §3 domain schema and the event ledger migrated in. No domain behaviour yet — see
-[`MILESTONES.md`](MILESTONES.md) for what lands next.
+the §3 domain schema and the event ledger migrated in, and the conductor can run in shadow
+mode (below) — observing the production conductor's input path and logging what it would
+claim. See [`MILESTONES.md`](MILESTONES.md) for what lands next.
 
 ## Quickstart — a running, empty Sortyard on a local cluster
 
@@ -69,6 +70,51 @@ docker run -d --name sortyard-pg -e POSTGRES_PASSWORD=pw -p 5432:5432 postgres:1
 PGHOST=localhost PGUSER=postgres PGPASSWORD=pw pytest tests/test_migrations.py   # needs psql
 ```
 
+## Shadow conductor (Phase 1)
+
+`sortyard-conductor --shadow` is the conductor in observe-only mode (design §8): every pass
+(default every 300 s, drive.py's cadence) it reads the production conductor's input path —
+the board view, the lane registry (`products.json`) and the task_ready gating output —
+**read-only** (GET only; it holds no write credential and no Kubernetes token), computes what
+it would claim and refuse, and appends that to the DecisionLog (`sortyard.decision_log`, plus
+`shadow_would_claim` / `shadow_would_skip` / `shadow_pass` events in the ledger). It never
+claims, merges, comments or writes anywhere but its own database. Each production pass
+(`production_pass_id`) is recorded once.
+
+Two input sources (`charts/sortyard/values.yaml`, `shadow.*`; formats in
+`src/sortyard/shadow/sources.py`): `snapshot` — a **pass feed** by URL or path
+(`{"passes": [board view, ...]}`, or a directory with one board view per pass) that retains
+passes until the shadow has read them, e.g. drive.py's board views exported by the
+production control plane; every pass not yet recorded is recorded on the next read, however
+many arrived in between (a single board view also works, but only sees the pass current at
+read time). `plane` — the board straight from Plane's REST API with a read-only API key,
+plus the lane registry mounted from a ConfigMap, driven by the production conductor's pass log
+(`shadow.plane.passes`), which retains each pass's inputs (the Plane issues and task_ready
+output it read); every new pass is replayed from its own inputs and recorded, however many
+arrived between polls. A pass with no retained inputs can only be read live while it is the
+newest; an older one stops the poll (nothing recorded, logged) instead of being decided
+against a board it never saw. Redirects that would carry the API
+key to another origin, or downgrade https to http, are refused.
+
+Runbook:
+
+```sh
+# Start (pass feed by URL):
+helm upgrade sortyard charts/sortyard --reuse-values --set shadow.enabled=true --set shadow.snapshot=<pass-feed URL>
+# Start (Plane): secret with a READ-ONLY key, then point the shadow at the board + lane registry.
+kubectl create secret generic plane-read --from-literal=api-key=<read-only Plane API key>
+helm upgrade sortyard charts/sortyard --reuse-values --set shadow.enabled=true --set shadow.source=plane --set shadow.plane.url=<Plane URL> --set shadow.plane.workspace=<slug> --set 'shadow.plane.projects={<project id>}' --set shadow.plane.apiKeySecret=plane-read --set shadow.lanes.configMap=<ConfigMap holding products.json> --set shadow.plane.passes=<pass-log URL> --set shadow.interval=15
+# Watch it:
+kubectl logs -f deployment/sortyard-shadow-conductor
+kubectl exec statefulset/sortyard-postgres -- psql -U sortyard sortyard -c "SELECT conductor_pass_id, decision, task_id, doc->'reason_codes' FROM sortyard.decision_log ORDER BY recorded_at DESC, (doc->'inputs'->>'preview_position')::int LIMIT 20"
+# Pause (keeps config): kubectl scale deployment/sortyard-shadow-conductor --replicas=0
+# Stop:
+helm upgrade sortyard charts/sortyard --reuse-values --set shadow.enabled=false
+```
+
+Locally: `SORTYARD_SHADOW_SNAPSHOT=board.json sortyard-conductor --shadow --once` (environment
+variables: `src/sortyard/services/conductor.py`).
+
 ## Data model
 
 The §3 domain objects are frozen as JSON Schemas in [`spec/`](spec/), and everything else is
@@ -98,9 +144,10 @@ request and every push to `main`, plus `helm lint`/`helm template` and a contain
 
 | Path | What |
 |---|---|
-| `src/sortyard/services/` | The six services (§4), one console script each: `sortyard-api`, `sortyard-conductor`, `sortyard-context-assembler`, `sortyard-eval-runner`, `sortyard-sensor-runner`, `sortyard-integrator`. All but the API are stubs that start, log and idle. |
+| `src/sortyard/services/` | The six services (§4), one console script each: `sortyard-api`, `sortyard-conductor`, `sortyard-context-assembler`, `sortyard-eval-runner`, `sortyard-sensor-runner`, `sortyard-integrator`. Besides the API, only the conductor's shadow mode (`--shadow`) does work yet; the rest are stubs that start, log and idle. |
+| `src/sortyard/shadow/` | The shadow conductor: read-only input adapters, the claim decision (a pure function), and the DecisionLog writer. |
 | `src/sortyard/models/` | The §3 data models, generated from `spec/` (`codegen.py` is the generator). |
-| `charts/sortyard/` | The Helm chart: API Deployment + Service, Postgres StatefulSet + Service + Secret, the migration Job. |
+| `charts/sortyard/` | The Helm chart: API Deployment + Service, Postgres StatefulSet + Service + Secret, the migration Job, and (opt-in) the shadow conductor Deployment. |
 | `charts/sortyard/migrations/` | The SQL migrations (§3 tables + event ledger) and `migrate.sh`, the Job's runner. |
 | `Dockerfile` | One image for every service; the Deployment's `command` picks the entry point. |
 | `spec/` | Phase 0: the §3 JSON Schemas and the OpenAPI spec, with their tests. |
