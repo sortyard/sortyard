@@ -77,8 +77,8 @@ shadow:
   # snapshot: a pass feed {"passes": [board view, ...]} retaining unread passes, a directory
   #   of board views (one per pass), or a single board view (file or http(s) URL; see
   #   sortyard.shadow.sources). Only a feed/directory records every production pass.
-  # plane: the board from Plane's REST API, joined with the lane registry below; one read per
-  #   new pass in the production pass log (use a short interval, e.g. 15).
+  # plane: the board from Plane's REST API, joined with the lane registry below; every new
+  #   pass in the production pass log is replayed from the inputs it retained.
   source: snapshot
   snapshot: ""
   # Optional task_ready gating output (file or http(s) URL).
@@ -90,7 +90,8 @@ shadow:
     projects: []
     # Name of a Secret with key `api-key`: a READ-ONLY Plane API key.
     apiKeySecret: ""
-    # The production conductor's pass log (file or http(s) URL): {"passes": [{"production_pass_id": ...}]}.
+    # The production conductor's pass log (file or http(s) URL), retaining each pass's inputs:
+    # {"passes": [{"production_pass_id": ..., "inputs": {"issues": {<project id>: [...]}, "gating": {...}}}]}.
     passes: ""
   # The lane registry (the conductor's products.json), mounted read-only from a ConfigMap.
   lanes:

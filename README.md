@@ -88,9 +88,12 @@ passes until the shadow has read them, e.g. drive.py's board views exported by t
 production control plane; every pass not yet recorded is recorded on the next read, however
 many arrived in between (a single board view also works, but only sees the pass current at
 read time). `plane` — the board straight from Plane's REST API with a read-only API key,
-plus the lane registry mounted from a ConfigMap, read once per new pass in the production
-conductor's pass log (`shadow.plane.passes`); passes superseded before the shadow could read
-the board are recorded as `shadow_pass_unobserved` gaps. Redirects that would carry the API
+plus the lane registry mounted from a ConfigMap, driven by the production conductor's pass log
+(`shadow.plane.passes`), which retains each pass's inputs (the Plane issues and task_ready
+output it read); every new pass is replayed from its own inputs and recorded, however many
+arrived between polls. A pass with no retained inputs can only be read live while it is the
+newest; an older one stops the poll (nothing recorded, logged) instead of being decided
+against a board it never saw. Redirects that would carry the API
 key to another origin, or downgrade https to http, are refused.
 
 Runbook:

@@ -345,7 +345,6 @@ def test_a_pass_feed_yields_every_pass_not_yet_recorded(tmp_path: pathlib.Path) 
     path.write_text(json.dumps(feed("p1", "p2", "p3")))
     pending = sources.SnapshotSource(str(path)).pending(lambda pid: pid == "p1")
     assert [s.production_pass_id for s in pending.snapshots] == ["p2", "p3"]
-    assert pending.unobserved == []
 
 
 def test_a_pass_feed_needs_pass_ids_and_its_own_gating(tmp_path: pathlib.Path) -> None:
@@ -449,6 +448,91 @@ def test_plane_source_builds_the_board_view_read_only(tmp_path: pathlib.Path) ->
     ]
     claims = [d.item_id for d in evaluate.evaluate(snap, evaluate.ClaimPolicy()) if d.claimed]
     assert claims == ["SORTYARD-8"]
+
+
+def retained_pass_2() -> dict[str, Any]:
+    """The inputs production pass 2 read: SORTYARD-6 still in progress, and task_ready
+    holding SORTYARD-8 — a board and gating unlike the live ones."""
+    routes = plane_routes()
+    base = f"/api/v1/workspaces/noncelogic/projects/{PLANE_PROJECT}"
+    issues = (
+        routes[f"{base}/issues/"]["results"] + routes[f"{base}/issues/?cursor=100:1:0"]["results"]
+    )
+    issues = [dict(i, state="st-prog") if i["sequence_id"] == 6 else i for i in issues]
+    return {
+        "taken_at": "2026-11-10T12:05:00Z",
+        "issues": {PLANE_PROJECT: issues},
+        "gating": {"SORTYARD-8": {"ready": False, "reason": "awaiting review"}},
+    }
+
+
+PASS_2_DECISIONS = [
+    (
+        "SORTYARD-8",
+        "skip",
+        ["held: task_ready: awaiting review", "held: dependency SORTYARD-6 not done (In Progress)"],
+    ),
+    ("SORTYARD-9", "skip", ["held: dependency SORTYARD-8 not done (Todo)"]),
+]
+
+
+def plane_source(url: str, tmp_path: pathlib.Path, log: dict[str, Any]) -> sources.PlaneSource:
+    lanes = tmp_path / "products.json"
+    lanes.write_text(json.dumps({"sortyard": {"lanes": 1}}))
+    passes = tmp_path / "passes.json"
+    passes.write_text(json.dumps(log))
+    return sources.PlaneSource(
+        base_url=url,
+        workspace_slug="noncelogic",
+        project_ids=[PLANE_PROJECT],
+        api_key="read-key",
+        lanes_path=str(lanes),
+        passes=str(passes),
+    )
+
+
+def test_plane_mode_replays_every_pass_from_its_retained_inputs(tmp_path: pathlib.Path) -> None:
+    """p1 is recorded; p2 and p3 arrive together. p2 is decided from the board and gating it
+    retained in the pass log, p3 (the newest, nothing retained) from the live board."""
+    inputs = tmp_path / "pass-2-inputs.json"
+    inputs.write_text(json.dumps(retained_pass_2()))
+    log = {"passes": ["p1", {"production_pass_id": "p2", "inputs": str(inputs)}, "p3"]}
+    up = FakeUpstream(plane_routes())
+    try:
+        pending = plane_source(up.url, tmp_path, log).pending(lambda pid: pid == "p1")
+    finally:
+        up.close()
+    assert up.methods() == {"GET"}
+    assert [s.production_pass_id for s in pending.snapshots] == ["p2", "p3"]
+    p2, p3 = pending.snapshots
+    assert p2.taken_at == "2026-11-10T12:05:00Z"
+    decided = [
+        (d.item_id, d.decision, list(d.reason_codes))
+        for d in evaluate.evaluate(p2, evaluate.ClaimPolicy())
+        if d.item_id != "SORTYARD-6"
+    ]
+    assert decided == PASS_2_DECISIONS
+    claims = [d.item_id for d in evaluate.evaluate(p3, evaluate.ClaimPolicy()) if d.claimed]
+    assert claims == ["SORTYARD-8"]
+    # Inline retained inputs replay identically.
+    log["passes"][1] = {"production_pass_id": "p2", "inputs": retained_pass_2()}
+    up = FakeUpstream(plane_routes())
+    try:
+        again = plane_source(up.url, tmp_path, log).pending(lambda pid: pid == "p1")
+    finally:
+        up.close()
+    assert again.snapshots[0].content_hash() == p2.content_hash()
+
+
+def test_plane_mode_refuses_an_older_pass_it_cannot_replay(tmp_path: pathlib.Path) -> None:
+    """A superseded pass that retained no inputs is not decided against today's board."""
+    up = FakeUpstream(plane_routes())
+    try:
+        source = plane_source(up.url, tmp_path, {"passes": ["p1", "p2", "p3"]})
+        with pytest.raises(sources.SourceError, match="p2 retained no inputs"):
+            source.pending(lambda pid: pid == "p1")
+    finally:
+        up.close()
 
 
 # --- the service: DecisionLog entries in the event ledger -------------------------------------
@@ -622,8 +706,8 @@ def test_passes_arriving_between_shadow_reads_are_all_recorded(
 def test_plane_mode_is_triggered_per_production_pass(
     db: Database, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:
-    """Plane only shows the board as it is now: each new production pass triggers one read,
-    recorded under that pass's id; passes superseded before a read are recorded as gaps."""
+    """Each new production pass is recorded under its id with its own decisions: passes 2 and 3
+    arrive together, pass 2 replayed from the inputs it retained in the pass log."""
     assert db.migrate().returncode == 0
     up = FakeUpstream(plane_routes())
     lanes = tmp_path / "products.json"
@@ -646,7 +730,17 @@ def test_plane_mode_is_triggered_per_production_pass(
         # No new production pass: no board read, nothing recorded.
         assert conductor.main(["--shadow", "--once"]) == 0
         assert len(up.requests) == reads
-        log.write_text(json.dumps({"passes": ["drive-pass-1", "drive-pass-2", "drive-pass-3"]}))
+        log.write_text(
+            json.dumps(
+                {
+                    "passes": [
+                        "drive-pass-1",
+                        {"production_pass_id": "drive-pass-2", "inputs": retained_pass_2()},
+                        "drive-pass-3",
+                    ]
+                }
+            )
+        )
         assert conductor.main(["--shadow", "--once"]) == 0
     finally:
         up.close()
@@ -656,13 +750,20 @@ def test_plane_mode_is_triggered_per_production_pass(
         " (doc->'transition'->>'name'), ',' ORDER BY seq)"
         " FROM sortyard.event WHERE doc->'object'->>'kind' = 'conductor_pass'"
     )
-    assert passes == (
-        "drive-pass-1:shadow_pass,drive-pass-2:shadow_pass_unobserved,drive-pass-3:shadow_pass"
-    )
-    assert (
-        db.value(
-            "SELECT string_agg(DISTINCT conductor_pass_id, ',' ORDER BY conductor_pass_id)"
+    assert passes == ("drive-pass-1:shadow_pass,drive-pass-2:shadow_pass,drive-pass-3:shadow_pass")
+    decisions = {
+        n: db.json(
+            "SELECT coalesce(json_agg(json_build_array(task_id, decision, doc->'reason_codes')"
+            " ORDER BY (doc->'inputs'->>'preview_position')::int), '[]')"
             " FROM sortyard.decision_log"
+            " WHERE conductor_pass_id = :'p' AND task_id <> 'SORTYARD-6'",
+            {"p": f"shadow-drive-pass-{n}"},
         )
-        == "shadow-drive-pass-1,shadow-drive-pass-3"
-    )
+        for n in (1, 2, 3)
+    }
+    assert [tuple(d) for d in decisions[2]] == PASS_2_DECISIONS
+    for n in (1, 3):
+        assert [tuple(d)[:2] for d in decisions[n]] == [
+            ("SORTYARD-8", "claim"),
+            ("SORTYARD-9", "skip"),
+        ]

@@ -18,7 +18,8 @@ Shadow configuration (environment):
   SORTYARD_SHADOW_PLANE_API_KEY     plane: a READ-ONLY API key
   SORTYARD_SHADOW_LANES         plane: lane registry (products.json), file path or URL
   SORTYARD_SHADOW_PASSES        plane: the production conductor's pass log, file path or URL;
-                                each new pass id in it triggers one board read
+                                each new pass in it is recorded, replayed from the Plane
+                                issues and gating output it retained (sources.PlaneSource)
   SORTYARD_SHADOW_GATING        optional: task_ready gating output, file path or URL
   SORTYARD_SHADOW_WORKSPACE     workspace the DecisionLog is scoped to (default ws-shadow)
   SORTYARD_DATABASE_HOST/PORT/NAME/USER/PASSWORD   the shadow's own database (libpq PG*
@@ -144,15 +145,6 @@ def _ingest(conn: Any, source: Any, workspace: str, env: Mapping[str, str]) -> b
             source.location,
         )
     ledger.ensure_workspace(conn, workspace, provisional_installation(env))
-    for production_pass_id in pending.unobserved:
-        ledger.record_unobserved(
-            conn,
-            workspace_id=workspace,
-            production_pass_id=production_pass_id,
-            reason="superseded before the shadow read the board",
-            ts=sources.now(),
-        )
-        log.warning("shadow: production pass %s happened but was not observed", production_pass_id)
     policy = evaluate.ClaimPolicy()
     for snapshot in pending.snapshots:
         decisions = evaluate.evaluate(snapshot, policy)

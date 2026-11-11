@@ -16,12 +16,16 @@ could claim, move, comment on or merge anything.
   but only observes the pass that is current when it is read.
 - ``PlaneSource`` — the board straight from Plane's REST API (what plane_sync and drive.py
   read), joined with the conductor's lane registry (``products.json`` of the
-  ``conductor-config`` ConfigMap) and, optionally, the task_ready gating output. Plane only
-  shows the board as it is *now*, so this source is triggered by the production conductor's
-  pass log: each new production pass id it lists triggers one board read, recorded under
-  that id. When several passes arrived since the last poll only the newest can still be
-  observed; the older ones are returned as *unobserved* so they are recorded as explicit
-  gaps rather than disappearing.
+  ``conductor-config`` ConfigMap) and, optionally, the task_ready gating output. It is
+  triggered by the production conductor's **pass log**, which retains, per pass, the inputs
+  that pass read: each entry is ``{"production_pass_id": ..., "inputs": {"issues":
+  {<project id>: [Plane issue rows]}, "gating": {task_ready output}}}`` (``inputs`` may
+  instead be the file path or URL of that document). Every new pass is replayed from its own
+  retained inputs — through the same Plane-to-board translation as a live read — and
+  recorded under its id, however many passes arrived since the last poll. Plane only shows
+  the board as it is *now*, so a pass without retained inputs can be read live only while it
+  is the newest pass; an older one is refused (nothing is recorded that poll) rather than
+  decided against a board it never saw.
 
 HTTP redirects never carry a credential to another origin and never downgrade https to
 http: ``ReadOnlyHttp`` refuses such redirects instead of following them.
@@ -60,15 +64,10 @@ class SourceError(RuntimeError):
 
 @dataclass(frozen=True)
 class Pending:
-    """What one poll of the input path yields: the production passes not recorded yet.
-
-    ``snapshots`` — passes the shadow observed, oldest first, each to be decided and recorded;
-    ``unobserved`` — production pass ids that happened but whose board can no longer be read
-    (recorded as gaps, never silently dropped).
-    """
+    """What one poll of the input path yields: the production passes not recorded yet, oldest
+    first, each to be decided and recorded."""
 
     snapshots: list[QueueSnapshot] = field(default_factory=list)
-    unobserved: list[str] = field(default_factory=list)
 
 
 class Source(Protocol):
@@ -289,20 +288,31 @@ class SnapshotSource:
         )
 
 
-def parse_pass_log(doc: Any) -> list[str]:
+@dataclass(frozen=True)
+class PassEntry:
+    """One production pass in the pass log: its id and the inputs it retained (an inline
+    ``{"issues": ..., "gating": ...}`` document, its location, or None)."""
+
+    production_pass_id: str
+    inputs: Any = None
+
+
+def parse_pass_log(doc: Any) -> list[PassEntry]:
     """The production conductor's pass log, oldest first: ``{"passes": [...]}`` or a list,
-    each entry a pass id or ``{"production_pass_id": ...}``."""
+    each entry a pass id or ``{"production_pass_id": ..., "inputs": ...}``."""
     entries = _feed_entries(doc)
     if entries is None:
         raise SourceError('the production pass log must be {"passes": [...]} or a JSON list')
-    ids: list[str] = []
+    passes: dict[str, PassEntry] = {}
     for entry in entries:
         pid = entry.get("production_pass_id") if isinstance(entry, Mapping) else entry
         if not isinstance(pid, str) or not pid:
             raise SourceError(f"production pass log: no pass id in {entry!r}")
-        if pid not in ids:
-            ids.append(pid)
-    return ids
+        inputs = entry.get("inputs") if isinstance(entry, Mapping) else None
+        if inputs is not None and not isinstance(inputs, (str, Mapping)):
+            raise SourceError(f"production pass log: {pid}: inputs must be an object or location")
+        passes.setdefault(pid, PassEntry(pid, inputs))
+    return list(passes.values())
 
 
 def _results(doc: Any) -> list[Mapping[str, Any]]:
@@ -314,8 +324,9 @@ def _results(doc: Any) -> list[Mapping[str, Any]]:
 
 class PlaneSource:
     """The board from Plane's REST API (``X-API-Key``; GET only), with the lane registry and
-    optional task_ready gating output joined in; each read is triggered by a new pass in the
-    production conductor's pass log (``passes``, file path or URL)."""
+    optional task_ready gating output joined in; one snapshot per new pass in the production
+    conductor's pass log (``passes``, file path or URL), replayed from the inputs that pass
+    retained (module docstring)."""
 
     PAGE_SIZE = 100
 
@@ -356,7 +367,8 @@ class PlaneSource:
             query = {"per_page": str(self.PAGE_SIZE), "cursor": str(page["next_cursor"])}
         raise SourceError(f"Plane project {project_id}: pagination did not end")
 
-    def _project_items(self, project_id: str) -> list[BoardItem]:
+    def _project_meta(self, project_id: str) -> tuple[str, dict[str, Any], dict[str, str]]:
+        """A project's board identifier, states by id and label names by id."""
         project = self._get(f"projects/{project_id}/")
         identifier = str(project.get("identifier") or "") if isinstance(project, Mapping) else ""
         if not identifier:
@@ -366,8 +378,16 @@ class PlaneSource:
             str(lb["id"]): str(lb.get("name") or lb["id"])
             for lb in _results(self._get(f"projects/{project_id}/labels/"))
         }
+        return identifier, states, labels
+
+    @staticmethod
+    def _board_items(
+        meta: tuple[str, Mapping[str, Any], Mapping[str, str]],
+        issues: Sequence[Mapping[str, Any]],
+    ) -> list[BoardItem]:
+        identifier, states, labels = meta
         items = []
-        for issue in self._issues(project_id):
+        for issue in issues:
             state = states.get(str(issue.get("state")))
             if state is None or state.get("group") not in STATE_GROUPS:
                 raise SourceError(f"{identifier}-{issue.get('sequence_id')}: unknown state")
@@ -390,11 +410,15 @@ class PlaneSource:
             )
         return items
 
-    def read(self, production_pass_id: str | None = None) -> QueueSnapshot:
-        taken_at = now()
-        items = [i for pid in self.project_ids for i in self._project_items(pid)]
-        lanes = parse_lanes(read_json(self.lanes_path, self.http))
-        gating = parse_gating(read_json(self.gating, self.http)) if self.gating else {}
+    def _snapshot(
+        self,
+        *,
+        items: list[BoardItem],
+        lanes: list[Lane],
+        gating: dict[str, Gate],
+        production_pass_id: str | None,
+        taken_at: str,
+    ) -> QueueSnapshot:
         try:
             return QueueSnapshot.build(
                 taken_at=taken_at,
@@ -407,12 +431,91 @@ class PlaneSource:
         except SnapshotError as exc:
             raise SourceError(str(exc)) from exc
 
+    def _live(
+        self,
+        production_pass_id: str | None,
+        meta: Mapping[str, tuple[str, Mapping[str, Any], Mapping[str, str]]],
+        lanes: list[Lane],
+    ) -> QueueSnapshot:
+        """The board as it is now (a live read)."""
+        taken_at = now()
+        items = [
+            item
+            for pid in self.project_ids
+            for item in self._board_items(meta[pid], self._issues(pid))
+        ]
+        return self._snapshot(
+            items=items,
+            lanes=lanes,
+            gating=parse_gating(read_json(self.gating, self.http)) if self.gating else {},
+            production_pass_id=production_pass_id,
+            taken_at=taken_at,
+        )
+
+    def read(self, production_pass_id: str | None = None) -> QueueSnapshot:
+        """The board as it is now (a live read)."""
+        meta = {pid: self._project_meta(pid) for pid in self.project_ids}
+        return self._live(
+            production_pass_id, meta, parse_lanes(read_json(self.lanes_path, self.http))
+        )
+
+    def _replay(
+        self,
+        entry: PassEntry,
+        meta: Mapping[str, tuple[str, Mapping[str, Any], Mapping[str, str]]],
+        lanes: list[Lane],
+    ) -> QueueSnapshot:
+        """A pass decided from the inputs it retained in the pass log."""
+        pid = entry.production_pass_id
+        doc = read_json(entry.inputs, self.http) if isinstance(entry.inputs, str) else entry.inputs
+        issues = doc.get("issues") if isinstance(doc, Mapping) else None
+        if not isinstance(issues, Mapping):
+            raise SourceError(f"production pass {pid}: retained inputs have no issues by project")
+        items = []
+        for project_id in self.project_ids:
+            rows = issues.get(project_id)
+            if not isinstance(rows, list):
+                raise SourceError(f"production pass {pid}: no retained issues for {project_id}")
+            items += self._board_items(
+                meta[project_id], [r for r in rows if isinstance(r, Mapping)]
+            )
+        if "gating" in doc:
+            gating = parse_gating(doc["gating"])
+        elif self.gating:
+            # Today's gating output joined onto an earlier pass would record decisions that
+            # pass never faced.
+            raise SourceError(f"production pass {pid}: retained inputs have no gating output")
+        else:
+            gating = {}
+        return self._snapshot(
+            items=items,
+            lanes=lanes,
+            gating=gating,
+            production_pass_id=pid,
+            taken_at=str(doc.get("taken_at") or now()),
+        )
+
     def pending(self, is_recorded: Callable[[str], bool]) -> Pending:
-        """New production passes: the board is read once, for the newest; any older new ones
-        can no longer be observed and are reported as such."""
+        """Every production pass not recorded yet, oldest first, each from its own inputs."""
         if not self.passes:
             raise SourceError("plane source: the production pass log (passes) is required")
-        new = [p for p in parse_pass_log(read_json(self.passes, self.http)) if not is_recorded(p)]
+        log = parse_pass_log(read_json(self.passes, self.http))
+        new = [e for e in log if not is_recorded(e.production_pass_id)]
         if not new:
             return Pending()
-        return Pending(snapshots=[self.read(production_pass_id=new[-1])], unobserved=new[:-1])
+        for entry in new[:-1]:
+            if entry.inputs is None:
+                raise SourceError(
+                    f"production pass {entry.production_pass_id} retained no inputs in the pass"
+                    " log and is no longer the newest pass: its board cannot be replayed"
+                )
+        lanes = parse_lanes(read_json(self.lanes_path, self.http))
+        meta = {pid: self._project_meta(pid) for pid in self.project_ids}
+        return Pending(
+            snapshots=[
+                self._live(entry.production_pass_id, meta, lanes)
+                if entry.inputs is None  # the newest pass: the board now is the board it read
+                else self._replay(entry, meta, lanes)
+                for entry in new
+            ]
+        )
