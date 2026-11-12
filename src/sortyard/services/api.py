@@ -1,12 +1,16 @@
 """API service — the only door (design §4): console, agents and conductor are all its clients.
 
-Phase 1 skeleton: liveness, Postgres-backed readiness and installation info. The REST surface
-of spec/openapi.json lands with the core state API task; this module gives it a home.
-
 Endpoints:
   GET /healthz   200 while the process serves requests.
   GET /readyz    200 when Postgres answers, 503 otherwise (the Kubernetes readiness gate).
   GET /v1/info   name, version and the services of this package.
+  /v1/workspaces/{workspace_id}/...   the Phase 1 REST surface of spec/openapi.json — tasks,
+                 lanes, policy read paths, the DecisionLog, decisions, a build worker's stage-run
+                 calls, findings, the Integrator instruction, role bindings and service-account
+                 tokens — behind bearer tokens and the §7 permission matrix (sortyard.api).
+
+Operator credential (interim, until OIDC sessions): ``sortyard-api --issue-operator-token
+<role-binding-id>`` prints a bearer token for an admin/operator/viewer RoleBinding.
 """
 
 from __future__ import annotations
@@ -20,13 +24,18 @@ import socket
 import struct
 import sys
 import threading
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from types import FrameType
+from typing import Any
+
+import psycopg
+import psycopg.conninfo
 
 from sortyard import __version__
+from sortyard.api import auth, routing
 from sortyard.services import SERVICES
 
 log = logging.getLogger("sortyard.api")
@@ -44,6 +53,10 @@ class Config:
     database_host: str = "localhost"
     database_port: int = 5432
     database_timeout_seconds: float = 2.0
+    database_name: str | None = None
+    database_user: str | None = None
+    database_password: str | None = None
+    token_ttl_seconds: int = auth.DEFAULT_TTL_SECONDS
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> Config:
@@ -52,7 +65,23 @@ class Config:
             port=int(env.get("SORTYARD_API_PORT", cls.port)),
             database_host=env.get("SORTYARD_DATABASE_HOST", cls.database_host),
             database_port=int(env.get("SORTYARD_DATABASE_PORT", cls.database_port)),
+            database_name=env.get("SORTYARD_DATABASE_NAME") or None,
+            database_user=env.get("SORTYARD_DATABASE_USER") or None,
+            database_password=env.get("SORTYARD_DATABASE_PASSWORD") or None,
+            token_ttl_seconds=int(env.get("SORTYARD_API_TOKEN_TTL_SECONDS", cls.token_ttl_seconds)),
         )
+
+    def conninfo(self) -> str:
+        """libpq connection string; fields left unset fall back to the PG* variables."""
+        fields: dict[str, Any] = {
+            "host": self.database_host,
+            "port": self.database_port,
+            "dbname": self.database_name,
+            "user": self.database_user,
+            "password": self.database_password,
+            "connect_timeout": max(1, int(self.database_timeout_seconds)),
+        }
+        return psycopg.conninfo.make_conninfo(**{k: v for k, v in fields.items() if v is not None})
 
 
 def postgres_answers(host: str, port: int, timeout: float) -> bool:
@@ -66,11 +95,15 @@ def postgres_answers(host: str, port: int, timeout: float) -> bool:
         return False
 
 
+Connect = Callable[[], "psycopg.Connection[Any]"]
+
+
 class Server(ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, connect: Connect | None = None) -> None:
         self.config = config
+        self.connect: Connect = connect or (lambda: psycopg.connect(config.conninfo()))
         super().__init__((config.host, config.port), Handler)
 
 
@@ -97,12 +130,40 @@ class Handler(BaseHTTPRequestHandler):
                 {"name": "sortyard", "version": __version__, "services": sorted(SERVICES)},
             )
         else:
-            self._json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            self._operation("GET")
 
-    def _json(self, status: HTTPStatus, body: Mapping[str, object]) -> None:
-        payload = json.dumps(body).encode()
+    def do_POST(self) -> None:
+        self._operation("POST")
+
+    def do_PATCH(self) -> None:
+        self._operation("PATCH")
+
+    def do_DELETE(self) -> None:
+        self._operation("DELETE")
+
+    def _operation(self, method: str) -> None:
+        length = int(self.headers.get("Content-Length") or 0)
+        raw = self.rfile.read(length) if length > 0 else b""
+        answer = routing.dispatch(
+            method,
+            self.path,
+            {k: v for k, v in self.headers.items()},
+            raw,
+            self.server.connect,
+            self.server.config.token_ttl_seconds,
+        )
+        if answer is None:
+            self._json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+        else:
+            self._json(HTTPStatus(answer.status), answer.body, answer.content_type)
+
+    def _json(
+        self, status: HTTPStatus, body: object, content_type: str = "application/json"
+    ) -> None:
+        payload = b"" if status == HTTPStatus.NO_CONTENT else json.dumps(body).encode()
         self.send_response(status)
-        self.send_header("Content-Type", "application/json")
+        if payload:
+            self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
         self.wfile.write(payload)
@@ -111,8 +172,20 @@ class Handler(BaseHTTPRequestHandler):
         log.info("%s %s", self.address_string(), format % args)
 
 
-def make_server(config: Config) -> Server:
-    return Server(config)
+def make_server(config: Config, connect: Connect | None = None) -> Server:
+    return Server(config, connect)
+
+
+def issue_operator_token(config: Config, role_binding_id: str, ttl_seconds: int) -> int:
+    """Print a bearer token for an operator RoleBinding (the interim operator credential)."""
+    try:
+        with psycopg.connect(config.conninfo()) as conn:
+            issued = auth.issue_operator_token(conn, role_binding_id, ttl_seconds)
+    except (ValueError, psycopg.Error) as exc:
+        print(f"sortyard-api: {exc}", file=sys.stderr)
+        return 1
+    print(issued.token)
+    return 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -121,7 +194,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         description="Sortyard API service. Configured by SORTYARD_API_* and "
         "SORTYARD_DATABASE_* environment variables.",
     )
-    parser.parse_args(argv)
+    parser.add_argument(
+        "--issue-operator-token",
+        metavar="ROLE_BINDING_ID",
+        help="print a bearer token for an admin/operator/viewer RoleBinding and exit "
+        "(the interim operator credential until OIDC sessions)",
+    )
+    parser.add_argument(
+        "--ttl",
+        type=int,
+        default=12 * 3600,
+        metavar="SECONDS",
+        help="lifetime of a token from --issue-operator-token (default 43200)",
+    )
+    args = parser.parse_args(argv)
+    if args.issue_operator_token:
+        return issue_operator_token(Config.from_env(), args.issue_operator_token, args.ttl)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     server = make_server(Config.from_env())
 

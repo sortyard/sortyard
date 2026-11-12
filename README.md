@@ -6,11 +6,11 @@ for agents. The design record is [`DESIGN.md`](DESIGN.md) (architecture: §4); t
 decided in [`DECISIONS.md`](DECISIONS.md) (SY-DEC-001); the frozen domain model and API
 contract are in [`spec/`](spec/).
 
-This repository is at the **Phase 1 skeleton**: the six services exist as entry points, the
-API service answers health/readiness/info, and the chart installs the API plus Postgres with
-the §3 domain schema and the event ledger migrated in, and the conductor can run in shadow
-mode (below) — observing the production conductor's input path and logging what it would
-claim. See [`MILESTONES.md`](MILESTONES.md) for what lands next.
+This repository is at **Phase 1**: the six services exist as entry points, the API service
+serves the Phase 1 REST surface of the OpenAPI spec behind service-account tokens and the §7
+permission matrix (below), the chart installs the API plus Postgres with the §3 domain schema
+and the event ledger migrated in, and the conductor can run in shadow mode (below) — observing
+the production conductor's input path and logging what it would claim. See [`MILESTONES.md`](MILESTONES.md) for what lands next.
 
 ## Quickstart — a running, empty Sortyard on a local cluster
 
@@ -61,14 +61,45 @@ python -m sortyard.models.codegen --check   # generated models match spec/ (CI f
 sortyard-api                             # serves on :8080; SORTYARD_DATABASE_HOST/PORT locate Postgres
 ```
 
-The migration and ledger tests (`tests/test_migrations.py`) run against a real Postgres and
-are skipped without one. Point them at any server you may create databases on, using the
-standard libpq variables (each run creates and drops its own database):
+The migration, ledger and API tests (`tests/test_migrations.py`, `tests/test_api_*.py`) run
+against a real Postgres and are skipped without one. Point them at any server you may create
+databases on, using the standard libpq variables (each run creates and drops its own database):
 
 ```sh
 docker run -d --name sortyard-pg -e POSTGRES_PASSWORD=pw -p 5432:5432 postgres:16-alpine
 PGHOST=localhost PGUSER=postgres PGPASSWORD=pw pytest tests/test_migrations.py   # needs psql
 ```
+
+## API service (Phase 1)
+
+`sortyard-api` is the only door (design §4). Under `/v1/workspaces/{workspace_id}/` it serves
+the Phase 1 surface of [`spec/openapi.json`](spec/openapi.json): tasks (create, groom, ready,
+claim, advance, hand back, block/unblock, cancel, requeue, per-task DecisionLog), lanes,
+policy read paths (policies, prioritization and sequencing policies, with their versions) and
+policy edits, the DecisionLog, decisions, a build worker's context-packet read and result
+submit, findings, the Integrator instruction, role bindings and service-account tokens. The
+routed operations and the roles allowed on each are `sortyard.api.permissions.OPERATIONS`,
+held to the spec's `x-sortyard-roles` by `tests/test_api_contract.py`, which also runs every
+operation against the spec's status codes and response schemas.
+
+Every call carries `Authorization: Bearer <token>`. Tokens are stored only as SHA-256 hashes
+(`sortyard.api_token`, migration 0002) and are confined to one workspace:
+
+- **Service accounts** (§7): an admin issues a token for an `agent-service-account`
+  RoleBinding with `POST .../role-bindings/{id}/tokens {"agent_role": ...}`. A `build-worker`
+  token names its `stage_run_id` and reaches only that stage run's context packet and result
+  (once); a `sensor` token names its `project_id` and files findings and `origin: sensor`
+  tasks there only; a `grooming-agent` token creates and grooms (`origin: grooming`), never
+  claims or merges; only the `conductor` claims, advances, hands back or instructs the
+  Integrator; only operator accounts edit policies and lanes or answer decisions. A token is
+  refused (422 `create_and_claim`) if it — together with the service account's other live
+  tokens — would both create and claim tasks; the table refuses such a row too.
+- **Operators**: until OIDC sessions land, an operator credential is printed by
+  `sortyard-api --issue-operator-token <role-binding-id>` (admin/operator/viewer bindings;
+  the binding's current role applies on every call), e.g.
+  `kubectl exec deployment/sortyard-api -- sortyard-api --issue-operator-token rb-admin`.
+
+Every mutation writes an AuditLog entry and a ledger event.
 
 ## Shadow conductor (Phase 1)
 
@@ -144,11 +175,12 @@ request and every push to `main`, plus `helm lint`/`helm template` and a contain
 
 | Path | What |
 |---|---|
-| `src/sortyard/services/` | The six services (§4), one console script each: `sortyard-api`, `sortyard-conductor`, `sortyard-context-assembler`, `sortyard-eval-runner`, `sortyard-sensor-runner`, `sortyard-integrator`. Besides the API, only the conductor's shadow mode (`--shadow`) does work yet; the rest are stubs that start, log and idle. |
+| `src/sortyard/services/` | The six services (§4), one console script each: `sortyard-api`, `sortyard-conductor`, `sortyard-context-assembler`, `sortyard-eval-runner`, `sortyard-sensor-runner`, `sortyard-integrator`. Besides the API (REST surface in `src/sortyard/api/`), only the conductor's shadow mode (`--shadow`) does work yet; the rest are stubs that start, log and idle. |
+| `src/sortyard/api/` | The API's REST surface: the §7 permission matrix (`permissions.py`), tokens (`auth.py`), routing, handlers and the Postgres store with its audit/ledger writes. |
 | `src/sortyard/shadow/` | The shadow conductor: read-only input adapters, the claim decision (a pure function), and the DecisionLog writer. |
 | `src/sortyard/models/` | The §3 data models, generated from `spec/` (`codegen.py` is the generator). |
 | `charts/sortyard/` | The Helm chart: API Deployment + Service, Postgres StatefulSet + Service + Secret, the migration Job, and (opt-in) the shadow conductor Deployment. |
-| `charts/sortyard/migrations/` | The SQL migrations (§3 tables + event ledger) and `migrate.sh`, the Job's runner. |
+| `charts/sortyard/migrations/` | The SQL migrations (§3 tables + event ledger; 0002: the API token store) and `migrate.sh`, the Job's runner. |
 | `Dockerfile` | One image for every service; the Deployment's `command` picks the entry point. |
 | `spec/` | Phase 0: the §3 JSON Schemas and the OpenAPI spec, with their tests. |
 | `tests/` | Tests for the package, chart, CI and this quickstart. |

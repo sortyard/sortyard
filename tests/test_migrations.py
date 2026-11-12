@@ -29,6 +29,8 @@ EMBEDDED = {"resource-envelope"}
 APPEND_ONLY = {"event", "decision_log", "audit_log"}
 # Rows other rows point at, so they go in first.
 FIRST = ["installation", "workspace"]
+# Tables that are not §3 objects: the API's bearer-token store (0002).
+INFRASTRUCTURE = {"api_token"}
 
 
 def schema(kind: str) -> dict[str, Any]:
@@ -72,7 +74,7 @@ def test_migrations_do_not_manage_their_own_transactions() -> None:
 
 def test_every_section_3_object_has_a_table() -> None:
     expected = {table(kind) for kind in models.MODELS if kind not in EMBEDDED}
-    assert created_tables() == expected
+    assert created_tables() == expected | INFRASTRUCTURE
 
 
 def test_generated_columns_name_real_schema_properties() -> None:
@@ -83,6 +85,8 @@ def test_generated_columns_name_real_schema_properties() -> None:
     assert blocks
     kinds = {table(k): k for k in models.MODELS}
     for name, body in blocks:
+        if name in INFRASTRUCTURE:
+            continue
         props = set(models.MODELS[kinds[name]].json_fields())
         for key in re.findall(r"GENERATED ALWAYS AS \(doc ->> '(\w+)'\)", body):
             assert key in props, f"{name}: {key}"
