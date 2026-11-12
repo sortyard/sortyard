@@ -3,8 +3,12 @@
 The schema is the contract and the models are derived from it: never edit the generated module
 by hand. After changing a schema, regenerate and commit both:
 
-    python -m sortyard.models.codegen           # rewrite src/sortyard/models/_generated.py
-    python -m sortyard.models.codegen --check   # exit 1 if the committed module has drifted
+    python -m sortyard.models.codegen           # rewrite _generated.py and schemas.json
+    python -m sortyard.models.codegen --check   # exit 1 if either committed file has drifted
+
+``schemas.json`` bundles the schemas themselves (keyed by ``$id``) into the package, so the
+installed services validate documents against the full JSON Schemas (``sortyard.models.schema``)
+— the generated classes enforce the structural contract only.
 
 What becomes a class: every top-level object schema (named by its ``title``), every object in
 a ``$defs`` block (common definitions by their own name, a schema's own definitions prefixed
@@ -31,6 +35,7 @@ from urllib.parse import urljoin
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 SPEC = ROOT / "spec"
 GENERATED = pathlib.Path(__file__).with_name("_generated.py")
+BUNDLE = pathlib.Path(__file__).with_name("schemas.json")
 COMMON = "common.schema.json"
 RESERVED = {"additional_properties", "from_dict", "to_dict", "json_fields"}
 WIDTH = 100
@@ -317,20 +322,32 @@ def generate(spec: pathlib.Path = SPEC) -> str:
     return Generator(spec).run()
 
 
+def bundle(spec: pathlib.Path = SPEC) -> str:
+    """Every schema in ``spec``, keyed by its ``$id``, as the packaged ``schemas.json``."""
+    docs = {}
+    for path in sorted(spec.glob("*.schema.json")):
+        doc = json.loads(path.read_text())
+        docs[doc["$id"]] = doc
+    return json.dumps(docs, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n"
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m sortyard.models.codegen", description=__doc__)
     parser.add_argument("--spec", type=pathlib.Path, default=SPEC, help="schema directory")
-    parser.add_argument("--check", action="store_true", help="fail if the module has drifted")
+    parser.add_argument("--check", action="store_true", help="fail if the outputs have drifted")
     args = parser.parse_args(argv)
-    source = generate(args.spec)
+    outputs = {GENERATED: generate(args.spec), BUNDLE: bundle(args.spec)}
     if args.check:
-        if not GENERATED.exists() or GENERATED.read_text() != source:
-            print(f"{GENERATED} is out of date with {args.spec}; run {parser.prog}")
+        drifted = [p for p, text in outputs.items() if not p.exists() or p.read_text() != text]
+        for path in drifted:
+            print(f"{path} is out of date with {args.spec}; run {parser.prog}")
+        if drifted:
             return 1
-        print(f"{GENERATED.name} matches {args.spec}")
+        print(f"{GENERATED.name} and {BUNDLE.name} match {args.spec}")
         return 0
-    GENERATED.write_text(source)
-    print(f"wrote {GENERATED}")
+    for path, text in outputs.items():
+        path.write_text(text)
+        print(f"wrote {path}")
     return 0
 
 
