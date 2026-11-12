@@ -17,6 +17,7 @@ service account.
 from __future__ import annotations
 
 import threading
+import time
 from collections.abc import Iterator
 from typing import Any
 
@@ -281,13 +282,14 @@ def test_overlapping_issuance_through_two_bindings_of_one_account_is_serialised(
     )
     admin = {"kind": "operator", "id": "op-admin"}
     outcome: dict[str, Any] = {}
+    second_pid: dict[str, int] = {}
+    connected = threading.Event()
 
-    first = psycopg.connect(api.conninfo)
-    try:
-        auth.issue_service_account_token(first, WS, "rb-dual-1", {"agent_role": "conductor"}, admin)
-
-        def second() -> None:
+    def second() -> None:
+        try:
             with psycopg.connect(api.conninfo) as conn:
+                second_pid["pid"] = conn.info.backend_pid
+                connected.set()
                 try:
                     auth.issue_service_account_token(
                         conn,
@@ -299,16 +301,42 @@ def test_overlapping_issuance_through_two_bindings_of_one_account_is_serialised(
                     outcome["second"] = "issued"
                 except auth.IssuanceRefused:
                     outcome["second"] = "refused"
+        except Exception as exc:  # surfaced to the main thread by the assertions below
+            outcome["second"] = f"error: {exc!r}"
+        finally:
+            connected.set()
 
-        thread = threading.Thread(target=second)
+    first = psycopg.connect(api.conninfo)
+    thread = threading.Thread(target=second, daemon=True)
+    try:
+        auth.issue_service_account_token(first, WS, "rb-dual-1", {"agent_role": "conductor"}, admin)
+        first_pid = first.info.backend_pid
         thread.start()
-        thread.join(timeout=1.0)
-        # The second issuance waits on the account while the first is uncommitted.
-        assert thread.is_alive()
+        assert connected.wait(timeout=30), "the second issuance never connected"
+        assert "pid" in second_pid, outcome
+        # The second issuance must be observably waiting on the first's uncommitted
+        # transaction before the first commits; otherwise sequential execution would pass.
+        deadline = time.monotonic() + 30
+        with psycopg.connect(api.conninfo, autocommit=True) as monitor:
+            while True:
+                row = monitor.execute(
+                    "SELECT %s = ANY(pg_blocking_pids(%s))", [first_pid, second_pid["pid"]]
+                ).fetchone()
+                if row is not None and row[0]:
+                    break
+                assert thread.is_alive(), f"the second issuance did not wait: {outcome}"
+                assert time.monotonic() < deadline, "the second issuance never blocked"
+                time.sleep(0.02)
+        assert not outcome, outcome
         first.commit()
+        thread.join(timeout=30)
+        assert not thread.is_alive(), "the second issuance did not finish after the commit"
     finally:
-        first.close()
-    thread.join(timeout=10)
+        if not first.closed:
+            first.rollback()
+            first.close()
+        if thread.ident is not None:
+            thread.join(timeout=30)
     assert outcome == {"second": "refused"}
     with api.db() as conn:
         roles = conn.execute(
