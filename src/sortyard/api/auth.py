@@ -8,7 +8,10 @@ A token belongs to one RoleBinding of one workspace and is stored only as its SH
   ``build-worker`` (confined to one stage run), ``sensor`` (confined to one project) or
   ``grooming-agent`` (optionally confined to one project). Issuance refuses any token whose
   permissions — together with every live token the same service account already holds —
-  would include both task creation and claiming: the queue-poisoning vector (§7).
+  would include both task creation and claiming: the queue-poisoning vector (§7). Issuance
+  holds a transaction lock on the service account itself (not just the binding), so two
+  overlapping issuances through different bindings of one account cannot both pass the check.
+  A project-scoped admin issues only tokens confined to its own project.
 - **Operator tokens** — the interim operator credential until OIDC sessions land
   (``sortyard-api --issue-operator-token <role-binding>``). The role is always the binding's
   current role (admin, operator or viewer); changing or deleting the binding takes effect on
@@ -18,6 +21,7 @@ A token belongs to one RoleBinding of one workspace and is stored only as its SH
 from __future__ import annotations
 
 import hashlib
+import json
 import secrets
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -150,6 +154,17 @@ def issue_operator_token(
     return _store_token(conn, binding, binding["role"], ttl_seconds)
 
 
+def lock_principal(conn: Conn, workspace_id: str, principal: Doc) -> None:
+    """Serialise token issuance per service account: a transaction-scoped advisory lock on
+    (workspace, principal), held until commit, so the capability check and the insert of one
+    issuance cannot interleave with another for the same account — whichever binding it
+    goes through."""
+    key = "sortyard.api_token:" + json.dumps(
+        [workspace_id, principal], sort_keys=True, separators=(",", ":")
+    )
+    conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", [key])
+
+
 def issue_service_account_token(
     conn: Conn,
     workspace_id: str,
@@ -157,9 +172,15 @@ def issue_service_account_token(
     request: Doc,
     issued_by: Doc,
     ttl_seconds: int = DEFAULT_TTL_SECONDS,
+    *,
+    issuer_project_id: str | None = None,
 ) -> Issued:
-    """issueServiceAccountToken: validate the request against the binding, refuse the
-    create+claim combination, store the token's hash."""
+    """issueServiceAccountToken: validate the request against the binding and the issuer's
+    scope, refuse the create+claim combination, store the token's hash.
+
+    ``issuer_project_id`` is the project a project-scoped admin is confined to: such an admin
+    issues only tokens confined to that project (never a workspace-wide conductor or
+    grooming token, never a build-worker token for another project's stage run)."""
     unknown = set(request) - {"agent_role", "project_id", "stage_run_id"}
     if unknown:
         raise store.unprocessable(f"unknown properties: {sorted(unknown)}")
@@ -209,6 +230,19 @@ def issue_service_account_token(
         raise store.unprocessable("the conductor token is workspace-wide; omit project_id")
     if project_id is not None and not store.exists(conn, "project", workspace_id, project_id):
         raise store.not_found("project", project_id)
+    if issuer_project_id is not None:
+        if role == "build-worker":
+            confined_to = _stage_run_project(conn, workspace_id, str(stage_run_id))
+        else:
+            confined_to = project_id
+        if confined_to != issuer_project_id:
+            raise store.forbidden(
+                f"this admin is confined to project {issuer_project_id!r}: it issues only "
+                "tokens confined to that project",
+                "project_scope",
+            )
+
+    lock_principal(conn, workspace_id, binding["principal"])
 
     held = conn.execute(
         "SELECT coalesce(array_agg(DISTINCT c), '{}') FROM sortyard.api_token,"
@@ -240,6 +274,17 @@ def issue_service_account_token(
         after={**summary, "role_binding_id": role_binding_id},
     )
     return issued
+
+
+def _stage_run_project(conn: Conn, workspace_id: str, stage_run_id: str) -> str | None:
+    row = conn.execute(
+        "SELECT t.project_id FROM sortyard.stage_run AS sr"
+        " JOIN sortyard.chain AS c ON c.workspace_id = sr.workspace_id AND c.id = sr.chain_id"
+        " JOIN sortyard.task AS t ON t.workspace_id = c.workspace_id AND t.id = c.task_id"
+        " WHERE sr.workspace_id = %s AND sr.id = %s",
+        [workspace_id, stage_run_id],
+    ).fetchone()
+    return None if row is None else row[0]
 
 
 def authenticate(conn: Conn, token: str) -> Principal | None:

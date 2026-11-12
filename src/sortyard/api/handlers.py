@@ -3,9 +3,11 @@
 By the time a handler runs, the caller is authenticated, its role is in the operation's
 ``x-sortyard-roles`` and its token belongs to the path's workspace; the handler runs inside one
 transaction. Handlers enforce what the role set cannot: the scope a token is confined to (a
-build worker's stage run, a sensor's or grooming agent's project), the origin a sensor or
-grooming agent may file under, the objects' state machines (§3.3), and the §3 schemas (via the
-generated models). Every mutation writes an AuditLog entry and a ledger Event.
+build worker's stage run; the project of a sensor, a grooming agent or a project-scoped
+operator account, which reaches no workspace-wide object), the origin a sensor or grooming
+agent may file under, the objects' state machines (§3.3), and the §3 schemas in full (the
+generated models' structure plus every value constraint, via ``sortyard.models.schema``).
+Every mutation writes an AuditLog entry and a ledger Event.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from sortyard import models
 from sortyard.api import auth, store
 from sortyard.api.auth import Principal
 from sortyard.api.store import ApiError, Conn, Doc, conflict, forbidden, not_found, unprocessable
+from sortyard.models import schema
 
 
 @dataclass
@@ -60,13 +63,18 @@ def handles(operation_id: str) -> Callable[[Handler], Handler]:
 
 
 def validate(model: type[models.Model], doc: Any, workspace_id: str) -> Doc:
-    """The document as its §3 schema's model accepts it (422 otherwise)."""
+    """The document as its full §3 JSON Schema accepts it (422 otherwise): the generated
+    model's structure and every value constraint the model cannot express (bounds, patterns,
+    if/then rules) — nothing is stored that the spec's schemas would reject."""
     if not isinstance(doc, dict):
         raise unprocessable("the body must be a JSON object")
     try:
         decoded = model.from_dict(doc)
     except models.ModelError as exc:
         raise unprocessable(str(exc)) from None
+    violations = schema.errors(model, doc)
+    if violations:
+        raise unprocessable("; ".join(violations), "schema")
     for key in ("id", "workspace_id"):
         if not re.match(store.ID_PATTERN, str(doc.get(key, ""))):
             raise unprocessable(f"{key} is not a valid id")
@@ -104,6 +112,51 @@ def in_project_scope(principal: Principal, project_id: Any) -> None:
         raise forbidden(
             f"this token is confined to project {principal.project_id!r}", "project_scope"
         )
+
+
+def workspace_wide(principal: Principal, what: str) -> None:
+    """Workspace-wide objects (lanes, workspace or cross-project policies, workspace-wide
+    credentials) are out of reach of a project-confined token."""
+    if principal.project_id is not None:
+        raise forbidden(
+            f"this token is confined to project {principal.project_id!r}: {what} reaches beyond it",
+            "project_scope",
+        )
+
+
+def task_project(conn: Conn, workspace_id: str, task_id: Any) -> str | None:
+    if not isinstance(task_id, str):
+        return None
+    task = store.get(conn, "task", workspace_id, task_id)
+    return None if task is None else task.get("project_id")
+
+
+def stage_run_project(conn: Conn, workspace_id: str, run: Doc) -> str | None:
+    """The project a stage run works for: its chain's task's project."""
+    chain = store.get(conn, "chain", workspace_id, str(run.get("chain_id", "")))
+    return None if chain is None else task_project(conn, workspace_id, chain.get("task_id"))
+
+
+def project_tasks_clause(principal: Principal, workspace_id: str) -> tuple[str, list[Any]] | None:
+    """For a project-confined caller, the SQL condition keeping rows whose task_id is a task
+    of its project."""
+    if principal.project_id is None:
+        return None
+    return (
+        "task_id IN (SELECT id FROM sortyard.task WHERE workspace_id = %s AND project_id = %s)",
+        [workspace_id, principal.project_id],
+    )
+
+
+def scoped_project_filter(principal: Principal, requested: str | None) -> str | None:
+    """A list's project filter: a project-confined caller sees its own project only."""
+    if principal.project_id is None:
+        return requested
+    if requested is not None and requested != principal.project_id:
+        raise forbidden(
+            f"this token is confined to project {principal.project_id!r}", "project_scope"
+        )
+    return principal.project_id
 
 
 def merge_patch(target: Any, patch: Any) -> Any:
@@ -263,11 +316,7 @@ def decision_log(req: Request, task: Doc, decision: str, reasons: list[str], **i
 @handles("listTasks")
 def list_tasks(req: Request) -> Reply:
     q = req.query
-    project = q.get("project_id")
-    if req.principal.project_id is not None:
-        if project is not None and project != req.principal.project_id:
-            raise forbidden(f"this token is confined to project {req.principal.project_id!r}")
-        project = req.principal.project_id
+    project = scoped_project_filter(req.principal, q.get("project_id"))
     state = q.get("state")
     if state is not None and state not in TASK_STATES + SIDE_STATES:
         raise store.bad_request(f"unknown state {state!r}")
@@ -576,24 +625,29 @@ def list_task_decision_log(req: Request) -> Reply:
 def list_decisions(req: Request) -> Reply:
     q = req.query
     filters = {
-        "project_id": q.get("project_id"),
+        "project_id": scoped_project_filter(req.principal, q.get("project_id")),
         "state": q.get("state"),
         "task_id": q.get("task_id"),
     }
     return listing(req, "decision", filters)
 
 
+def load_decision(req: Request, *, lock: bool = False) -> Doc:
+    did = req.params["decision_id"]
+    doc = found(store.get(req.conn, "decision", req.workspace_id, did, lock=lock), "decision", did)
+    in_project_scope(req.principal, doc.get("project_id"))
+    return doc
+
+
 @handles("getDecision")
 def get_decision(req: Request) -> Reply:
-    did = req.params["decision_id"]
-    return Reply(
-        200, found(store.get(req.conn, "decision", req.workspace_id, did), "decision", did)
-    )
+    return Reply(200, load_decision(req))
 
 
 @handles("createDecision")
 def create_decision(req: Request) -> Reply:
     doc = validate(models.Decision, req.body, req.workspace_id)
+    in_project_scope(req.principal, doc["project_id"])
     # DecisionCreate: created open, with no resolution — no creator can record an answer.
     answered = sorted({"resolution", "answered_by", "answer_channel", "resolved_at"} & set(doc))
     if doc["state"] != "open" or answered:
@@ -624,9 +678,7 @@ def answer_decision(req: Request) -> Reply:
     if channel not in ("ui", "integration_comment", "api"):
         raise unprocessable(f"unknown answer_channel {channel!r}")
     did = req.params["decision_id"]
-    before = found(
-        store.get(req.conn, "decision", req.workspace_id, did, lock=True), "decision", did
-    )
+    before = load_decision(req, lock=True)
     if before["state"] != "open":
         raise conflict(f"decision is {before['state']}", "state")
     if before.get("options") and resolution not in before["options"]:
@@ -674,6 +726,7 @@ def get_lane(req: Request) -> Reply:
 
 @handles("createLane")
 def create_lane(req: Request) -> Reply:
+    workspace_wide(req.principal, "a lane")
     doc = validate(models.Lane, req.body, req.workspace_id)
     if store.exists(req.conn, "lane", req.workspace_id, doc["id"]):
         raise conflict(f"lane {doc['id']!r} exists", "exists")
@@ -694,6 +747,7 @@ def create_lane(req: Request) -> Reply:
 
 @handles("updateLane")
 def update_lane(req: Request) -> Reply:
+    workspace_wide(req.principal, "a lane")
     patch = object_body(req)
     if {"id", "workspace_id"} & set(patch):
         raise conflict("a lane's id and workspace are fixed", "immutable_field")
@@ -717,6 +771,7 @@ def update_lane(req: Request) -> Reply:
 
 @handles("deleteLane")
 def delete_lane(req: Request) -> Reply:
+    workspace_wide(req.principal, "a lane")
     lid = req.params["lane_id"]
     before = found(store.get(req.conn, "lane", req.workspace_id, lid, lock=True), "lane", lid)
     busy = req.conn.execute(
@@ -797,6 +852,11 @@ def materialise(req: Request, model: type[models.Model], table: str) -> Doc:
     """A new immutable definition version from the API (DB mode, §5.1): validated, stamped
     with its content hash, recorded."""
     doc = validate(model, req.body, req.workspace_id)
+    if req.principal.project_id is not None:
+        # A project-confined operator edits only policies scoped to its own project.
+        if doc.get("scope") != "project":
+            workspace_wide(req.principal, f"a {doc.get('scope')}-scoped policy")
+        in_project_scope(req.principal, doc.get("scope_ref"))
     doc.setdefault("source", "db")
     computed = store.content_hash(doc)
     if doc.get("content_hash", computed) != computed:
@@ -856,14 +916,21 @@ def list_decision_log(req: Request) -> Reply:
         "conductor_pass_id": q.get("conductor_pass_id"),
         "decision": decision,
     }
-    return listing(req, "decision_log", filters, order="recorded_at, id")
+    extra = project_tasks_clause(req.principal, req.workspace_id)
+    return listing(req, "decision_log", filters, order="recorded_at, id", extra=extra)
 
 
 @handles("getDecisionLogEntry")
 def get_decision_log_entry(req: Request) -> Reply:
     did = req.params["decision_log_id"]
-    doc = store.get(req.conn, "decision_log", req.workspace_id, did)
-    return Reply(200, found(doc, "decision log entry", did))
+    doc = found(
+        store.get(req.conn, "decision_log", req.workspace_id, did), "decision log entry", did
+    )
+    if req.principal.project_id is not None:
+        in_project_scope(
+            req.principal, task_project(req.conn, req.workspace_id, doc.get("task_id"))
+        )
+    return Reply(200, doc)
 
 
 # --- findings (§3.8) ----------------------------------------------------------------------
@@ -880,8 +947,7 @@ def create_alert(req: Request) -> Reply:
         if subject["kind"] == "project":
             project = subject["ref"]
         elif subject["kind"] == "task":
-            task = store.get(req.conn, "task", req.workspace_id, subject["ref"])
-            project = None if task is None else task.get("project_id")
+            project = task_project(req.conn, req.workspace_id, subject["ref"])
         else:
             project = None
         in_project_scope(req.principal, project)
@@ -913,9 +979,12 @@ def load_stage_run(req: Request, *, lock: bool = False) -> Doc:
         raise forbidden(
             "a build-worker token reaches only the stage run it was issued for", "stage_run_scope"
         )
-    return found(
+    run = found(
         store.get(req.conn, "stage_run", req.workspace_id, srid, lock=lock), "stage run", srid
     )
+    if req.principal.project_id is not None:
+        in_project_scope(req.principal, stage_run_project(req.conn, req.workspace_id, run))
+    return run
 
 
 @handles("getStageRunContextPacket")
@@ -1015,6 +1084,12 @@ def instruct_integrator(req: Request) -> Reply:
 @handles("createRoleBinding")
 def create_role_binding(req: Request) -> Reply:
     doc = validate(models.RoleBinding, req.body, req.workspace_id)
+    if req.principal.project_id is not None:
+        # A project-scoped admin grants within its project only.
+        scope = doc["scope"]
+        if scope.get("kind") != "project":
+            workspace_wide(req.principal, "a workspace-wide role binding")
+        in_project_scope(req.principal, scope.get("ref"))
     agent = doc["role"] == "agent-service-account"
     if (doc["principal"]["kind"] == "agent") != agent:
         raise unprocessable(
@@ -1047,5 +1122,6 @@ def issue_service_account_token(req: Request) -> Reply:
         object_body(req),
         req.actor,
         req.token_ttl_seconds,
+        issuer_project_id=req.principal.project_id,
     )
     return Reply(201, issued.body())
