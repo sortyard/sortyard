@@ -152,6 +152,39 @@ def test_project_operator_cannot_edit_workspace_wide_objects(api: Api) -> None:
 
 
 @requires_postgres
+def test_project_operator_cannot_reversion_a_policy_outside_its_project(api: Api) -> None:
+    # The existing Policy's scope is authorized, not only the proposed version's: a proj-a
+    # operator cannot take over a proj-b or global Policy by submitting it re-scoped to proj-a.
+    pol = dict(api.doc("policy", "pol-1") or {})
+    theirs = {**pol, "id": "pol-theirs", "scope": "project", "scope_ref": "proj-b"}
+    theirs.pop("content_hash", None)
+    theirs.pop("source", None)
+    r = api.ws("POST", "/policies", "operator", theirs)
+    assert r.status == 201, r.body
+    for pid, current in (("pol-theirs", theirs), ("pol-1", pol)):
+        hijack = {**current, "scope": "project", "scope_ref": "proj-a", "version": "8.0.0"}
+        hijack.pop("content_hash", None)
+        r = api.ws("POST", f"/policies/{pid}/versions", "a-operator", hijack)
+        assert r.status == 403, (pid, r.body)
+        assert r.body["reason_code"] == "project_scope"
+        assert (api.doc("policy", pid) or {})["version"] == current["version"]
+        assert api.ws("GET", f"/policies/{pid}/versions/8.0.0", "viewer").status == 404
+
+    # A proj-a Policy is versioned by the proj-a operator, and the proposed scope is still
+    # checked: it cannot be re-scoped out of proj-a.
+    own = {**theirs, "id": "pol-mine", "scope_ref": "proj-a", "version": "1.0.0"}
+    assert api.ws("POST", "/policies", "a-operator", own).status == 201
+    moved = {**own, "scope_ref": "proj-b", "version": "2.0.0"}
+    r = api.ws("POST", "/policies/pol-mine/versions", "a-operator", moved)
+    assert r.status == 403, r.body
+    widened = {**own, "scope": "global", "version": "2.0.0"}
+    widened.pop("scope_ref")
+    assert api.ws("POST", "/policies/pol-mine/versions", "a-operator", widened).status == 403
+    r = api.ws("POST", "/policies/pol-mine/versions", "a-operator", {**own, "version": "2.0.0"})
+    assert r.status == 201, r.body
+
+
+@requires_postgres
 def test_project_admin_grants_only_within_its_project(api: Api) -> None:
     # No workspace-wide token: a conductor token is workspace-wide by definition.
     r = api.call(

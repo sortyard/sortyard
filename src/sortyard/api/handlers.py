@@ -848,15 +848,20 @@ for _name, (_table, _param, _model) in DEFINITIONS.items():
     _definition_handlers(_name, _table, _param)
 
 
+def in_policy_scope(principal: Principal, doc: Doc) -> None:
+    """A project-confined operator edits only policies scoped to its own project."""
+    if principal.project_id is None:
+        return
+    if doc.get("scope") != "project":
+        workspace_wide(principal, f"a {doc.get('scope')}-scoped policy")
+    in_project_scope(principal, doc.get("scope_ref"))
+
+
 def materialise(req: Request, model: type[models.Model], table: str) -> Doc:
     """A new immutable definition version from the API (DB mode, §5.1): validated, stamped
     with its content hash, recorded."""
     doc = validate(model, req.body, req.workspace_id)
-    if req.principal.project_id is not None:
-        # A project-confined operator edits only policies scoped to its own project.
-        if doc.get("scope") != "project":
-            workspace_wide(req.principal, f"a {doc.get('scope')}-scoped policy")
-        in_project_scope(req.principal, doc.get("scope_ref"))
+    in_policy_scope(req.principal, doc)
     doc.setdefault("source", "db")
     computed = store.content_hash(doc)
     if doc.get("content_hash", computed) != computed:
@@ -892,8 +897,10 @@ def propose_policy_version(req: Request) -> Reply:
     pid = req.params["policy_id"]
     if body.get("id") != pid:
         raise unprocessable("the version's id must be the policy in the path")
-    if store.get_definition(req.conn, "policy", req.workspace_id, pid) is None:
-        raise not_found("policy", pid)
+    current = found(store.get_definition(req.conn, "policy", req.workspace_id, pid), "policy", pid)
+    # Authorize the Policy being versioned, not only the proposed version: a project-confined
+    # operator may not take over another project's (or a global) Policy by re-scoping it.
+    in_policy_scope(req.principal, current)
     version = body.get("version")
     if isinstance(version, str) and store.get_definition(
         req.conn, "policy", req.workspace_id, pid, version
