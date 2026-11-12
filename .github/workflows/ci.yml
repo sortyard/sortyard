@@ -63,13 +63,9 @@ jobs:
         run: pytest tests
 
   spec:
-    # The seeded Phase 0 spec tests (spec/test_*.py). They currently fail on main: the seed
-    # omitted spec/PERMISSIONS.md and two issueServiceAccountToken fields are not in the
-    # schemas. Reported, not hidden: this job runs and shows its result but does not gate
-    # merges until the seed is repaired; then delete `continue-on-error`.
+    # The seeded Phase 0 spec tests (spec/test_*.py).
     name: spec (Phase 0 schemas + OpenAPI)
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
