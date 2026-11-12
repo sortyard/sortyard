@@ -58,3 +58,17 @@ def test_database_tests_run_against_a_real_postgres_in_ci() -> None:
 
 def test_ci_fails_when_generated_models_drift_from_the_schemas() -> None:
     assert "python -m sortyard.models.codegen --check" in all_run_lines()
+
+
+def test_ci_boots_the_one_command_replica() -> None:
+    replica = load()["jobs"]["replica"]
+    runs = [step.get("run", "") for step in replica["steps"]]
+    assert "./replica/replica.sh up" in runs
+    assert any("./replica/replica.sh down" in run for run in runs)
+    # Pinned to the versions AGENTS.md documents as tested.
+    brief = (ROOT / "AGENTS.md").read_text()
+    versions = [step.get("with", {}).get("version") for step in replica["steps"]]
+    for version in ("v3.16.3", "v1.31.4"):
+        assert version in versions and version in brief, version
+    assert any("kind/releases/download/v0.25.0/" in run for run in runs)
+    assert "v0.25.0" in brief

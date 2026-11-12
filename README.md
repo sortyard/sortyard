@@ -12,12 +12,23 @@ the §3 domain schema and the event ledger migrated in, and the conductor can ru
 mode (below) — observing the production conductor's input path and logging what it would
 claim. See [`MILESTONES.md`](MILESTONES.md) for what lands next.
 
+Contributors and agents: start with [`AGENTS.md`](AGENTS.md), the repo brief (architecture
+map, build loop, conventions, known gaps).
+
 ## Quickstart — a running, empty Sortyard on a local cluster
+
+**One command:** `./replica/replica.sh up` checks the tools listed below (and their
+versions), then does all of the following on a kind cluster. It also adds the shadow
+conductor, reading fake outside providers (Plane, the production pass log), and smoke-tests
+the result.
+`./replica/replica.sh down` removes it. Details are in [`AGENTS.md`](AGENTS.md#local-replica).
+The manual steps:
 
 You need [Docker](https://docs.docker.com/get-docker/),
 [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation),
 [kubectl](https://kubernetes.io/docs/tasks/tools/) and
-[Helm 3](https://helm.sh/docs/intro/install/). Run every command from the repository root.
+[Helm 3](https://helm.sh/docs/intro/install/) (tested with kind v0.25.0, kubectl v1.31.4 and
+Helm v3.16.3; the replica also needs curl). Run every command from the repository root.
 
 ```sh
 # 1. A throwaway Kubernetes cluster.
@@ -151,7 +162,9 @@ request and every push to `main`, plus `helm lint`/`helm template` and a contain
 | `charts/sortyard/migrations/` | The SQL migrations (§3 tables + event ledger) and `migrate.sh`, the Job's runner. |
 | `Dockerfile` | One image for every service; the Deployment's `command` picks the entry point. |
 | `spec/` | Phase 0: the §3 JSON Schemas and the OpenAPI spec, with their tests. |
-| `tests/` | Tests for the package, chart, CI and this quickstart. |
+| `replica/` | The one-command local replica: `replica.sh` (kind + this chart + fake outside providers), its kind config, values overrides and fakes. |
+| `tests/` | Tests for the package, chart, CI, replica, this quickstart and `AGENTS.md`. |
+| `docs/findings/` | Friction found while building the repo's own foundations, filed as findings ([`contributor-foundation.md`](docs/findings/contributor-foundation.md)). |
 | `docs/goldfish/` | Goldfish reports: a zero-context agent runs the documented install and files every point of friction (Phase 1: [`phase-1-install-smoke.md`](docs/goldfish/phase-1-install-smoke.md)). |
 
 ## Project charter

@@ -1,0 +1,29 @@
+# Local replica overrides, layered on charts/sortyard/values.yaml by replica/replica.sh.
+#
+# Only what a laptop cluster must differ in is set here. Topology (Deployments, StatefulSet,
+# migration Job), routing (ClusterIP Services) and auth shape (the generated Postgres password
+# Secret; the shadow's read-only Plane API key Secret) are the chart's own. The image tag is
+# set on the command line from the image the script just built.
+
+postgres:
+  persistence:
+    size: 1Gi
+
+# The shadow conductor, configured the way production runs it (source: plane) but pointed at
+# the fake providers in replica/fakes.yaml instead of the real Plane and production conductor.
+shadow:
+  enabled: true
+  interval: 15
+  workspace: ws-replica
+  source: plane
+  plane:
+    url: http://sortyard-fake-providers:8080
+    workspace: replica
+    projects:
+      - 5f1e0c3a-0000-4000-8000-000000000001
+    # Created by replica.sh with a random key; the fake Plane checks the same Secret.
+    apiKeySecret: sortyard-replica-plane-read
+    passes: http://sortyard-fake-providers:8080/conductor/passes.json
+  lanes:
+    configMap: sortyard-replica-lanes
+    key: products.json
