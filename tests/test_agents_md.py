@@ -76,7 +76,7 @@ PATH_LIKE = re.compile(r"`((?:\.?[\w.-]+/)+[\w.-]*|[\w.-]+\.(?:md|py|yaml|yml|to
 
 
 # Named by the brief precisely because they are missing (its Known gaps section).
-KNOWN_MISSING = {"spec/PERMISSIONS.md"}
+KNOWN_MISSING: set[str] = set()
 
 
 def exists(name: str) -> bool:

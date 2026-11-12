@@ -146,3 +146,17 @@ Extension Registry (a location, carried as `registry` on Extension), and Observa
     fields to change.
 17. **Archetype status.** "shipped" vs "candidate" is from the prose (§3.2), not a named field.
 18. **RoleBinding scope.** §3.9 names the roles but no scope; `workspace | project` is assumed.
+
+## API-defined request fields (`openapi.json`)
+
+A request-body field that is not a §3 schema property is marked `x-sortyard-api-defined: true`
+in `openapi.json` and explained here (held by `spec/test_openapi.py`).
+
+- `agent_role` (`issueServiceAccountToken`): the §7 agent role (`conductor`, `build-worker`,
+  `sensor`, `grooming-agent`) the issued service-account token carries. It is a property of the
+  token, not of a §3 object: the RoleBinding's `role` names human roles only, and agent roles
+  exist as service accounts (§7). Issuance refuses any token set that could both create and
+  claim tasks.
+- `stage_run_id` (`issueServiceAccountToken`): the StageRun a `build-worker` token is confined
+  to, so a worker can claim only its own context packet and submit only its own stage result.
+  It scopes the token; no §3 object carries it as a field of the same name on this request.
