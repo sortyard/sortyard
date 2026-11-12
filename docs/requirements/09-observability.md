@@ -12,7 +12,7 @@ zero (factory-measurement-contract).
 ---
 
 ### OBS-001 — One ordered ledger, written with the state it describes
-**MS1** · WP1.1 · MUST · KEEP
+**MS1** · WP1.1 · MUST · FIX
 
 Every state change writes one event `{seq, time, actor, object, transition, facts, refs}` in the
 same database transaction as the change. Events are append-only and globally ordered by `seq`.
@@ -22,6 +22,11 @@ timeline interleaves all three.
 - AC1: There is no code path that changes a state table without an event (enforced by routing all writes through domain commands and a test that diffs tables against events after the scenario suite).
 - AC2: Appending the same event twice records it once; reusing an id for different content is refused.
 - AC3: Update, delete and truncate on ledger tables are refused by the database.
+- AC4: Demonstration (count, MS7) — the stores that hold delivery state or history are counted for the legacy system and for the pilot installation, and the pilot's tables are diffed against its events. Target: one store, and zero state changes without an event over the whole pilot. Floor: fewer stores than the legacy inventory, and zero unexplained differences between tables and events (BL-14, BL-24).
+
+Baseline: State and history are spread over `state.json`, `grooming.json`, the dispatcher's SQLite database, JSONL ledgers and the board's database, with no common order; they have disagreed in production (HARNESS-256; FACTORY-DASHBOARD-DESIGN; BL-14, BL-24).
+
+Better on: simplicity, safety, failure-visibility.
 
 Source: migration `0001` (append-only triggers, `append_event` idempotency); DESIGN §3.8; FACTORY-DASHBOARD-DESIGN ("A durable event ledger is the follow-up for exact historical series").
 
@@ -69,10 +74,15 @@ denominator, clock, window, cohort), a unit and its coverage rule. The v1 catalo
 | `cost.agent_minutes_per_merge` | Agent wall time of every finished stage for a project (builds, reviews, fix rounds, triage, failures) ÷ changes merged in its repos, same window. |
 | `cost.stages_per_merge`, `cost.tokens_per_merge` | Same cohort; tokens where recorded. |
 | `main.health` | Per repo: latest completed required run on the default branch, its conclusion, and the age of the last success. |
+| `chain.control_wait` | For chains terminal in the window: the sum of the gaps between an enabling event and the action it enables (stage finished → next dispatched, checks green → merge armed, verdict → next round, merge observed → Done). Excludes time in agents, CI, reviews and waiting for a slot (FLW-019). |
+| `stall.episodes` | Episodes in the window in which a chain passed a phase bound or a stage made no progress: count, share recovered with no person, time to detection, time to recovery (REC-026). |
+| `operator.interventions` | Mutations by a person on work in flight (requeue, cancel, force, manual state change, resolving a hand-back), for each week and for each 100 merged tasks; owner-list answers are counted separately (REC-024). |
+| `upgrade.impact` | For each upgrade: failed API requests, missed events, time without a leader, stages failed or retried because of it (DEP-010). |
 
 - AC1: Each metric has a fixture with a hand-computed expected value.
 - AC2: A metric whose source is incomplete returns `null` with a reason (API-012).
 - AC3: Percentiles use nearest-rank and state `n`.
+- AC4: The four comparison metrics (`chain.control_wait`, `stall.episodes`, `operator.interventions`, `upgrade.impact`) have one definition each, shared by the tests that record them from MS3 on and by the catalogue, so a demonstration and a dashboard cannot disagree.
 
 Source: factory-measurement-contract "Metric definitions"; `metrics/analyze.py` (merged per day, open→first green, last green→merge, open→merge, review rounds, auto-merge use); conductor README `cost_item`.
 
@@ -87,12 +97,17 @@ describe the past and gate nothing.
 Source: DESIGN §3.8 ThroughputWindow; Joe 2026-11-05 (time survives only as looking back at throughput).
 
 ### OBS-006 — Delivery cost
-**MS6** · WP6.1 · MUST · KEEP
+**MS6** · WP6.1 · MUST · FIX
 
 For each project and window: agent-minutes per merged change and stages per merged change,
 computed from recorded stage usage. Stages whose usage is unreadable are named, not guessed.
 
 - AC1: The published number and the list of excluded stages always appear together.
+- AC2: Demonstration (ledger, MS7) — agent-minutes and stages for each merged change over the pilot's window, from the ledger, against the same project's legacy figure. Target: no agent-minute is spent on a stage that could not succeed (missing base, unregistered target, unreadable input), and the figure is available for any window and project within 1 s. Floor: cost for each merged change no higher than the legacy baseline, and the figure kept as a series for any past window, which the legacy item cannot give (BL-16).
+
+Baseline: The sync writes a delivery-cost item on each board for the current window; the cost of a merged change is not kept as a series (conductor README `cost_item`; k3s-harness #186; BL-16).
+
+Better on: cost, failure-visibility.
 
 Source: driver §3 "Delivery cost" (k3s-harness #186: "Unreadable requests are named, not guessed").
 
@@ -119,13 +134,18 @@ are future work, not queue depth.
 Source: `GET /api/mh/queue-census`; FACTORY-DASHBOARD-DESIGN (`eligible_queued_stages` rule).
 
 ### OBS-009 — Daily record
-**MS6** · WP6.1 · SHOULD · KEEP
+**MS6** · WP6.1 · SHOULD · FIX
 
 One generated record per day and project: what merged, what did not and why, what is parked or
 handed back, incidents on main, quarantined jobs, cost. Generated from the ledger; nobody writes
 it by hand.
 
 - AC1: The record for a past day is reproducible byte for byte.
+- AC2: Demonstration (ledger, MS6) — the daily record is generated twice for 14 past days of the reference workload. Target: byte-identical on every re-run, ready within 60 s of the day's end, with zero model calls. Floor: every figure of the legacy report is present and reproducible, and no agent run is spent writing it (BL-27).
+
+Baseline: Throughput reports and Slack cards are written by an agent on a schedule, and the daily pipeline record is a file committed to a repository (driver §6; JOB-QUARANTINE.md; BL-27).
+
+Better on: cost, failure-visibility.
 
 Source: DESIGN §6 view 13 ("no hand-written status ever again"); JOB-QUARANTINE.md (`ledger/pipeline-daily/YYYY-MM-DD.md`).
 
@@ -223,8 +243,11 @@ Source: factory-measurement-contract "Mainline release health".
 ### OBS-018 — Improvement ledger
 **LATER** · — · LATER · KEEP
 
-A record per tuning intervention with hypothesis, pre and post cohort values and a verdict
-(`improved`, `regressed`, `inconclusive`, `not_live`).
+A record for each tuning intervention with hypothesis, pre and post cohort values and a verdict
+(`improved`, `regressed`, `inconclusive`, `not_live`). Deferred past 1.0 on the evidence that
+the estate's ledger of this kind is not in regular use; the cut is conditional on the usage
+census (MIG-017), and the scorecard (QLT-051) already records before and after values for every
+measured criterion.
 
 - AC1: Until it ships, the audit of policy changes (SCH-011) plus the windowed metrics give the raw material.
 

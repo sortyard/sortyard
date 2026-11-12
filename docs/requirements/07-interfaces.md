@@ -24,6 +24,7 @@ come from the JSON Schemas in `spec/`, from which the Python models are generate
 
 - AC1: A contract test calls every operation in the document against a running server and validates each response against its schema.
 - AC2: `python -m sortyard.models.codegen --check` and the OpenAPI drift check gate every PR; the `spec` job is no longer `continue-on-error`.
+- AC3: Surface parity, measured at every merge to `main`: the share of the commands a person or an agent may perform that are REST operations, and the share of REST operations that have a CLI path, MCP reach and, when operator-facing, a console control. Target: 100% on all four at every merge, with no exemption. Floor: 100% for REST, CLI and MCP at every merge; console exemptions are dated and empty at each milestone exit (UI-002).
 
 Source: spec NOTES "API conventions"; `.github/workflows/ci.yml` (the `spec` job currently fails on main and does not gate); goldfish GF1-02, GF1-09.
 
@@ -36,6 +37,11 @@ command.
 
 - AC1: The same command called from an HTTP handler and called in-process (the controller's path) produces identical state and events (shared test).
 - AC2: No invariant test depends on going through HTTP.
+- AC3: Demonstration (chaos, MS3) — the API is stopped for 10 minutes while chains are in flight. Target: claims, the advancement of finished stages and landing continue throughout, every result produced meanwhile is accepted when the API returns, and zero stages fail. Floor: no evaluation is skipped and no stage fails because the API is down; the legacy conductor skipped every pass while its API was unavailable (BL-25).
+
+Baseline: The legacy conductor is a client of the dispatcher's API. On 2026-11-12 every drive pass was skipped for about 32 minutes while the API pod held an old bundle, and API rollouts have failed reviews, grooming and flake processing (conductor README "API rollouts"; BL-25, BL-08).
+
+Better on: stall-rate, safety, upgrade-effort.
 
 Source: DESIGN §4 ("API service — the only door"); see CF-07 for why the controller does not use HTTP.
 
@@ -67,8 +73,8 @@ Source: inference — the frozen API replaces whole documents by merge patch wit
 ### API-005 — Idempotency keys
 **MS1** · WP1.2 · MUST · KEEP
 
-`POST` operations that create or trigger accept an `Idempotency-Key` header with the semantics of
-REC-013; keys are remembered for at least 24 hours.
+`POST` operations that create or trigger accept an `Idempotency-Key` header with the semantics
+of REC-013; keys are remembered for the retention period (default 24 hours).
 
 - AC1: Contract test: replaying each creating operation with the same key returns the first response.
 
@@ -86,7 +92,7 @@ endpoint (`POST …/tasks/{id}/release`, `/requeue`, `/cancel`, `/hand-back/reso
 Source: spec NOTES "API conventions".
 
 ### API-007 — Server-assigned ids, client-supplied external ids
-**MS1** · WP1.2 · MUST · FIX
+**MS1** · WP1.2 · MUST · KEEP
 
 The server assigns ids and sequence numbers. A client may supply an `external_id` unique within
 a project, which makes creates idempotent and lets a file be re-applied.
@@ -94,7 +100,7 @@ a project, which makes creates idempotent and lets a file be re-applied.
 - AC1: Creating two tasks with the same `external_id` in one project yields one task.
 - AC2: No operation requires the client to invent a primary key.
 
-Source: spec NOTES API ambiguity 10 ("`POST` takes the whole object with a client-chosen `id`").
+Source: spec NOTES API ambiguity 10 ("`POST` takes the whole object with a client-chosen `id`") — a gap in the frozen spec, not in the estate: Plane assigns ids and sequence numbers today, and `plane_tasks.py file` re-applies a file by task id.
 
 ### API-008 — Event stream
 **MS1** · WP1.2 · MUST · KEEP
@@ -149,7 +155,7 @@ Source: FACTORY-DASHBOARD-DESIGN "Decision and boundary" and "Source model and i
 
 Every aggregate carries `as_of` and a coverage state. A value whose source is unread, stale or
 incomplete is `null` with a `reason`; a ratio with a zero denominator is `null` with
-`no_eligible_items`, never 0% or 100%.
+`no_eligible_items`, never a number.
 
 - AC1: Shared helper and a lint: aggregate fields are typed as `value | null + reason`.
 - AC2: The UI renders `unknown` for null (UI-024).
@@ -178,6 +184,11 @@ commit, image digest, schema version and the health state (REC-019).
 
 - AC1: With a wrong database password `/readyz` returns 503 and the rollout does not go green.
 - AC2: The running revision is visible without cluster access.
+- AC3: Demonstration (count, MS1) — the facts that answer "what is running, and is it healthy" (version, commit, image digest, schema version, health state) are listed with where each is read. Target: 100% from `/v1/info` in one call. Floor: none needs cluster access; the legacy revision is a cluster annotation (BL-28).
+
+Baseline: The running revision is visible only as a cluster annotation (task-pickup conformance row 7, HARNESS-256; BL-28).
+
+Better on: failure-visibility, operator-actions.
 
 Source: goldfish GF1-07 ("a wrong password installs green"); task-pickup conformance row 7 (running revision visible only as a cluster annotation, HARNESS-256).
 
@@ -187,7 +198,7 @@ Source: goldfish GF1-07 ("a wrong password installs green"); task-pickup conform
 One operation files a set of tasks with their relations atomically (TRK-012) and returns a
 verdict per task.
 
-- AC1: 200 tasks with dependencies file in one call in under 5 s on the reference install.
+- AC1: Filing 200 tasks with dependencies in one call on the reference install. Target: under 1 s. Floor: under 5 s.
 
 Source: `plane_tasks.py file`; the 2026-11-08 import (40 new items, 252 relations).
 
@@ -204,7 +215,7 @@ verified by signature.
 Source: AGENTS.md "The rule" (observed state); the estate today polls (`drive` every 3 min, `plane_sync` every 5 min) and cannot receive webhooks on a tailnet-only host.
 
 ### API-017 — No controller-only public operations
-**MS1** · WP1.2 · MUST · FIX
+**MS1** · WP1.2 · MUST · KEEP
 
 Claiming a task, advancing a chain, instructing the integrator and applying a decision default
 are not API operations. The frozen spec's `claimTask`, `advanceTask`, `handBackTask` and
@@ -213,7 +224,7 @@ are not API operations. The frozen spec's `claimTask`, `advanceTask`, `handBackT
 - AC1: The OpenAPI document contains no operation whose only permitted role is the controller.
 - AC2: System actors (`system:controller`, `system:integrator`, each with its version) are a separate actor type in the ledger, and no API credential can act as one.
 
-Source: PERMISSIONS.md matrix (conductor-only rows); CF-07.
+Source: PERMISSIONS.md matrix (conductor-only rows); CF-07. The estate has no public claim operation either: the conductor claims inside its own process.
 
 ### API-018 — Workspace addressing
 **MS1** · WP1.2 · SHOULD · KEEP
@@ -254,6 +265,11 @@ sets for 1.0: **worker** (`get_packet`, `submit_result`); **intake** (`file_task
 
 - AC1: `tools/list` returns exactly the tool set of the token's role: an `intake` token sees its five tools and nothing else; a worker token sees two (from MS3, MCP-005).
 - AC2: The tool list for each role is generated from role annotations on the OpenAPI operations and a curated manifest; a test fails if a manifest tool has no backing operation.
+- AC3: Demonstration (benchmark, MS5) — an operator-side agent with only an MCP address and a token performs the legacy operations inventory (BL-20): find why a task waits, requeue, cancel, run a job, resolve a hand-back, answer a decision, change lanes. Target: 100% of the inventory done with at most 25 tools in view, no cluster access and no shell. Floor: every operation the legacy scripts offer is done without cluster access or the shared board key (BL-20, BL-26).
+
+Baseline: Agents operate the legacy system with the scripts of CLI-005, which need a shell in the cluster and the shared board key; its MCP server is read-only with four tools (driver §4 "Tools"; `cp_mcp.py`; BL-20, BL-26).
+
+Better on: safety, operator-actions, install-effort.
 
 Source: PERMISSIONS.md "§7 rules"; legacy `cp_mcp.py` (a curated read-only set: `get_insights`, `get_overview`, `get_request`, `get_stage_outcomes`); the prototype exposes one tool per operation (194).
 
@@ -348,6 +364,7 @@ verdict returned by `task file`; `queue_audit.py` → `queue audit`; `repos_chec
 --validate`; `preflight` → `task preflight`.
 
 - AC1: The migration guide has this table and each row has a test.
+- AC2: (WP5.11) Coverage of the legacy operations inventory (BL-20: the tools above, the legacy console's journeys and the steering done on the Plane board), as the share with a documented and tested Sortyard equivalent. Target: 100% by the MS5 gate. Floor: 100% of the operations the usage census (MIG-017) shows in use, before the first cutover.
 
 Source: driver §4 "Tools"; conductor README (tool descriptions).
 
@@ -362,12 +379,12 @@ A fresh install has no accounts and no default password. The chart creates a one
 token in a Secret; presenting it once creates the first admin and invalidates the token.
 
 - AC1: The API refuses every other operation until bootstrap completes.
-- AC2: The setup token cannot be used twice and expires after 24 hours; the docs say how to mint a new one.
+- AC2: The setup token cannot be used twice and expires (default after 24 hours); the docs say how to mint a new one.
 
 Source: inference — DESIGN §3.1 assumes an OIDC provider; a stranger's install has none. Plane benchmark: instance-admin first-run setup.
 
 ### IAM-002 — Operator sign-in
-**MS1** · WP1.3 · MUST · NEW
+**MS1** · WP1.3 · MUST · FIX
 
 Three methods: local accounts (password hashed with argon2id, optional TOTP); OIDC; and a
 trusted-proxy header mode for installations behind an authenticating proxy. Local accounts ship
@@ -376,6 +393,11 @@ in MS1; OIDC and the proxy mode are complete by MS6.
 - AC1: A local account signs in with its password and, when enrolled, a TOTP code; a wrong second factor is refused and the attempt is audited.
 - AC2: (WP6.4) The proxy mode is refused at startup unless the API is unreachable except through the proxy (a NetworkPolicy the chart renders, verified by a startup probe).
 - AC3: (WP6.4) OIDC maps a claim to roles; a user with no mapping gets no access.
+- AC4: Demonstration (chaos, MS6) — a pod inside the cluster sends every mutating operation with a forged identity header, in each sign-in mode. Target: 100% refused and audited, in every mode. Floor: zero forged requests accepted; the legacy backend accepts them until it is locked down (BL-26).
+
+Baseline: The legacy console trusts a `Tailscale-User-Login` header that pods inside the cluster can forge, and its mutation routes accept any same-network POST (harness-console decided D2, D16; VISION; BL-26).
+
+Better on: safety.
 
 Source: harness-console decided D2, D16 (the `Tailscale-User-Login` header is forgeable from in-cluster pods until the backend is locked down); HC02-BACKEND-LOCKDOWN-DESIGN.
 
@@ -409,7 +431,7 @@ A service account has a role and a scope. Tokens are shown once, stored hashed, 
 90 days), can be revoked, and record last use. Issuing, rotating and revoking are audited.
 
 - AC1: A database dump contains no usable token.
-- AC2: An expiring token is flagged in the token list 14 days before expiry and, from MS5, raises an attention item (OBS-014).
+- AC2: An expiring token is flagged in the token list ahead of expiry (default 14 days) and, from MS5, raises an attention item (OBS-014).
 
 Source: `identity/README.md` (scopes issued and revoked as data, every mutation audited); the owner's GitHub token expiry is tracked by hand today (driver §5).
 
@@ -449,6 +471,11 @@ edit; system-created tasks record their origin and the rule that released them.
 - AC1: No role's column contains both task creation and any release-rule or policy edit.
 - AC2: A worker-token call to create a task is refused.
 - AC3: The legacy pattern (the sync creates urgent triage items and the driver claims them, both deterministic) is allowed and attributed to `system:` actors.
+- AC4: Demonstration (count, MS1) — every credential is listed with whether it can introduce work and whether it can release or claim it, for the legacy system and for Sortyard. Target: zero credentials hold both, and 100% of the matrix cells are tested. Floor: fewer credentials hold both than in the legacy system, where one shared key does (BL-26).
+
+Baseline: The sync that files urgent triage items and the driver that claims them share one Plane key (DESIGN §7; `plane_sync.queue_triage`); by inference the filing tools use the same one (BL-26).
+
+Better on: safety.
 
 Source: DESIGN §7 (queue-poisoning vector); spec NOTES API ambiguity 6 (who creates `chain` and `eval-finding` tasks?); `plane_sync.queue_triage` and `drive` share one Plane key today.
 
@@ -485,16 +512,20 @@ result, in an append-only store. A refused request is logged separately from mut
 audit trail of an object is visible on that object.
 
 - AC1: The append-only guarantee is enforced by the database (update, delete and truncate refused), as in the existing migration.
-- AC2: Every UI action that mutates shows up in the entity's audit trail within 5 s.
+- AC2: The time from a mutating UI action to its entry in the entity's audit trail. Target: 1 s. Floor: 5 s.
 
 Source: harness-console J5 ("an audit entry (actor, time, target, result) is visible on the entity"); migration `0001` (refuse triggers).
 
 ### IAM-012 — Approval mode for agent-proposed actions
-**LATER** · — · LATER · KEEP
+**MS6** · WP6.6 · SHOULD · KEEP
 
-An operator-agent token can be put in a mode where destructive actions become proposals that a
-person approves. Out of scope for 1.0 together with the embedded concierge.
+An operator-agent token, and the embedded concierge (UI-026), can run in approval mode: a
+state-changing action becomes a proposal that a person approves, edits or rejects in the console
+before it runs. The proposal shows the exact action and its effect; approving runs it as the
+approver, audited with the proposer named.
 
-- AC1: The API's action endpoints already separate "check" from "do", so this is additive later.
+- AC1: A proposal never executes without the approval of a person who holds the role the action needs; an edited proposal runs as edited.
+- AC2: The legacy journeys for approving and for editing an approval (J7, J12) pass against Sortyard.
+- AC3: A proposal is the stored "check" half of an action endpoint, which already separates check from do; no second execution path exists.
 
-Source: harness-console J7, decided D9.
+Source: harness-console J7, decided D9; console e2e `j7-approve`, `j12-approval-edit`. Cut reversed on 2026-11-12: the feature is built and in the legacy console, and no measured case showed that removing it is better.

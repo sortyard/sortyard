@@ -5,9 +5,12 @@ release to the queue), **GRM** (grooming and shaping).
 
 Format of every requirement: heading `ID — title`; a tag line
 `**milestone** · work package · priority · origin`; the statement; acceptance criteria (`AC`);
-the estate source. Priority: MUST / SHOULD / LATER. Origin: **KEEP** (preserves a behaviour that
-works today), **FIX** (keeps the intent, closes a recorded gap), **NEW** (needed for a
-self-hostable product; no estate equivalent). Source abbreviations are in
+the estate source. Priority: MUST / SHOULD / LATER. Origin, relative to the estate as it runs:
+**KEEP** (the estate behaves this way and Sortyard preserves it), **FIX** (the estate does this
+differently and Sortyard changes it on purpose), **NEW** (nothing in the estate occupies this
+place). A FIX requirement is a divergence: it also carries a `Baseline:` line, a `Better on:`
+line and a `Demonstration` criterion, and a criterion that states a quantity as a bar has a
+`Target:` and a `Floor:` ([18-divergences.md](18-divergences.md) §1). Source abbreviations are in
 [17-evidence.md](17-evidence.md).
 
 ---
@@ -43,6 +46,11 @@ each fact; the spec is not a YAML block inside the body.
 - AC1: The JSON Schema for Task has `kind`, `repo`, `outcome`, `acceptance`, `needs`, `inputs`, `builds_on`; the current `spec/task.schema.json` (no `kind`, `repo` or `acceptance`) is superseded.
 - AC2: Importing a legacy item whose description holds a ```` ```task ```` block produces the same typed fields, with Plane's own fields winning where both exist (title, priority, parent, relations, due date).
 - AC3: Editing a field through UI, CLI or MCP changes the same stored value (one round-trip test per surface).
+- AC4: Demonstration (replay, MS2) — every item of the driven boards, and the recorded invisible filings (HARNESS-608, HARNESS-615 to HARNESS-618), go through the importer's dry run and the filing operation. Target: 100% of items yield the typed fields the legacy parser read, and 100% of the invisible filings are refused or returned with a non-visible verdict in the filing response itself. Floor: every invisible filing is reported in the filing response; the legacy system reported them only at a later sweep (BL-12).
+
+Baseline: The spec is a fenced `task` block inside the Plane description, beside Plane's own fields, with a field-ownership table to say which copy wins (task-ready "The task item"). A filing with a malformed block or a missing label is found only by the later filing sweep (BL-12).
+
+Better on: failure-visibility, safety, simplicity.
 
 Source: task-ready "The task item" (field ownership table); conductor README "Plane tasks". Gap: the frozen schema drops `kind`/`repo`/`acceptance` that the live ready rules require.
 
@@ -72,6 +80,11 @@ Board states: `backlog` (held), `todo` (planned), `in_progress`, `in_review`, `d
 - AC2: `PATCH` never changes state or queue status; only action endpoints do (API-006).
 - AC3: The legal-transition table is data in the repo and is unit-tested one test per transition plus one per refused transition.
 - AC4: A task that is `todo` on the board and in flight in the queue cannot be represented: every action changes board state and queue status in one transaction (the claim itself is SCH-016).
+- AC5: Demonstration (chaos, MS3) — the claim, requeue and cancel scenarios run 10,000 times with a fault injected at a random point of the action. Target: zero runs end with board state and queue status in disagreement, with no repair step. Floor: zero disagreements once the controller has restarted; the legacy system recorded this disagreement in production (BL-24).
+
+Baseline: Queue status is three Plane labels plus the conductor's `state.json`. The board can say Todo while the record says claimed, and such an item is skipped every pass with nothing showing it (task-pickup conformance row 4, HARNESS-256; BL-24).
+
+Better on: safety, failure-visibility, operator-actions.
 
 Source: task-pickup §2a (state table), §conformance row 4 (HARNESS-256: board says Todo, record says claimed); labels `conductor`, `self-heal`, `needs-human` are today's queue status (driver §4).
 
@@ -82,7 +95,7 @@ A task may have one parent of kind `parent`; nesting is allowed. A parent is Don
 planned child is Done, and nested parents close in the same evaluation. A parent in Backlog holds
 all its descendants.
 
-- AC1: Closing the last open child closes the parent, and its parent, within one reconcile (≤ 10 s).
+- AC1: Closing the last open child closes the parent, and its parent. Target: in the same transaction. Floor: within 10 s.
 - AC2: Moving a parent to Backlog marks every descendant held (`parent in backlog`) and moving it back clears the mark; from MS2 the mark is the reason code `held: parent in backlog` (SCH-009).
 - AC3: A parent with an open child cannot be moved to Done by hand without an explicit `force` reason that is audited.
 
@@ -111,6 +124,11 @@ move`, and the API all write the same rank. Rank is the delivery order the sched
 - AC1: `POST …/tasks/{id}/rank {before|after: KEY-N}` reorders; the next list call returns the new order (the Pickup Preview follows it from MS2, SCH-008).
 - AC2: Every reorder writes a ledger event with actor, old position, new position and optional reason.
 - AC3: A new top-level task lands last and the filing response says so.
+- AC4: Demonstration (benchmark, MS1) — a scripted reorder of 40 top-level tasks through the API, the case the 2026-11-08 import needed. Target: one call per move, each shown by the next list call in under 1 s, with nobody dragging. Floor: the whole reorder is done through the API in under 5 s per move; the legacy order cannot be written by API at all (BL-28).
+
+Baseline: Plane's API does not write `sort_order`: only a person dragging on the board can reorder, and the 2026-11-08 import could not set a starting order (task-ready; release note 2026-11-08; BL-28).
+
+Better on: operator-actions, latency.
 
 Source: task-ready "Only a person dragging on the board can reorder (Plane's API does not write `sort_order`)"; 2026-11-08 release note (the import could not set starting order).
 
@@ -134,6 +152,11 @@ override, origin.
 
 - AC1: Adding or removing any label changes no system field or state and — from MS2 — no eligibility (property test over random labels).
 - AC2: Each legacy control label — `conductor`, `job`, `self-heal`, `needs-human`, `route:*`, `decision`, `follow-up`, `regression`, `red-main`, `task`, `PR` — has a typed field or relation that carries its meaning; the table is in the docs and is the one the importer uses (MIG-003).
+- AC3: Demonstration (replay, MS2) — every control-label combination found on the driven boards, and the recorded missing-label filings, are imported. Target: 100% map to typed fields, and a task that is eligible in every respect but one names that one in its verdict. Floor: no legacy control state is unrepresentable, and no task can be invisible for want of a label (BL-12).
+
+Baseline: The eleven control labels of AC2 carry release, queue status, routing and kind. A filing without the right label is invisible to pickup until the sweep reports it (driver §3–§4; HARNESS-608, HARNESS-615 to HARNESS-618; BL-12).
+
+Better on: failure-visibility, safety.
 
 Source: driver §3–§4 (labels as control signals); HARNESS-608/615–618 (filings invisible because a label was missing).
 
@@ -185,13 +208,13 @@ blocker), or `FAILED` (with the failed check). The verdict fails closed: an inpu
 read is `FAILED (read)`, never visible.
 
 - AC1: The verdict is returned by create, by file-many, by `sortyardctl pickup status KEY-N` and on the task detail page.
-- AC2: A task that stays `WILL-RELEASE` for more than 30 minutes becomes `FAILED (release)`; from MS5 it also appears on the project's single `FILING-INVISIBLE` condition (REC-023).
+- AC2: A task that stays `WILL-RELEASE` longer than the release limit (default 30 minutes, the legacy sweep interval) becomes `FAILED (release)`; from MS5 it also appears on the project's single `FILING-INVISIBLE` condition (REC-023).
 - AC3: Verdict vocabulary and exit codes match `pickup_status.py`, so existing agent prompts keep working.
 
 Source: conductor README "Filing visibility"; task-pickup §9; HARNESS-251.
 
 ### TRK-014 — Board, list and filters
-**MS1** · WP1.5 · MUST · NEW
+**MS1** · WP1.5 · MUST · FIX
 
 The tracker has a board view (columns by state), a list view, and filters on project, state,
 kind, priority, label, parent, queue status and text. Filter, sort and selection live in the URL.
@@ -199,6 +222,11 @@ kind, priority, label, parent, queue status and text. Filter, sort and selection
 - AC1: A URL copied from one browser reproduces the same view in another.
 - AC2: Lists are server-paginated with cursors in both directions and show a total count.
 - AC3: System-raised tasks (TRK-003 system kinds) are visually distinct and filterable in one click.
+- AC4: Demonstration (benchmark, MS2) — the operator journeys of BL-18 (find a task, see the health items, see why a task waits, reorder a milestone, file and release a task) are scripted against Sortyard and against the legacy pair of Plane and the harness console, counting steps, tools and time. Target: every journey takes at most half the legacy steps, in one tool, with each view rendered in under 1 s. Floor: no journey takes more steps or more time than on the legacy pair, and none needs a second tool (BL-18).
+
+Baseline: The board is Plane, a separate product with its own database and services ([12-quality-bar.md](12-quality-bar.md) §1), and the pipeline is shown by a second tool, the harness console; the owner steers in one and reads the other (driver §6 "The owner steers in Plane"; BL-18, BL-14).
+
+Better on: operator-actions, latency, simplicity, install-effort.
 
 Source: harness-console journeys J2; Plane board usage (driver §6 "The owner steers in Plane").
 
@@ -242,13 +270,16 @@ the originating task; one item per approval, deduplicated across rounds.
 - AC1: A follow-up is never claimed until a person or grooming moves it to Todo and releases it.
 - AC2: A review that lists the same finding in two rounds produces one follow-up.
 - AC3: Filing survives a tracker write failure: queued on the chain record and retried every reconcile.
+- AC4: Demonstration (count, MS4) — after the delivery scenario suite, count the records that stand for work but can never run: requests or stages that are neither terminal, nor owned by a live chain, nor a task on the board. Target: zero, with no such state in the schema. Floor: zero; the usage census counts the blocked follow-up requests that rejected verifies left in the legacy dispatcher (BL-21).
 
 Source: driver §4 (reviewing); TEST-REVIEW "Review scope" (PRE-EXISTING → follow-ups, `retry_test_follow_ups`).
 
 ### TRK-019 — File attachments
 **LATER** · — · LATER · NEW
 
-Binary attachments on tasks are out of scope for 1.0; links cover the estate's use.
+Binary attachments on tasks are out of scope for 1.0, on the evidence that links cover the
+estate's use. The cut is conditional: if the usage census (MIG-017) counts attachments in use on
+a driven board, this requirement is scheduled before that board's cutover.
 
 - AC1: The schema reserves no attachment field in v1; adding one later is an additive API change.
 
@@ -370,10 +401,10 @@ Source: k3s driver "Discharging needs and decisions" (`outcome_met`); HARNESS-27
 ### RDY-009 — Premise rules as an optional policy pack
 **MS5** · WP5.10 · SHOULD · KEEP
 
-The estate's premise rules ship as a policy pack, off by default: `intended_use` recorded as
-consistent/contradicts; reference-clone quarantine (capabilities taken, business shape not taken
-or imported by a premise-class decision); access tasks cite a decision that decides that
-specific target.
+The estate's premise rules ship as a policy pack, switched on in the estate bundle and off by
+default for new installations: `intended_use` recorded as consistent/contradicts;
+reference-clone quarantine (capabilities taken, business shape not taken or imported by a
+premise-class decision); access tasks cite a decision that decides that specific target.
 
 - AC1: With the pack enabled, a task whose milestone contradicts the project's intended-use record is not ready, and neither is anything under it.
 - AC2: A citation of a decision that decides a different question raises one `CITATION-MISMATCH` condition routed to the owner, never duplicated.
@@ -389,6 +420,11 @@ preflight gates as a planned task. There is no project setting that bypasses the
 
 - AC1: `sortyardctl task add --release` on a task that fails preflight returns `FAILED (preflight …)` and leaves it unreleased.
 - AC2: Ad-hoc `job` tasks run the checks that apply to jobs (`build-target`, `evidence-reach`, `inputs`).
+- AC3: Demonstration (parity, MS2) — the six recorded tasks of 2026-11-09 and the HARNESS-504 case are filed with `task add --release` into a project whose build target is not registered. Target: 100% are refused at filing with the failing check named, and none is released. Floor: none becomes claimable in the Pickup Preview; the legacy system claimed all six (BL-08).
+
+Baseline: Items filed directly on boards with task release off bypass the ready rules and preflight (task-ready, HARNESS-504). On 2026-11-09 six tasks on such a board were claimed into a build target that was not registered (BL-08).
+
+Better on: safety, failure-visibility.
 
 Source: task-ready ("directly-filed items on `tasks: off` boards bypass even the ready rules", HARNESS-504).
 
@@ -446,7 +482,7 @@ decision stays open, routed to whoever applies the answer. A premise-class decis
 its default: past `decide_by` it is escalated once to the owner list and stays open. A decision
 recorded as decided closes on the next evaluation.
 
-- AC1: Time-travel test: at `decide_by + 1 s` a routine decision is Done with a "default applied" event; a premise-class one is `needs_human` routed to `owner`.
+- AC1: Time-travel test: one tick after `decide_by` a routine decision is Done with a "default applied" event; a premise-class one is `needs_human` routed to `owner`.
 - AC2: The answer is re-read from the store at every evaluation; nothing is trusted from a cache.
 - AC3: Work blocked by a premise-class decision is never released while it is undecided.
 
@@ -512,9 +548,10 @@ Source: conductor README (grooming packets, 200,000-character limit, `grooming.j
 ### GRM-005 — Grooming silence raises an alarm
 **MS5** · WP5.7 · MUST · KEEP
 
-After two consecutive failed grooming attempts, or an eligible queue empty for more than 60
-minutes with no run dispatched, one `GROOMING-STALLED <project>` condition is raised with the
-error, attempt count, queue-empty-since time and the pickup status of every open planned task.
+After two consecutive failed grooming attempts, or an eligible queue empty for longer than the
+limit with no run dispatched (default 60 minutes, the legacy value), one `GROOMING-STALLED
+<project>` condition is raised with the error, attempt count, queue-empty-since time and the
+pickup status of every open planned task.
 
 - AC1: The condition is updated in place, never duplicated, and closes when the project has an eligible head again.
 - AC2: Both thresholds are policy data.
@@ -542,6 +579,11 @@ Each finding is one deduplicated condition.
 
 - AC1: The plan↔board↔STATUS.md↔register comparisons of `drift.py` have no equivalent because those copies no longer exist; the sweep's scope is documented as exactly the list above.
 - AC2: A sweep whose read fails reports failure and is retried; it never reports "clean".
+- AC3: Demonstration (count, MS5) — the copies of plan state that can disagree are counted, and the sweep runs over the boards imported for the pilot rehearsal. Target: zero second copies and zero false findings. Floor: fewer copies than the legacy four, and fewer false findings than the legacy check filed on the same boards (BL-24).
+
+Baseline: The legacy sync compares four copies of the plan — plan file, board, STATUS.md and registers — and files what disagrees; on a board that has no plan file by design it filed false items (conductor README "Drift consolidation"; SORTYARD-68, SORTYARD-69; BL-24).
+
+Better on: simplicity, failure-visibility.
 
 Source: conductor README "Drift consolidation" and `queue_reconciliation`; HARNESS-249.
 

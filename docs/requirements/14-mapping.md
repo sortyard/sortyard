@@ -25,9 +25,9 @@ planner should take.
 | Phase 1A — Foundation | **MS0** + **MS1** | Repo, chart, schema, ledger hold. The API, identity and client work — done only as prototypes outside the product — lands in MS1. |
 | Phase 1B — Shadow truth | Migration track: **MS0** (WP0.2, WP0.3) + **MS2** (WP2.8) | The comparison holds; the live soak is replaced by record-and-replay (CF-13); the latency question is closed (CF-12). |
 | Phase 2 — Read-only glass over shadow data | **MS1**, **MS2**, **MS6** | The views hold; "read-only" and "over shadow data" do not (CF-01, CF-03). Board and task detail move to MS1 and are writable; preview, decision log and inbox to MS2 over native data; dashboards to MS6. |
-| Phase 3A — Bound execution core | **MS3** + **MS4** + part of **MS5** | Launcher, mirrors, integrator, credentials, conductor, self-heal hold. Sync controller, extension registry and eval runner are cancelled (CF-05, CF-06, CF-10). |
-| Phase 3B — HARNESS authority cutover | **MS7a**, with SORTYARD as the pilot | The rehearsal and hypercare hold. HARNESS is not migrated (CF-15); the Plane projection is dropped (CF-16). |
-| Phase 4A — Cutover factory | **MS7** (WP7.1, WP7.5), **MS5** | The kit holds. Sensor and grooming parity is product work in MS5. Evidence import is deferred; the freeze is in MS0. |
+| Phase 3A — Bound execution core | **MS3** + **MS4** + part of **MS5** | Launcher, mirrors, integrator, credentials, conductor, self-heal hold. The extension registry and the eval runner are cancelled; the sync controller shrinks to a one-way pull from Git (CF-05, CF-06, CF-10). |
+| Phase 3B — HARNESS authority cutover | **MS7a**, with SORTYARD as the pilot | The rehearsal and hypercare hold. HARNESS is not migrated (CF-15); the Plane projection is dropped in favour of a rehearsed rollback export (CF-16). |
+| Phase 4A — Cutover factory | **MS7** (WP7.1, WP7.5), **MS5** | The kit holds. Sensor and grooming parity is product work in MS5. Evidence import is deferred; the freeze and the capture of legacy baselines are in MS0. |
 | Phase 4B — Product cutovers | **MS7b** (WP7.4) | Holds, extended from three products to every driven project. |
 | Phase 4C — Legacy retirement | **MS7c** (WP7.5) | Holds. |
 | Phase 5 — Definitions conformance + extension platform | Mostly cancelled; remainder in **MS2–MS8** | Conformance survives as MIG-010. Write surfaces ship with their capabilities. The SDK shrinks to a worker conformance kit (EXT-002). Proposals and the fork lane are project governance (CF-22). |
@@ -60,10 +60,10 @@ planner should take.
 | SORTYARD-20 | Backlog | M2.4 | Task detail is its chain + trace viewer | **Split** | MS1 · WP1.5; MS3 · WP3.9; MS6 · WP6.3 | UI-004, UI-010, UI-011. |
 | SORTYARD-21 | Backlog | M2.5 | Pickup Preview over shadow decisions | **Re-scope** | MS2 · WP2.5, WP2.7 | Over native data (SCH-008, UI-006). |
 | SORTYARD-22 | Backlog | M2.6 | DecisionLog and audit explorer | **Keep** | MS2 · WP2.7; MS6 · WP6.3 | UI-016. |
-| SORTYARD-23 | Backlog | M2.7 | Eval grid and throughput dashboards | **Split / Cancel** | MS6 · WP6.1, WP6.2 | Dashboards keep; the eval grid is cancelled (CF-23). |
+| SORTYARD-23 | Backlog | M2.7 | Eval grid and throughput dashboards | **Split / Cancel** | MS6 · WP6.1, WP6.2 | Dashboards keep. The eval grid is not built in Sortyard; it stays with the experiment rig (CF-23, MIG-013). |
 | SORTYARD-24 | Backlog | M2.8 | Decision inbox and shadow what-if | **Re-scope** | MS2 · WP2.7, WP2.6 | Inbox: UI-007. What-if: DEF-007. "Shadow steering" is cancelled. |
 | SORTYARD-25 | Backlog | M2.9 | Console quality walk | **Cancel** | — | Replaced by the gate at every milestone (QLT-004) and the required a11y and keyboard specs (UI-019). |
-| SORTYARD-26 | Backlog | M3.1 | Definitions sync controller | **Cancel** | — | Replaced by apply/export (DEF-002) and source lock (DEF-003) (CF-06). |
+| SORTYARD-26 | Backlog | M3.1 | Definitions sync controller | **Re-scope** | MS3 · WP3.8 | The two-way synchroniser is not built. Its one-way half is: a locked installation pulls its definitions from Git, as the legacy conductor does (DEF-003; CF-06). |
 | SORTYARD-27 | Backlog | M3.2 | Extension registry core | **Cancel** | — | CF-05. See EXT-001, EXT-005. |
 | SORTYARD-28 | Backlog | M3.3 | Context Assembler and packet store | **Re-scope** | MS3 · WP3.5 | Packet templates (EXE-015). |
 | SORTYARD-29 | Backlog | M3.4 | Execution Binding resolver | **Re-scope** | MS3 · WP3.2 | EXE-001: the checks that exist, without skills or recipes. |
@@ -78,13 +78,16 @@ planner should take.
 | SORTYARD-38 | Backlog | M3.13 | Pilot rehearsal in the replica | **Re-scope** | MS7 · WP7.1 | Rehearse the kit with SORTYARD as the subject. |
 | SORTYARD-39 | Backlog | M3.14 | HARNESS cutover and hypercare | **Re-scope** | MS7 · WP7.2 | The pilot is SORTYARD. |
 | SORTYARD-40 | Backlog | M4.1 | Repeatable cutover kit | **Keep** | MS7 · WP7.1 | MIG-007 to MIG-009. |
-| SORTYARD-41 | Backlog | M4.2 | Evidence and baseline import | **Cancel (defer)** | LATER | MIG-014. The freeze is MIG-001 in MS0. |
+| SORTYARD-41 | Backlog | M4.2 | Evidence and baseline import | **Split** | MS0 · WP0.4; LATER | Baselines are captured and loaded as reference series (MIG-016). Importing the full history stays deferred (MIG-014). The freeze is MIG-001 in MS0. |
 | SORTYARD-42 | Backlog | M4.3 | Sensor and grooming parity | **Split** | MS5 · WP5.6, WP5.7, WP5.8; MS7 · WP7.3 | Grooming GRM-001 to 006; mechanisms REC-017/018; estate observers MIG-012. |
-| SORTYARD-43 | Backlog | M4.4 | Experiment-rig disposition | **Keep** | MS7 · WP7.5 | MIG-013; a decision. |
+| SORTYARD-43 | Backlog | M4.4 | Experiment-rig disposition | **Keep** | MS7 · WP7.5 | MIG-013: kept as its own deployment unless the usage census shows no use. |
 | SORTYARD-44 | Backlog | M4.5 | Rove cutover | **Keep** | MS7 · WP7.4 | Order per OD-7. |
 | SORTYARD-45 | Backlog | M4.6 | Loopmentum cutover | **Keep** | MS7 · WP7.4 | |
 | SORTYARD-46 | Backlog | M4.7 | Cortexplane cutover | **Keep** | MS7 · WP7.4 | Needs WP7.3 (DLV-003). |
 | — | — | — | Cutovers for WALWARDEN, CRANK, CLOSER, NONCE | **New** | MS7 · WP7.4 | Driven projects the corpus omitted (CF-15). |
+| — | — | — | Legacy baselines and usage census | **New** | MS0 · WP0.4 | MIG-016, MIG-017: what every divergence is measured against (QLT-050). Start with WP0.3. |
+| — | — | — | Concierge and approval mode | **New** | MS6 · WP6.6 | UI-026, IAM-012: kept from the legacy console; the earlier cut was reversed. |
+| — | — | — | Comparisons against the legacy system | **New** | each milestone | One task for each `Demonstration` criterion (rule 12 in [13-milestones.md](13-milestones.md)). |
 | SORTYARD-47 | Backlog | M4.8 | Dispatcher absorption | **Re-scope** | MS7 · WP7.5 | Absorption is the product build (MS3, MS4); what remains is switching it off (MIG-011). |
 | SORTYARD-48 | Backlog | M4.9 | drive.py and plane_sync retirement | **Keep** | MS7 · WP7.5 | MIG-011. |
 | SORTYARD-49 | Backlog | M4.10 | One-source-of-truth audit | **Keep** | MS7 · WP7.5 | MIG-011. |
@@ -96,7 +99,7 @@ planner should take.
 | SORTYARD-55 | Backlog | M5.6 | Operator write surfaces | **Cancel** | — | Each screen ships with its capability (CF-03): UI-008 (MS2), UI-012 (MS4), UI-017 (MS1→MS6). |
 | SORTYARD-56 | Backlog | M5.7 | Extension SDK, scaffold, conformance kit | **Re-scope** | MS8 · WP8.4 | Only the worker conformance kit (EXT-002) and pinned bundles (EXT-005). |
 | SORTYARD-57 | Backlog | M5.8 | Proposals | **Cancel** | — | Project governance (CF-22; QLT-042). |
-| SORTYARD-58 | Backlog | M5.9 | Definitions-repo cutover | **Re-scope** | MS6 · WP6.4; MS7 · WP7.2 | The estate's definitions bundle plus source lock (DEF-003), applied at the pilot. |
+| SORTYARD-58 | Backlog | M5.9 | Definitions-repo cutover | **Re-scope** | MS3 · WP3.8; MS7 · WP7.2 | The estate's definitions bundle, locked to its Git source and pulled (DEF-003), applied at the pilot. |
 | SORTYARD-59 | Backlog | M5.10 | Fork-PR verification lane | **Cancel** | — | Provider-hosted CI for forks (QLT-013). |
 | SORTYARD-60 | Backlog | M6.1 | Public docs, quickstart, examples | **Keep** | MS8 · WP8.1 | QLT-001. The quickstart exists from MS1 and MS3. |
 | SORTYARD-61 | Backlog | M6.2 | Security and supply-chain pass | **Split** | MS1 · WP1.1, WP1.6; MS8 · WP8.2 | QLT-022, QLT-024 early; QLT-020, 021, 023 at 1.0. |
@@ -144,16 +147,16 @@ planner should take.
 | R2 — description-level dependencies are not dependencies | Planner rule 5 (file by tranche) until the pilot; after it, relations are enforced by Sortyard itself (TRK-006). |
 | R3 — one lane is the programme's clock | The board now has 2 lanes; sizes and the elapsed-time estimate are in [13-milestones.md](13-milestones.md); OD-11. |
 | R4 — decision-gated work must not look like lane work | [15-open-decisions.md](15-open-decisions.md); planner rule 8. |
-| R5 — the shadow baseline moves | Each recorded pass carries the legacy revision (MIG-002). |
+| R5 — the shadow baseline moves | Each recorded pass carries the legacy revision (MIG-002), and the baselines are captured again before each cutover (MIG-016). |
 | R6 — pipeline purity binds the corpus itself | Every behaviour is tested on fakes (QLT-010, CIH-013, EXT-003); live proof only in MS7 operations. |
 | R7 — connective tissue is scheduled work | The three threads at the end of [13-milestones.md](13-milestones.md). |
 
 ## 5. Board actions for the planner
 
 1. **Now:** move SORTYARD-70, 71, 79 and 13 to the head of Todo. Close SORTYARD-1 with a link to CF-18. Close 68 and 69. Cancel 73.
-2. **File MS0:** the milestone parent, its three work-package parents (WP0.1–WP0.3) and their requirement tasks (rules 1 and 2 in [13-milestones.md](13-milestones.md)); link 13, 70, 71, 72, 74, 76, 79, 80 under them.
+2. **File MS0:** the milestone parent, its four work-package parents (WP0.1–WP0.4) and their requirement tasks (rules 1 and 2 in [13-milestones.md](13-milestones.md)); link 13, 70, 71, 72, 74, 76, 79, 80 under them.
 3. **Replace SORTYARD-7** with the MS1 milestone parent, its work-package parents WP1.1–WP1.7 and their tasks; move 17, 19 and 20's MS1 parts under WP1.5; file in Todo when MS0's gate passes.
-4. **Cancel** 25, 26, 27, 35, 51, 52, 53, 55, 57, 59, 64, each with its reason from §2.
+4. **Cancel** 25, 27, 35, 51, 52, 53, 55, 57, 59, 64, each with its reason from §2. SORTYARD-26 is re-scoped, not cancelled.
 5. **Retitle or replace** the remaining Backlog items when their milestone becomes next (rule 5 in [13-milestones.md](13-milestones.md)). Until then they stay in Backlog untouched.
-6. **File the decisions** OD-1 to OD-11 as `decision` items with their defaults and dates.
+6. **File the decisions** OD-1 to OD-11 as `decision` items (rule 8 in [13-milestones.md](13-milestones.md)): OD-5 to OD-11 as decided by default, OD-1 to OD-4 as premise-class decisions that stay open and block the MS3 gate (OD-1 to OD-3) and the MS4 gate (OD-4).
 7. **Consider turning task release on for the SORTYARD board** (`tasks: on` in `repos.yaml`) before MS1 is filed. Today its work enters only as items labelled by hand, so nothing applies the blocked-by relations that rule 1 relies on (rule 5). With about a hundred tasks in a milestone, releasing each by hand is the weak point; with release on, the legacy system applies the ready rules, preflight and relations itself. Not verified: whether anything else depends on the board being `tasks: off`.

@@ -242,7 +242,10 @@ Source: conductor README "Plane sync" `unlanded_builds` (`STRAND_ACT_HOURS`, `ST
 
 The engine can express a design → reviews → approval → build → verify workflow with a revision
 cap. No such workflow, and no self-repair that edits and redeploys the control plane, ships in
-1.0.
+1.0. The cut is conditional: if the usage census (MIG-017) counts design chains started in its
+window, a design-first workflow is added to the estate bundle before the first cutover.
+Self-repair of the control plane is not carried in either case; changes to Sortyard go through
+Sortyard and a release.
 
 - AC1: A test bundle defines a three-phase workflow with a review loop and a round cap, and runs on the scripted harness.
 
@@ -259,6 +262,25 @@ final outcome and keeps its failed-attempt history.
 - AC2: Attempt timestamps are sufficient to compute pickup latency and execution time (OBS-007) without proxies.
 
 Source: `mh_task_attempts` (notes); factory-measurement-contract ("Preserve an immutable attempt for each retry/requeue"; `request_updated_at_proxy` as a known weakness).
+
+### FLW-019 — The control plane adds almost nothing to a task's time
+**MS4** · WP4.7 · MUST · FIX
+
+Every hand-off inside a chain — stage finished to next stage dispatched, checks green to
+auto-merge armed, review verdict to fix round, merge observed to Done — happens on the event
+that enables it, not at the next pass. The time a chain spends waiting on Sortyard itself (not
+on an agent, CI, a review or a free slot) is measured per chain as `chain.control_wait` and
+shown beside its cycle time.
+
+- AC1: Demonstration (ledger, MS4) — `chain.control_wait` is computed for every chain of the delivery scenario suite and compared with the same hand-offs in the legacy records. Target: p95 at most 60 s per chain, summed over all its hand-offs. Floor: at most half the legacy wait for the same number of hand-offs, each of which waits for the next three-minute or five-minute pass (BL-03).
+- AC2: Demonstration (ledger, MS7) — release-to-merge time of one-PR tasks in the pilot, from the ledger, against the same project's legacy figure. Target: p50 at most 30 minutes for a task whose CI takes 10 minutes. Floor: a lower p50 and a lower p90 than the legacy baseline for tasks of the same kind (BL-02).
+- AC3: Git host and CI facts arrive by webhook where the installation can receive them and by polling otherwise (API-016); the polling interval for change requests with a chain in flight is policy (default 10 s, with conditional requests, so an unchanged answer costs no rate limit).
+
+Baseline: Every hand-off waits for the next pass: the drive pass runs every 3 minutes and the sync every 5 (task-pickup §3; BL-03). Time from release to merge is not measured today (BL-02).
+
+Better on: latency, throughput.
+
+Source: task-pickup §3 (pass cadence); AGENTS.md "The rule" (advance on observed state). Inference: a chain's legacy wait is its number of hand-offs times the mean wait for a pass.
 
 ---
 
@@ -301,18 +323,21 @@ adds a merge gate of its own to the repo.
 
 Source: driver §4 "Hard rules" ("never `--admin`, never a direct merge, never `ship.py merge`, never a merge gate"); `gh pr merge --auto --squash --match-head-commit`.
 
-### MRG-004 — Bypass for quarantined jobs is off by default and policy-gated
-**MS5** · WP5.5 · SHOULD · FIX
+### MRG-004 — Merging past a quarantined job is a policy, and the estate keeps it
+**MS5** · WP5.5 · SHOULD · KEEP
 
 The legacy system lands an approved head past a quarantined flaky job with an admin merge, once
-per head, when every other required check has an accepted conclusion. In Sortyard this is a
-policy (`merge.quarantine_bypass`) that is `off` by default; when on, it needs a credential with
-bypass rights, acts once per head, and records the quarantined jobs it passed.
+per head, when every other required check has an accepted conclusion. Sortyard keeps the
+behaviour as a policy (`merge.quarantine_bypass`): when on, it needs a credential with bypass
+rights, acts once per head, and records the quarantined jobs it passed. The estate bundle ships
+it on, as today. The default bundle for new installations ships it off, which is a default for
+strangers and not a change for the estate (OD-9).
 
 - AC1: With the policy off, a change request held only by a quarantined job waits and shows `held: quarantined job gates merge`.
 - AC2: With the policy on and any non-quarantined required check not accepted, no bypass happens.
+- AC3: With the estate bundle applied, the JOB-QUARANTINE scenario — only quarantined jobs failing, every other required check accepted — merges the approved head once, as the legacy system does.
 
-Source: JOB-QUARANTINE.md "Quarantine" (`gh pr merge --squash --admin --match-head-commit`), which contradicts the driver's "never `--admin`". Owner decision OD-9.
+Source: JOB-QUARANTINE.md "Quarantine" (`gh pr merge --squash --admin --match-head-commit`), which contradicts the driver's "never `--admin`". Owner decision OD-9. Kept for the estate on 2026-11-12: switching it off there would hold approved changes that merge today, with no measured gain to set against that.
 
 ### MRG-005 — Behind or conflicting change requests are brought up to date by Sortyard
 **MS4** · WP4.6 · MUST · KEEP
@@ -370,7 +395,7 @@ A clean, green, armed change request that has not merged after the stall thresho
 gets auto-merge re-triggered once and another threshold; then the task parks. The re-trigger is
 recorded before the host is called, so a partial failure cannot loop it.
 
-- AC1: The worked case in task-pickup §8 (two slots held ~9 h) is a scenario test that ends with both slots freed at the threshold.
+- AC1: The worked case in task-pickup §8 (two slots held about nine hours) is a scenario test that ends with both slots freed at the threshold.
 
 Source: task-pickup §5 and conformance row 1 (HARNESS-242); `drive.py` note 416.
 
@@ -462,10 +487,10 @@ the repo, or a failing step that also runs on change requests) → a `triage` ta
 lane; **infrastructure** (secrets store, runners, cluster convergence, no failing test) → the
 self-heal queue, spending no triage attempt; **estate access** (signing in to the secrets store,
 applying or verifying production state, live third-party credentials, a runner refused its
-token) → a task routed to `devops`, never to a build; **never started** (zero jobs) → re-run once,
-file as infrastructure only on a second zero-job failure; **unrunnable** (a queued job no online
-runner's labels can match after 30 min) → one urgent task naming the labels and the nearest
-runner.
+token) → a task routed to `devops`, never to a build; **never started** (zero jobs) → re-run
+once, file as infrastructure only on a second zero-job failure; **unrunnable** (a queued job no
+online runner's labels can match after the limit, default 30 min) → one urgent task naming the
+labels and the nearest runner.
 
 - AC1: Each class has fixtures taken from the recorded incidents; the classifier is versioned and open items are re-classified when its rules change.
 - AC2: A log with a failing test is never classified as infrastructure; an application's own "X is not configured" warning does not count as an infrastructure cause.
@@ -499,7 +524,7 @@ to a person. Red for an infrastructure cause or at none of the original steps cl
 and the new failure is filed separately. No verdict within 24 h of the merge parks it with the
 runs seen; a workflow no longer on the default branch closes it.
 
-- AC1: Scenario tests cover: push-workflow confirm from merge time (LOOP-518), cancelled run as no verdict (ROVE-615), deleted workflow (CPV2-535), 24 h limit (CPV2-625).
+- AC1: Scenario tests cover: push-workflow confirm from merge time (LOOP-518), cancelled run as no verdict (ROVE-615), deleted workflow (CPV2-535), the confirm limit (CPV2-625).
 - AC2: Sortyard does not start a second suite on the same runners when the merge's own run will decide.
 
 Source: driver §4 "Red main"; conductor README "Incident notes" (`verdict_events`, `NO_VERDICT`, `CONFIRM_LIMIT`, `moved_on`); `TRIAGE_ROUNDS`, `DISPATCH_GRACE`, `PROOF_WAIT`.
@@ -558,10 +583,10 @@ Source: conductor README "Incident notes" `ci_round`; "Blocking causes".
 **MS5** · WP5.5 · SHOULD · KEEP
 
 Results of one job at one head must agree. The second contradictory result marks the job a flake
-suspect and quarantines it: it runs report-only and does not open fix rounds, matched by workflow
-and job name. Exit after 7 days or 20 consecutive clean runs. Re-entry within 7 days of exit
-happens on the first contradiction and files one high-priority task. Per-test flake accounting
-keeps a ledger and feeds the test-review checklist.
+suspect and quarantines it: it runs report-only and does not open fix rounds, matched by
+workflow and job name. Exit after 7 days or 20 consecutive clean runs (defaults). Re-entry
+within 7 days of exit happens on the first contradiction and files one high-priority task.
+Per-test flake accounting keeps a ledger and feeds the test-review checklist.
 
 - AC1: A job scripted fail, pass, fail on one head is quarantined at the third run with all three runs as evidence.
 - AC2: If the quarantine ledger cannot be read, every required check gates.

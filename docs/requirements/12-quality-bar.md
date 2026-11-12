@@ -62,9 +62,9 @@ translation is taken up when someone asks for it.
 | Dimension | Plane, from section 1 | Sortyard's bar | Requirements |
 |---|---|---|---|
 | Documentation | A 59-line agent guide; hosted docs not examined | Docs built from the repository, every command executed in CI, generated references, a zero-context install at every milestone | QLT-001 to QLT-005 |
-| Install time | Not measured; 13 services, 4 stateful dependencies, 58 variables | First task filed within 15 minutes in at most 8 commands; demo chain within 30 minutes; no value required; idle footprint at most 0.5 CPU and 1 GiB | DEP-005, DEP-006, DEP-013 |
-| Upgrade guarantees | An upgrade option in `setup.sh`; no stated guarantee found | Tested upgrades with data from every earlier minor; one-minor rollback without a restore; work in flight survives | DEP-007 to DEP-010, QLT-031 |
-| Tests and CI | No workflow runs tests | Every test layer on every pull request; coverage floors; no tolerated flakes | QLT-010 to QLT-016 |
+| Install time | Not measured; 13 services, 4 stateful dependencies, 58 variables | Target: one command and 3 minutes to a first task, 5 more to a finished demo chain; idle footprint 0.25 CPU and 512 MiB. Floor: 8 commands and 15 minutes, 30 minutes to the demo, 0.5 CPU and 1 GiB. No value required | DEP-005, DEP-006, DEP-013 |
+| Upgrade guarantees | An upgrade option in `setup.sh`; no stated guarantee found | Tested upgrades with data from every earlier minor; one-minor rollback without a restore; work in flight survives. Target: zero failed requests and zero paused seconds in an upgrade. Floor: at most 5 s of failed requests, never silent | DEP-007 to DEP-010, REC-015, QLT-031 |
+| Tests and CI | No workflow runs tests | Every test layer on every pull request; coverage targets with floors under them; no tolerated flakes; required checks in 5 minutes at p95 as the target, 15 as the floor | QLT-010 to QLT-016 |
 | Security and supply chain | 89 advisories, two thirds of them authorisation flaws; no `USER` directive | One default-deny authorisation function tested cell by cell; threat model and independent review; signed images with SBOM and provenance; restricted pods | IAM-009, IAM-010, QLT-020 to QLT-025, DEP-014 |
 | API stability | A generated OpenAPI document; no written deprecation policy found | `/v1` frozen at 1.0, additive only; deprecations kept two minors or six months; breaking changes fail CI | API-013, EXT-007, QLT-030 |
 | Accessibility | Lint only | WCAG 2.2 AA target; automated scan and keyboard journeys as required checks; three viewport widths | UI-019, UI-020 |
@@ -91,7 +91,7 @@ command block in the docs is executed in CI against the replica.
 Source: `tests/test_readme.py` (the quickstart is already tested); goldfish GF1-04; CORPUS M6.1.
 
 ### QLT-002 — README
-**MS0** · WP0.1 · MUST · FIX
+**MS0** · WP0.1 · MUST · NEW
 
 The README says what Sortyard is, shows the quickstart, links the docs, and states the project's
 status honestly. Charter, tracking notes and internal references move out.
@@ -154,27 +154,28 @@ pull request that builds the image, installs the chart on a kind cluster and exp
 
 Source: AGENTS.md "Testing model" (the estate's own standard, applied to Sortyard).
 
-### QLT-011 — Coverage floors
+### QLT-011 — Coverage targets and floors
 **MS1** · WP1.1 · MUST · NEW
 
-Branch coverage of the domain layer at least 90%; whole backend at least 80%; console statements
-at least 70% plus the journey suite. The floors only rise.
+Coverage is measured for each layer and enforced in CI: branch coverage of the domain layer,
+line coverage of the whole backend, statement coverage of the console beside the journey suite.
+The floors only rise.
 
-- AC1: CI fails below a floor.
+- AC1: Coverage of the domain layer, the whole backend and the console, in that order. Target: 100%, 90% and 85%. Floor: 90%, 80% and 70%; CI fails below a floor.
 
 Source: inference — Plane publishes no coverage figure; the legacy `test_conductor.py` (10,364 lines for 2,589 of code) sets the house standard.
 
 ### QLT-012 — Every pull request runs everything
-**MS0** · WP0.1 · MUST · FIX
+**MS0** · WP0.1 · MUST · KEEP
 
 Lint, format, strict type-check, generated-code and generated-document drift (including this
 directory's `tools/gen.py --check`), all test layers, chart lint and render, image build and the
 install smoke run on every pull request and are required. No job is `continue-on-error`.
 
 - AC1: `main` is never red: a failing required check on `main` is treated as an incident.
-- AC2: p95 duration of required checks is at most 15 minutes.
+- AC2: The p95 duration of the required checks on a pull request. Target: 5 minutes. Floor: 15 minutes.
 
-Source: `.github/workflows/ci.yml` (the `spec` job is `continue-on-error`); AGENTS.md "Green main, stop the line".
+Source: AGENTS.md "Green main, stop the line" (the estate's own standard, kept); `.github/workflows/ci.yml` (the `spec` job is `continue-on-error`, a gap in the prototype repository).
 
 ### QLT-013 — Fork pull requests are safe to run
 **MS8** · WP8.5 · MUST · NEW
@@ -210,11 +211,14 @@ Source: AGENTS.md "Delivery lanes" rule 5 ("fakes encode the providers' document
 ### QLT-016 — Performance bars on a reference workload
 **MS6** · WP6.4 · MUST · NEW
 
-On the reference workload (20 projects, 50,000 tasks, 5,000 open, 200 chains in flight): list
-and detail API p95 at most 300 ms; scheduler evaluation at most 2 s per project; Overview render
-at most 2 s; event-stream lag at most 2 s.
+On the reference workload (20 projects, 50,000 tasks, 5,000 open, 200 chains in flight) the
+product stays fast enough that nobody waits for it. A load job measures the bars below before
+each release; console latency is in UI-009 and UI-018.
 
-- AC1: A load job runs before each release and its results are in the release notes.
+- AC1: List and detail API latency. Target: p95 at most 50 ms. Floor: p95 at most 300 ms.
+- AC2: Scheduler evaluation of one project. Target: at most 200 ms. Floor: at most 2 s.
+- AC3: Event-stream lag from commit to a subscribed client. Target: at most 250 ms. Floor: at most 2 s.
+- AC4: The load job's results are in the release notes and the scorecard (QLT-051).
 
 Source: harness-console J1 (2 s), J2 (10,000 rows); `architecture.md` ("datasets of ~10^3–10^4 requests").
 
@@ -225,10 +229,12 @@ Source: harness-console J1 (2 s), J2 (10,000 rows); `architecture.md` ("datasets
 ### QLT-020 — Security policy and response
 **MS8** · WP8.2 · MUST · NEW
 
-`SECURITY.md`: private reporting channel; acknowledgement within 3 business days; a fix or
-mitigation target of 30 days for high and critical; advisories published with affected versions.
+`SECURITY.md`: a private reporting channel; a stated time to acknowledge a report; a stated time
+to a fix or mitigation for high and critical findings; advisories published with affected
+versions.
 
 - AC1: The reporting channel is tested before 1.0.
+- AC2: Time to acknowledge a report, and time to a fix or mitigation for a high or critical finding. Target: one business day and 7 days. Floor: three business days and 30 days.
 
 Source: Plane `SECURITY.md` (three business days) — matched, with fix targets added.
 
@@ -270,10 +276,16 @@ Source: CORPUS M6.2 ("image signing and build provenance"); the legacy release c
 ### QLT-024 — Releases come from CI, from a tag
 **MS1** · WP1.6 · MUST · FIX
 
-A release is produced only by the release workflow from a signed tag on `main`. Nothing is built
-on a laptop. The workflow holds no cluster credential.
+A release is produced only by the release workflow from a signed tag on `main`, and every merge
+to `main` publishes a development build the same way, so the newest merged code is always
+installable. Nothing is built on a laptop. The workflow holds no cluster credential.
 
 - AC1: The release workflow is the only identity allowed to push release artefacts.
+- AC2: Demonstration (ledger, MS7) — for every merge to `main` during the pilot, the time from the merge to the running installation serving it, from the release workflow and the ledger. Target: every merge running within 10 minutes, with no person involved. Floor: no person and no hand-applied object involved, and no slower than the legacy merge-to-release time; the legacy release of 2026-11-12 needed a Role applied by hand (BL-11).
+
+Baseline: Merged changes to the legacy control plane were not released until someone released them (task-pickup conformance row 8, HARNESS-246); the pull-based release controller that followed was blocked for about 32 minutes on 2026-11-12 by a hand-maintained Role (BL-11).
+
+Better on: latency, operator-actions, safety.
 
 Source: DESIGN §9 ("the reboot's own releases go through CI like everything else"); CI-RELEASE.md ("It has no Kubernetes credential or cluster network path").
 
@@ -363,3 +375,50 @@ organisation, PyPI, npm, container registry) are claimed, before the repository 
 - AC1: The record is in `DECISIONS.md`.
 
 Source: DESIGN §10 item 1 ("Still owed before public launch: a formal trademark search"; namespaces unclaimed at check time).
+
+---
+
+## Divergences, targets and floors
+
+Two rules from the owner (2026-11-12) that cut across every other requirement. The register
+they govern — baselines, divergences, the audit of every cut and the scorecard of measured
+criteria — is [18-divergences.md](18-divergences.md).
+
+### QLT-050 — Every divergence from the estate is demonstrably better, or the legacy behaviour is kept
+**MS0** · WP0.1 · MUST · NEW
+
+Wherever Sortyard behaves differently from the estate's system — a requirement with origin
+`FIX`, a legacy parity row that is not `KEEP`, a cut, a finding that replaces a mechanism — this
+specification records the legacy baseline with its evidence, the dimensions on which the new
+behaviour is better, and a demonstration: a measured comparison against the baseline with a
+threshold, made by replay, the parity suite, ledger metrics, a scripted benchmark, fault
+injection, a count, a drill or the usage census. "Different but equivalent" does not pass. A
+divergence whose demonstration misses its floor is not shipped to the estate: the legacy
+behaviour stays, as the estate bundle's setting or as the requirement itself, until the
+demonstration passes.
+
+- AC1: `tools/gen.py --check` fails when a `FIX` requirement lacks its `Baseline:`, its `Better on:` or its demonstration; when a parity row that is not `KEEP`, a cut or a replacing finding cites no divergence entry; and when a divergence entry lacks the fields its verdict needs.
+- AC2: Each demonstration is a named test or job (rule 3 of [13-milestones.md](13-milestones.md)) that reads its baseline from the captured values (MIG-016) and fails below its floor.
+- AC3: A change that introduces a new divergence adds its entry and its demonstration in the same pull request; review rejects it otherwise.
+- AC4: Before each cutover the divergences the project relies on are listed with their measured results in the hypercare plan (MIG-009); one that missed its floor is switched to the legacy behaviour for that project.
+
+Source: the owner, 2026-11-12 ("Anywhere sortyard diverges from the cobbled solution we have in hand, the divergence needs to evolve into something that's demonstrably better in as many ways possible").
+
+### QLT-051 — Plan for the target, gate on the floor
+**MS1** · WP1.1 · MUST · NEW
+
+Every measured criterion has two levels. The **target** is the best outcome imaginable for a
+product of this kind, set from first principles and from the best tools in the field; the
+design and the work packages are sized for it. The **floor** is what a gate enforces: better
+than the legacy baseline where there is one, and the stated absolute bar where there is not. A
+cutover, a promotion or a milestone exit needs only the floors. Each measured value is recorded
+with its target and floor in a scorecard. A value between floor and target opens one
+`target-gap` task in Backlog — backlog, not failure — which closes when the target is met or
+the owner retires it.
+
+- AC1: `tools/gen.py --check` fails when an acceptance criterion or a milestone exit states a quantity as a bar without both a target and a floor. A quantity that is a shipped policy default is exempt and says so.
+- AC2: Tests assert the floor and write the measured value to `scorecard.json` in the release artefacts; from MS6 a dashboard shows value, floor, target and trend for every criterion listed in [18-divergences.md](18-divergences.md) §3 (UI-015).
+- AC3: At each milestone gate every criterion due is at or above its floor, and each one below its target has exactly one open `target-gap` task naming the measured value.
+- AC4: A target is never lowered to fit a measurement; changing one is a change to this specification, with the reason recorded.
+
+Source: the owner, 2026-11-12 ("Why not plan for the best outcome imaginable and be ready to accept we might miss the mark by a little").

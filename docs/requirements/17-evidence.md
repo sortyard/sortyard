@@ -54,13 +54,13 @@ read from a read-only export of the remote ref, not from the working tree.
 | TEST-REVIEW, DESIGN-REVIEW, JOB-QUARANTINE, CI-RELEASE, FACTORY-DASHBOARD-DESIGN, measurement contract | Read in the parts quoted; not in full |
 | `drive.py` (2,589 lines) | Module head, constants and packet templates read; behaviour taken from the conductor README and from the numbered code notes extracted for every function |
 | `mh.py` (8,050 lines) | Lines 1–5,052 through working notes with line references (work model, request validation, result builder, worker template, Job render, proof worker, ledger protocol, schema, store, credential pool); `caps_allow` and `_drive_order` read directly; lines 5,052 onward mapped by function name only |
-| `plane_sync.py`, `plane_tasks.py`, `grooming.py`, `preflight.py`, `causes.py`, `self_heal.py`, `release_verify.py`, `delivery.py`, `drift.py`, `test_review.py`, `design_review.py` | Not read as code; behaviour taken from the conductor README, which documents each |
+| `plane_sync.py`, `plane_tasks.py`, `grooming.py`, `preflight.py`, `causes.py`, `self_heal.py`, `release_verify.py`, `delivery.py`, `drift.py`, `test_review.py`, `design_review.py` | Not read as code; behaviour taken from the conductor README, which documents each. For the audit of 2026-11-12 two points were checked in the code: `grooming.py` excludes the method directories (roles, skills, contracts) from inputs, and `design_review.py` reads its checklist from a skill file |
 | `api.py`, `auth.py`, `ship.py`, `cred_sync.py`, `mechanism_health.py` and the continuity monitors | Not read as code; `ship.py`'s fence is taken from DESIGN §3.7a |
 | Kubernetes manifests | Object inventory by script; `deployment.yaml` strategy and resources |
-| Legacy console | Route list, component list, API endpoints used, end-to-end spec names, bundle budget |
+| Legacy console | Route list, component list, API endpoints used, end-to-end spec names (26 files, journeys 1 to 13), bundle budget; for the audit, that the concierge is implemented (`concierge.py`, `components/concierge/`, its end-to-end specs) |
 | `metrics/analyze.py` | The first 60 lines (the definitions used) |
 | meta-harness `AGENTS.md` | "Delivery lanes", "The rule", "Testing model", "Green main" read; the rest by heading |
-| meta-harness `repos.yaml` | The driver entries: project keys, lanes, build and task-release switches |
+| meta-harness `repos.yaml` | The driver entries: project keys, lanes, build and task-release switches; that the conductor reads it from a clone on every pass |
 | meta-harness templates, skills, scripts, MANUAL | Directory listings only |
 | Plane | Repository layout, workflows, Dockerfiles, self-host bundle, settings and counts by script; release and advisory data from the GitHub API |
 | The live cluster, `state.json`, the dispatcher database | Not read |
@@ -78,6 +78,11 @@ read from a read-only export of the remote ref, not from the working tree.
 - This directory is checked by [tools/gen.py](tools/gen.py) (`--check` passes at the time of
   writing). The tool was linted and formatted with `ruff` 0.17.4 under this repository's
   settings; it has not run in the repository's CI.
+- The revision of 2026-11-12 applied the owner's two directions (QLT-050, QLT-051). Every
+  requirement's origin was re-read against the estate rather than against the design, and each
+  cut was re-examined; the outcome is in [18-divergences.md](18-divergences.md) §5 and
+  [11-coherence.md](11-coherence.md) Part C. The evidence for each legacy baseline is the
+  source already cited by the requirement it belongs to.
 - Constants quoted in requirements are the values in the sources at the revisions above. Some
   differ between documents written at different times (for example the heavy caps: 4/3/2 in the
   driver log, 6/5/2 in task-pickup); DEF-005 records them as deployment-specific.
@@ -101,3 +106,20 @@ read from a read-only export of the remote ref, not from the working tree.
    and is to be replaced by measurement at the MS1 gate.
 6. **The prototype code.** The six Phase 1 prototypes were sized and their READMEs read; their
    fitness for porting was not reviewed.
+7. **The legacy baselines.** [18-divergences.md](18-divergences.md) §2 states what the sources
+   already say and marks the rest "to capture". Nothing was measured for this specification:
+   no figure for merges a day, release-to-merge time, operator interventions, delivery cost,
+   stage start or journey steps exists yet. Whether each can be measured from the frozen
+   evidence is itself unverified; MIG-016 finds out, and a demonstration whose baseline cannot
+   be measured falls back to its absolute floor.
+8. **Use of the legacy features that are not carried.** Design chains, sentence-to-task
+   requests, projected issue items, the experiment rig, the concierge, the improvement ledger,
+   attachments and the other Plane features were judged unused or little used by inference
+   from the documents. None was counted. Every such cut is conditional on the usage census
+   (MIG-017).
+9. **The targets.** Targets in the acceptance criteria are judgement about the best outcome
+   for a product of this kind. They were not derived from a measurement of any other product,
+   and no product other than Plane was examined. The floors that refer to a legacy baseline
+   are only as good as that baseline.
+10. **Who holds the board key.** That the sync and the driver share one key is in the sources;
+    that the filing tools use the same key is inference.

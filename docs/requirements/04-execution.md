@@ -26,7 +26,7 @@ resolved the stage is not launched and the task shows `unbound: <element>`.
 
 - AC1: Every stage run references exactly one binding; the Job is rendered from the binding and nothing else.
 - AC2: The v1 `unbound` elements are: `mirror-base-missing`, `mirror-stale`, `input-unverified`, `no-eligible-credential`, `image-unresolved`, `packet-too-large`, `definition-invalid`.
-- AC3: The binding does not include skill versions or context recipes; those objects are not part of 1.0 (see [11-coherence.md](11-coherence.md) CF-05).
+- AC3: The binding fixes everything a worker reads: the packet (by hash), the repository at the base commit, the inputs (by digest) and the worker image (by digest), which carries the harness settings and any skill files. Nothing else reaches a worker. Skill versions and context recipes are not separate objects in 1.0, which is how the estate works today ([11-coherence.md](11-coherence.md) CF-05).
 
 Source: DESIGN §3.7b; `ensure_base`, `vendor_inputs`, `_pick_claude_account` (the checks that exist today, in three places).
 
@@ -125,15 +125,21 @@ by a host cron.
 Source: `MIRROR_MISS`, `ensure_base`, `seed_mirror` incident notes (CPV2-408 burned ten builds on one missing head); `mh.py` `mirror_readiness_state` (stale if > 300 s).
 
 ### EXE-009 — Mirrors and run output do not need a shared volume
-**MS3** · WP3.3 · MUST · NEW
+**MS3** · WP3.3 · MUST · FIX
 
 By default workers reach the mirror over the cluster network (read-only Git over HTTP,
 authenticated with the stage token) and return commits to a staging namespace on the mirror
-service. A shared-volume mode is an optional optimisation. No `ReadWriteMany` storage class is
-required to install.
+service. A shared-volume mode remains as an option, and an installation keeps it when the
+comparison below does not show the network path to be at least as fast. No `ReadWriteMany`
+storage class is required to install.
 
 - AC1: The default chart installs and runs the demo on a kind cluster and on a three-node cluster with only `ReadWriteOnce` storage.
 - AC2: A worker can push only to `refs/sortyard/stage/<stage-run-id>/*` on the mirror service; any other ref is refused.
+- AC3: Demonstration (benchmark, MS3) — stage start is timed from dispatch to the agent's first instruction on a 1 GB repository, on one node and on three nodes with `ReadWriteOnce` storage only. Target: p95 at most 20 s on both. Floor: it runs on three nodes with no shared volume, and is no slower than the legacy stage start on one node (BL-23).
+
+Baseline: Mirrors and run directories live on one volume (`mh-work`) mounted by the tools pod and every Job, which fixes the topology to one node or `ReadWriteMany` storage (inference from the manifests; BL-14). A base missing from the mirror burned ten builds (CPV2-408; BL-23).
+
+Better on: install-effort, simplicity, safety.
 
 Source: inference — today mirrors and run directories live on one PVC (`mh-work`) mounted by the tools pod and every Job, which fixes the topology to one node or RWX storage.
 
@@ -264,15 +270,19 @@ silently absent.
 Source: `mh_trajectories` (status `captured|missing|error`, notes); harness-console J3; TRAJECTORY-CAPTURE-DESIGN.md.
 
 ### EXE-020 — The control plane is protected from its workers
-**MS3** · WP3.2 · MUST · NEW
+**MS3** · WP3.2 · MUST · FIX
 
 Workers run in their own namespace with a ResourceQuota and LimitRange sized from the caps. The
 control-plane pods have resource requests and, where the installer allows cluster-scoped objects,
 a higher PriorityClass. A runaway worker can fail its own stage; it cannot evict the control
 plane.
 
-- AC1: Load test: workers pinned at their limits do not push control-plane API p95 latency past 1 s.
+- AC1: Demonstration (chaos, MS3) — workers are pinned at their CPU and memory limits at the full heavy cap while the API and the controller are measured. Target: API p95 at most 300 ms and event-stream lag at most 5 s, with no control-plane pod evicted or restarted. Floor: API p95 at most 1 s and no control-plane pod evicted; the legacy system has no such protection (BL-28).
 - AC2: The chart works without the PriorityClass (namespace-admin install, DEP-002) and says which protection is then missing.
+
+Baseline: Workers run with small requests and no ResourceQuota or PriorityClass, so worker load can starve the control plane (DESIGN §3.7b honesty note; BL-28).
+
+Better on: safety, stall-rate.
 
 Source: DESIGN §3.7b honesty note ("today it runs with only small requests and no PriorityClass/ResourceQuota protection").
 
@@ -295,8 +305,12 @@ An operator can cancel a queued or running stage, or a whole chain. Cancel delet
 records `operator-cancelled`, frees the slot, and leaves the PR (if any) as chosen in the action:
 left open or closed.
 
-- AC1: Cancelling a running stage ends its pod within 60 s and no result from it is accepted afterwards (fenced by epoch).
+- AC1: Demonstration (benchmark, MS3) — running stages are cancelled at random points, 200 times. Target: the pod is gone and the slot free within 10 s, and 100% of late results are refused. Floor: within 60 s, and no late result is accepted (fenced by epoch); the legacy system cannot cancel a running task (BL-28).
 - AC2: The confirm dialog and the CLI state the effect before acting.
+
+Baseline: A running task cannot be cancelled; only a queued one can (driver §5; driver §7 "Stop an item mid-flight: Not supported yet"; BL-28).
+
+Better on: operator-actions, recovery-time, safety.
 
 Source: driver §5 ("A running task can't be cancelled"); driver §7 ("Stop an item mid-flight: Not supported yet").
 
@@ -348,10 +362,10 @@ Source: `mh.py` pool (notes: `POOL_USAGE_WINDOW_S` 5 h, `POOL_COOLING_S` 5 h, `P
 ### CRD-004 — Pool health: quarantine and probes
 **MS4** · WP4.3 · SHOULD · KEEP
 
-An authentication failure quarantines the account. A small probe Job checks a quarantined account
-at most every 15 minutes; recovery is recorded only when the probe succeeded against the same
-credential generation and quarantine generation it started with. Viewing status never triggers a
-paid probe.
+An authentication failure quarantines the account. A small probe Job checks a quarantined
+account no more often than the probe interval (default 15 minutes, the legacy value); recovery
+is recorded only when the probe succeeded against the same credential generation and quarantine
+generation it started with. Viewing status never triggers a paid probe.
 
 - AC1: Replacing the credential files changes the generation and makes the next probe eligible immediately.
 - AC2: A probe that started before a re-authentication cannot clear the new quarantine state.
@@ -387,13 +401,18 @@ Source: driver §5 Codex keeper (k3s-harness #201; the 2026-11-01 sign-out attri
 **MS4** · WP4.1 · MUST · FIX
 
 The Git host write credential is used only by the integrator component. The preferred form is a
-GitHub App whose installation tokens are minted per operation with the narrowest permissions; a
-personal token is supported and flagged as weaker. Where the credential lives is an owner
-decision (OD-6).
+GitHub App whose installation tokens are minted per operation, scoped to the repository and the
+permissions that operation needs, and revoked when it ends; a personal token is supported and
+flagged as weaker. Where the credential lives is an owner decision (OD-6).
 
 - AC1: Only the integrator pod mounts the App key or token; API and controller pods do not (manifest test).
 - AC2: The App's required permissions are listed in the docs and verified at onboarding; a missing permission degrades by name (for example "cannot cancel superseded runs: Actions write missing").
 - AC3: Token expiry is surfaced ahead of time on the credentials screen (UI-012) and, from MS5, as an attention item (OBS-014).
+- AC4: Demonstration (count, MS4) — the permissions of the write credential, the pods that can read it and its lifetime are listed for the legacy system and for Sortyard on the same repositories. Target: a token per operation, scoped to one repository, readable by one pod and revoked when the operation ends. Floor: fewer permissions, fewer holders and a shorter lifetime than the legacy personal token, and no expiry date for a person to track (BL-26).
+
+Baseline: The Git write credential is the owner's personal token in a cluster Secret, read by the conductor, with an expiry date tracked by hand (driver §4 and §5; BL-26).
+
+Better on: safety, operator-actions.
 
 Source: driver §5 (the Git write credential in the cluster is the owner's personal token, with an expiry date; an App credential takes precedence if one is added); 2026-11-04 release note (`actions: write` needed for `cancel_pr_runs`).
 
@@ -402,8 +421,8 @@ Source: driver §5 (the Git write credential in the cluster is the owner's perso
 
 For each credential with a rate limit Sortyard keeps recent readings, computes the burn rate
 inside the reset window, and raises one urgent `QUOTA <credential>` condition when remaining
-drops below 20% or the projection reaches zero before the reset. The condition lists every
-mechanism sharing the bucket.
+drops below the low mark (default 20%) or the projection reaches zero before the reset. The
+condition lists every mechanism sharing the bucket.
 
 - AC1: A fixture where the bucket burns to zero before reset raises the condition while remaining is still above zero.
 - AC2: A credential with no reading inside its window is reported `stale`, not healthy.

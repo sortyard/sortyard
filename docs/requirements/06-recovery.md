@@ -23,6 +23,11 @@ hold a slot indefinitely.
 
 - AC1: A generated table lists each phase, its end conditions and its bound; a definition with an unbounded phase is refused at apply time.
 - AC2: Scenario tests exist for every row of task-pickup §5 and §7.
+- AC3: Demonstration (parity, MS5) — every stall episode in the baseline catalogue (BL-05) is replayed as a scenario. Target: every slot is freed at its bound with the item parked, handed back or escalated, and no episode needs a person to free a slot. Floor: no slot is held past its bound in any catalogued episode; the legacy system held slots for hours in each of them (BL-05).
+
+Baseline: The rule existed in the design, but the released code only commented on a merge that never fired, and two slots were held about nine hours (task-pickup conformance row 1, HARNESS-242; BL-05).
+
+Better on: stall-rate, recovery-time, operator-actions.
 
 Source: task-pickup §2a ("No state in the design holds a slot without an exit") and conformance row 1 (the released code only commented; two slots were held about nine hours).
 
@@ -98,18 +103,25 @@ the CI log is refused once per CI round and the round is re-sent.
 Source: driver "Recovery" (label `self-heal`); `hand_back` notes 140, 434.
 
 ### REC-008 — Blocking causes bring parked work back by themselves
-**MS5** · WP5.2 · MUST · KEEP
+**MS5** · WP5.2 · MUST · FIX
 
 A park or hand-back may carry a typed blocking cause: `pr` (resolved when it merges), `defect`
 (when the named task is Done), `check` (when each named check's latest run on the branch head
 passed after the park), `infra` (when that infrastructure is healthy again), `decision` (never:
-a person decides). Parked items are polled at most every 30 minutes; a resolved cause returns
-the item to the queue with a notice. An `infra` cause returns an item at most twice. A `defect`
-cause naming no existing task files one.
+a person decides). A cause is re-evaluated on the event that can resolve it — the task closing,
+the merge or the check run being observed, the health state changing — and by a backstop poll
+(default every 5 minutes; the legacy poll is 30). A resolved cause returns the item to the queue
+with a notice. An `infra` cause returns an item at most twice (default). A `defect` cause naming
+no existing task files one.
 
-- AC1: The CPV2-606/607/608 case is a scenario: three items parked on one defect return within one poll of the defect's fix merging.
+- AC1: The CPV2-606/607/608 case is a scenario: three items parked on one defect return when the defect's fix merges, with no poll involved.
 - AC2: An item with no cause, a `decision` cause or an unknown kind is never auto-returned.
 - AC3: Workers can name a cause in their account; the packet asks for it; the self-heal agent or a person can set one.
+- AC4: Demonstration (parity, MS5) — the recorded parked items and their causes are replayed, timing from the resolving event to the item being back in the queue. Target: back within 60 s for every cause Sortyard observes itself. Floor: back within 5 minutes; the legacy poll is at most every 30 minutes (BL-06).
+
+Baseline: `causes.tick` polls each parked item at most every 30 minutes, a limit set by the board's rate limit, so resolved work waits up to that long to return (conductor README "Blocking causes"; BL-06).
+
+Better on: recovery-time, throughput.
 
 Source: conductor README "Blocking causes" (`causes.py`, `POLL`, `RETURNS`; Joe 2026-11-06).
 
@@ -131,9 +143,10 @@ Source: conductor `SELF-HEAL.md`; HARNESS-248 (the contract listed the wrong pro
 ### REC-010 — Self-heal drain
 **MS5** · WP5.2 · MUST · KEEP
 
-While any task of a project has been in self-heal or `needs_human` for more than 24 hours, one
-urgent `SELF-HEAL-STALLED <project>` condition lists each item, its stop reason and its age. It
-closes only when nothing of the project remains in either queue.
+While any task of a project has been in self-heal or `needs_human` for longer than the drain
+limit (default 24 hours, the legacy value), one urgent `SELF-HEAL-STALLED <project>` condition
+lists each item, its stop reason and its age. It closes only when nothing of the project remains
+in either queue.
 
 - AC1: The condition is updated in place and never duplicated.
 
@@ -147,6 +160,11 @@ chain in one phase longer than the stall threshold (default 4 h) gets exactly on
 where it is stuck.
 
 - AC1: The information the legacy conductor kept only in `state.json` (phase, slot use, stale live records, running revision) is readable without cluster access.
+- AC2: Demonstration (count, MS3) — the facts an operator needs about work in flight (phase, slot use, time in phase, stale records, running revision) are listed with where each is read. Target: 100% through the API, the CLI and the console, each within 1 s. Floor: none needs cluster access; in the legacy system every one of them does (BL-28).
+
+Baseline: Phase, slot use, stale live records and the running revision are readable only in `state.json` on a cluster volume or as a cluster annotation (task-pickup conformance row 7, HARNESS-256; BL-28).
+
+Better on: failure-visibility, operator-actions.
 
 Source: driver §4 "Visibility"; task-pickup conformance row 7 (HARNESS-256).
 
@@ -175,25 +193,39 @@ original result; the same key with a different payload is refused.
 Source: driver §5 (`client_request_id` is idempotent); driver "Recovery" (409 advances the attempt counter).
 
 ### REC-014 — Controller restart and failover
-**MS3** · WP3.7 · MUST · NEW
+**MS3** · WP3.7 · MUST · FIX
 
 At most one controller acts at a time (leader election with a fencing epoch). After a crash,
-restart or failover the new leader resumes within 60 seconds with no duplicate Jobs, change
-requests, comments or merges and no lost stage result.
+restart or failover a new leader resumes with no duplicate Jobs, change requests, comments or
+merges and no lost stage result. A leader that is shutting down hands over instead of letting
+its lease lapse.
 
 - AC1: Chaos test: kill the leader at random points during 200 chains; the end state equals a run with no kills.
 - AC2: A deposed leader's writes are refused by the epoch check.
+- AC3: Demonstration (chaos, MS3) — the leader is killed at random points during 200 chains, timing from the kill to the next reconcile by a leader. Target: at most 15 s, with an end state equal to a run with no kills. Floor: at most 60 s; the legacy system resumes at its next pass, up to three minutes later (BL-25).
+
+Baseline: One writer is guaranteed by `concurrencyPolicy: Forbid` on the CronJobs and `strategy: Recreate` on the API; work interrupted by a crash is picked up at the next pass, and every rollout has 30 to 40 seconds with nothing listening (task-pickup §3; `k8s/deployment.yaml`; BL-25).
+
+Better on: recovery-time, safety, upgrade-effort.
 
 Source: inference from the single-writer constraints today (`concurrencyPolicy: Forbid` on the CronJobs; `strategy: Recreate` "single writer to the sqlite db: never two pods").
 
-### REC-015 — Version-skew guard
-**MS3** · WP3.7 · MUST · KEEP
+### REC-015 — Version skew never pauses delivery silently
+**MS3** · WP3.7 · MUST · FIX
 
-A controller that finds the database schema or the API at a different version than it expects
-does nothing and writes nothing until they agree, and reports `skew` in health.
+Adjacent versions run side by side: the controller and the API of one minor version work with
+the schema and the stage contract of the previous one (DEP-007, DEP-009), so an upgrade does not
+pause delivery. Only a schema outside that window makes the controller idle: it writes nothing
+and reports `skew` in health at once (`/readyz`, `/v1/info`, the Overview); from MS5 its missed
+heartbeats also raise a `SILENT` condition (REC-017).
 
-- AC1: During a rolling upgrade no reconcile runs against a schema the code does not expect.
-- AC2: The skew state is visible; it is never a silent idle.
+- AC1: During a rolling upgrade between adjacent minors no reconcile is skipped for skew, and no reconcile ever runs against a schema outside the supported window.
+- AC2: The skew state is visible wherever health is shown; it is never a silent idle.
+- AC3: Demonstration (chaos, MS3) — a rolling upgrade runs during 20 chains, and separately an upgrade is made to stall half-way, measuring the seconds in which no reconcile runs and the time until the stall is reported. Target: zero paused seconds, and a stuck upgrade reported within 60 s. Floor: paused at most 60 s and never silently; the legacy system skipped every pass for about 32 minutes with only a log line (BL-08, BL-25).
+
+Baseline: On version skew the legacy pass ends without writing. On 2026-11-12 every pass was skipped for about 32 minutes while the API pod held an old bundle, with no alarm (conductor README "API rollouts"; BL-08, BL-25).
+
+Better on: stall-rate, failure-visibility, upgrade-effort.
 
 Source: conductor README "API rollouts" (`api_skew`; "ends without touching `state.json`"); 2026-11-12 release stall ("pass skipped, rollout: API bundle …" for about 32 min with no visible alarm).
 
@@ -201,9 +233,9 @@ Source: conductor README "API rollouts" (`api_skew`; "ends without touching `sta
 **MS5** · WP5.1 · MUST · KEEP
 
 Connection-level failures to the database, the API, the Git host or the cluster API are retried
-with capped backoff (legacy: 1, 2, 4, 8, 15 s up to 90 s). A reconcile that cannot proceed ends
-without partial writes. No verdict, review outcome or grooming result is recorded as `failed` or
-`unavailable` because a dependency was briefly down.
+with capped backoff (default schedule, the legacy one: 1, 2, 4, 8, 15 s up to 90 s). A reconcile
+that cannot proceed ends without partial writes. No verdict, review outcome or grooming result
+is recorded as `failed` or `unavailable` because a dependency was briefly down.
 
 - AC1: Eleven simulated 40-second restarts in a day produce zero failed reviews and zero parked items.
 
@@ -259,6 +291,11 @@ merges.
 
 - AC1: A worker from a cancelled or superseded attempt submits a result: it is refused and recorded as stale.
 - AC2: The check is in the integrator and the API, not only in the controller's memory.
+- AC3: Demonstration (chaos, MS3) — superseded workers, deposed controllers and cancelled attempts each try every side effect (result, push, change-request write, merge) 1,000 times. Target: 100% refused at the integrator or the API and recorded as stale. Floor: zero stale side effects accepted; the legacy system has no check at that boundary (BL-28).
+
+Baseline: No durable per-task revision is checked where side effects happen; the steering document says to report that absence honestly (in-flight-steering; BL-28).
+
+Better on: safety.
 
 Source: in-flight-steering ("A durable per-task revision must eventually be checked by the actual side-effecting execution boundary … Until that path is implemented … report its absence honestly").
 
@@ -271,6 +308,11 @@ revises the existing chain; it never starts a competing one.
 
 - AC1: After a mid-flight edit there is still exactly one chain for the task, with a higher epoch.
 - AC2: Evidence that the change did not invalidate is reused; only invalidated reviews re-run.
+- AC3: Demonstration (benchmark, MS4) — a scripted operator edits a task's text mid-build, cancels a stage and stops a chain, counting steps and the reviews that re-run. Target: one action each, in force at the next stage, with only invalidated reviews re-run. Floor: each is done from the console with no cluster access and no competing chain; the legacy procedure is manual (BL-28).
+
+Baseline: Stopping or steering an item in flight is a prose procedure, and stopping one mid-flight is "Not supported yet" (driver §7; in-flight-steering; BL-28).
+
+Better on: operator-actions, safety, cost.
 
 Source: in-flight-steering ("steering revises the existing task"); driver §7 ("Stop an item mid-flight: Not supported yet").
 
@@ -309,6 +351,7 @@ premise-class decisions escalated, needs routed to `owner`, and items escalated 
 
 - AC1: The owner list is one API call; an item appears on it for one of the four reasons, shown.
 - AC2: A notification reaches the owner only for an owner-list item or a factory-down state with nothing acting on it (OBS-013).
+- AC3: Operator actions on work in flight (requeue, cancel, force, manual state change, resolving a hand-back), counted from the ledger for each week and for each 100 merged tasks (`operator.interventions`). Target: zero in a week. Floor: fewer for each 100 merged tasks than the legacy baseline (BL-07).
 
 Source: driver §6 ("The owner is never a step inside delivery"; "Slack is only for what the owner alone can do, or the factory being down with nothing acting on it").
 
@@ -325,5 +368,29 @@ work volume.
 
 - AC1: The parity matrix is machine-readable: CI fails when a row that is due has no passing scenario, and reports every other row as pending with the milestone that owes it.
 - AC2: After each chaos run, every task is in a terminal or owned state and no slot is held past its bound.
+- AC3: A scenario that is a demonstration runs with its legacy baseline beside it, writes the measured value to the scorecard (QLT-051) and fails below its floor.
 
 Source: inference — the legacy system encodes its behaviour in `test_conductor.py` (10,364 lines) and `test_mh.py` (3,268 lines); a claims-only shadow comparison cannot exercise the step machine.
+
+### REC-026 — Stalls are detected and recovered in minutes
+**MS5** · WP5.2 · MUST · FIX
+
+A stall is found by the system, not by a watch or a person, and is recovered or owned within
+minutes. Three mechanisms. (1) Each phase's bound is derived from that phase's own history (a
+multiple of its recent p95, policy data) instead of one flat threshold, with the legacy stall
+threshold as the ceiling. (2) A no-progress watchdog: a stage that produces no output,
+heartbeat or state change for `stage.no_progress_seconds` (default 600) is ended and retried or
+parked under its failure budget. (3) A task in self-heal that nothing has picked up within
+`selfheal.unpicked_seconds` (default 900) is put on the attention list and sent to its route.
+Every stall class in the catalogue has a named recovery, and every episode is recorded
+(`stall.episodes`) with its detection and recovery times.
+
+- AC1: Demonstration (chaos, MS5) — every stall class of the baseline catalogue (BL-05) is injected during the 72-hour run and the recorded episodes are replayed. Target: 100% of catalogued classes have a recovery, at least 95% of episodes heal with no person, detection within 60 s and recovery within 10 minutes at p95. Floor: a higher self-healed share and a lower median time to recovery than the legacy baselines (BL-05, BL-06).
+- AC2: A bound derived from history is never longer than the ceiling, and a phase with too little history uses the ceiling (default: the legacy stall threshold).
+- AC3: Each recovery names the watch or alert it retires, in the migration guide (MIG-011); no new watch is added for a stall class that has a recovery.
+
+Baseline: One flat stall threshold of 4 hours; parked causes polled at most every 30 minutes; 35 self-heal items open with 21 untouched for 24 hours (HARNESS-444); recorded episodes of 8, 9 and 20 hours and of two days (BL-05, BL-06).
+
+Better on: stall-rate, recovery-time, operator-actions, failure-visibility.
+
+Source: conductor README "Self-heal drain" and "Incident notes"; task-pickup §5; the estate's practice of building a recovery for each stall class instead of another watch. The three mechanisms are inference from the recorded episodes.

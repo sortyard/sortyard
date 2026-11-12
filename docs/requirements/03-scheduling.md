@@ -47,6 +47,11 @@ only by the importer, which converts prefix matches into parent links.
 
 - AC1: The scheduler contains no title or id string matching.
 - AC2: The importer's report lists every task ranked by prefix and the parent link it created for it.
+- AC3: Demonstration (replay, MS2) — the recorded passes are replayed with rank taken from parent links only, after the importer has converted prefix matches. Target: 100% of recorded claim orders are reproduced, with every prefix-ranked task linked to its parent by the importer and none left for a person. Floor: no divergence in the replay comparison (MIG-005) is caused by rank, and renaming a task changes no rank, which it can under the legacy rule (BL-28).
+
+Baseline: `milestone_rank` also ranks a task whose id is a text prefix of a top-level task's (task-pickup §4 step 2). Inference from that rule: renaming a task can change its rank (BL-28).
+
+Better on: safety, simplicity.
 
 Source: `milestone_rank` (task-pickup §4 step 2: "equals its task id … or a prefix of these followed by `-`").
 
@@ -79,11 +84,14 @@ Source: driver §4 ("Urgent runs as a harness `rush` request and ignores the lan
 ### SCH-006 — A freed slot is reused promptly
 **MS3** · WP3.6 · MUST · FIX
 
-When a slot frees, the next eligible task is claimed within 30 seconds (p95), not at the next
-fixed pass.
+When a slot frees, the next eligible task is claimed on that event, not at the next fixed pass.
 
-- AC1: Measured in the scenario suite: slot-free event to claim event p95 ≤ 30 s, max ≤ 120 s.
+- AC1: Demonstration (benchmark, MS3) — the scenario suite measures the time from a slot-free event to the next claim event over 1,000 hand-overs. Target: p95 at most 5 s. Floor: p95 at most 30 s and maximum at most 120 s; the legacy minimum is one pass, up to 180 s (BL-04).
 - AC2: A periodic full re-evaluation (default every 60 s) guarantees progress even if an event is missed.
+
+Baseline: A freed slot is reused at the next pass, and passes run every three minutes (task-pickup §3; BL-04).
+
+Better on: latency, throughput.
 
 Source: task-pickup §3 ("Minimum latency from 'slot freed' to 'next item claimed' is one pass" — three minutes today).
 
@@ -110,8 +118,13 @@ the next N claims (default 10). Available through API, CLI (`sortyardctl queue`,
 MCP and UI.
 
 - AC1: The preview is computed by the same function the scheduler runs, from the same snapshot type.
-- AC2: Changing a lane cap, a priority, a rank or a dependency changes the preview within 5 s.
+- AC2: The time from changing a lane cap, a priority, a rank or a dependency to the preview showing it. Target: 1 s. Floor: 5 s.
 - AC3: Every place an item can wait (task-pickup §7's table) corresponds to a reason code shown here.
+- AC4: Demonstration (benchmark, MS2) — for each place an item can wait in task-pickup §7's table, a scripted operator asks why a task is not running. Target: one call or one screen answers in under 1 s for 100% of the places. Floor: every place is answered in fewer steps than the legacy route, which needs `state.json` from the cluster or a hand derivation (BL-09).
+
+Baseline: Several of the places an item can wait are "Not visible" to a reader (task-pickup §7); phase and slot use are in `state.json` on a cluster volume (HARNESS-251, HARNESS-256; BL-09).
+
+Better on: failure-visibility, operator-actions, latency.
 
 Source: task-pickup §7 ("Where a reader sees it": several rows say "Not visible"); HARNESS-251, HARNESS-256.
 
@@ -141,6 +154,11 @@ reasons) and the inputs it used: policy versions, a hash of the queue snapshot, 
 - AC1: "Why was X not claimed at time T" is one query returning the evaluation, X's reasons and the tasks ranked ahead of it.
 - AC2: A recorded evaluation can be re-run offline from its stored inputs and yields the same decisions (determinism test).
 - AC3: Skips are deduplicated: an unchanged skip reason is stored once with a last-seen time, so the log does not grow per pass.
+- AC4: Demonstration (replay, MS2) — the worked case of task-pickup §8 and 20 questions sampled from the recorded passes are answered from the decision log. Target: 100% answered by one query in under 1 s, each naming the tasks ranked ahead. Floor: 100% answered without reading comments or cluster files; the legacy answer is a hand derivation (BL-09).
+
+Baseline: Why a task was not picked is derived by hand from board comments and `state.json` (task-pickup §8; BL-09).
+
+Better on: failure-visibility, operator-actions.
 
 Source: task-pickup §8 (a derivation done by hand from Plane comments); DESIGN §3.8 DecisionLog.
 
@@ -153,6 +171,11 @@ what from which value, and shows which decisions were made under which version.
 
 - AC1: Changing a project's lanes through UI, CLI or API changes claims within one evaluation.
 - AC2: No scheduling constant is a literal in code: a test enumerates the policy keys in the legacy-constants table (DEF-005) and asserts each is read from configuration.
+- AC3: Demonstration (benchmark, MS2) — a lane change and a cap change are made through the console, the CLI and the API, timing each from the action to the first evaluation that uses it. Target: one action, in force within 5 s, with its audit entry. Floor: a lane change is no slower than the legacy commit route, and a cap or threshold change needs no code change and no release (BL-10).
+
+Baseline: Lanes change by a commit to `repos.yaml`, read at the next pass; caps and thresholds are literals in three files and need a code change and a release (driver §1; task-pickup conformance row 8, HARNESS-246; BL-10).
+
+Better on: latency, operator-actions, failure-visibility.
 
 Source: driver §1 ("the same values are hardcoded"), task-pickup conformance row 8 (HARNESS-246: merged changes not released).
 
@@ -187,6 +210,11 @@ task or project from being evaluated, claimed or advanced in the same cycle.
 
 - AC1: Fault-injection test: an exception while evaluating project A leaves project B's evaluation unaffected; from MS3 the same test covers claims and the advancement of running chains.
 - AC2: The error is recorded on the affected task or project and counted (REC-005).
+- AC3: Demonstration (chaos, MS3) — an exception is injected into the evaluation, the claim and the advancement of one task in each of 1,000 cycles across five projects. Target: every other task and project is evaluated, claimed and advanced in the same cycle, with at most 5 s of added delay. Floor: no other task or project is skipped in that cycle; the legacy pass aborted (BL-22).
+
+Baseline: An exception in one claim aborts the rest of the pass (task-pickup §3 and conformance row 2, HARNESS-254; BL-22).
+
+Better on: stall-rate, throughput, safety.
 
 Source: task-pickup conformance row 2 and §3 ("An exception in a claim aborts the rest of the pass", HARNESS-254).
 
@@ -199,6 +227,11 @@ and the health view says so.
 
 - AC1: A simulated read failure produces zero claims and a `scheduler: snapshot unavailable` health state.
 - AC2: No code path orders by priority alone because rank was unavailable.
+- AC3: Demonstration (chaos, MS2) — each input of an evaluation (tasks, relations, ranks, lanes, policies) is made unreadable in turn over the recorded passes. Target: zero claims are decided from a partial read, and the health view names the unreadable input within one evaluation. Floor: zero evaluations order by fewer keys; the legacy pass ordered by priority alone after a failed clone (BL-22).
+
+Baseline: A failed clone of the plan made the pass ignore milestone order and claim by priority alone (task-pickup conformance row 3, HARNESS-255; BL-22).
+
+Better on: safety, failure-visibility.
 
 Source: task-pickup conformance row 3 (HARNESS-255: a failed clone made the pass ignore milestone order); driver §4 ("An unreadable board pauses non-urgent claims").
 
@@ -211,6 +244,11 @@ effects for that chain (REC-020).
 
 - AC1: Two controllers racing to claim the same task result in exactly one chain (concurrency test).
 - AC2: If the controller dies between claim and first stage launch, the chain is resumed, not re-claimed, after restart.
+- AC3: Demonstration (chaos, MS3) — two controllers race for the same tasks, and the leader is killed between claim and launch, over 10,000 claims. Target: zero duplicate chains, zero tasks left Todo with a live record, and no repair step. Floor: zero of either after restart; the legacy system left such a task skipped every pass (BL-24).
+
+Baseline: A Todo item with a stale live record is skipped every pass and nothing shows it (task-pickup §4, HARNESS-256; BL-24).
+
+Better on: safety, stall-rate.
 
 Source: task-pickup §4 ("A Todo item with a stale live record is skipped every pass", HARNESS-256); in-flight-steering ("one task, one current route, one writer").
 

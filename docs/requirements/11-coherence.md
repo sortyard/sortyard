@@ -4,7 +4,9 @@ Part A states the six things that make this one product: who owns each fact, whe
 interface boundaries are, how identity works, what gets deployed, how it is extended, and how it
 is observed. Part B lists what in DESIGN v6 and CORPUS contradicts that, is missing, or
 over-reaches, with the change recommended and the evidence. Findings are numbered **CF-nn** and
-referenced from the requirement files.
+referenced from the requirement files. Part C records what the owner's two directions of
+2026-11-12 — a divergence must be demonstrably better, and plan for the best outcome — changed
+in this specification.
 
 ---
 
@@ -19,7 +21,7 @@ observation with a time. Everything computed is a projection that can be dropped
 |---|---|---|---|
 | Tasks, relations, order, notes, decisions, needs | Sortyard (Postgres) | Operators and agents through the API; the controller through domain commands | the record |
 | Chains, stage attempts, bindings, verdicts, park and hand-back reasons | Sortyard | The controller; workers submit results through the API | the record |
-| Definitions (policies, lanes, project config, workflows, packet templates, profiles, checklists) | Sortyard, as immutable versions | `apply`, UI, API | the record; files are a transport (DEF-002) |
+| Definitions (policies, lanes, project config, workflows, packet templates, profiles, checklists) | Sortyard, as immutable versions | `apply`, UI, API, or the pull from a locked Git source | the record; files are a transport (DEF-002, DEF-003) |
 | Ledger (events, decisions, audit) | Sortyard, append-only | Every domain command, in the same transaction as the change | the record |
 | Identity: users, bindings, service accounts, token hashes | Sortyard | Admins | the record |
 | Packets, logs, traces, receipts | Sortyard blob store, addressed by content hash | Controller, workers | the record, subject to retention |
@@ -34,7 +36,7 @@ observation with a time. Everything computed is a projection that can be dropped
 Consequences that the requirements enforce:
 
 - **One writer path.** Every change is a domain command that validates, changes state and appends its event in one transaction (API-002, OBS-001). The API and the controller call the same commands.
-- **No bidirectional sync, anywhere.** Not with Plane (MIG-004 is read-only; OD-4), not with a definitions repository (DEF-002), not with the Git host (observations only).
+- **No bidirectional sync, anywhere.** Not with Plane (MIG-004 is read-only; OD-4), not with a definitions repository (a locked installation pulls one way, DEF-003), not with the Git host (observations only).
 - **Concurrency is explicit.** Objects have revisions; stale writes are refused (API-004); chains have epochs; stale side effects are refused (REC-020).
 - **History is free.** Any object's past is its events (OBS-002); metrics are folds over the ledger (OBS-003).
 
@@ -100,9 +102,10 @@ Git write credential; the integrator holds the Git write credential and can crea
 No CRDs and no cluster-scoped objects are needed (DEP-002). Stateful dependencies are Postgres
 and one blob location (DEP-003).
 
-Upgrades are a chart version bump: a pre-upgrade migration Job (DEP-007), expand-then-contract
-schema changes so the previous application version keeps working, a skew guard that keeps the
-controller idle until versions agree (REC-015), running Jobs that survive and are collected
+Upgrades are a chart version bump with no downtime as the target: a pre-upgrade migration Job
+(DEP-007), expand-then-contract schema changes so that adjacent versions run side by side and
+nothing pauses for skew (REC-015), a surge rollout of the API and leaders that hand over on
+shutdown (DEP-010, REC-014), running Jobs that survive and are collected
 afterwards (DEP-009), and a tested path from every earlier minor (DEP-008). The legacy system's
 release guarantees — exact-commit builds, digest pinning, no cluster credential in CI, an older
 release cannot replace a newer one, the running revision is visible — are kept by standard means
@@ -136,6 +139,12 @@ person can do (OBS-013).
 Each finding: what the record says, why it does not hold, the change. Severity: **structural**
 (changes the plan), **scope** (changes what is built), **correction** (a fact or a gap).
 
+Each finding ends with a **Divergence** line. Where the change alters what the estate's system
+does today, the line names the entry in [18-divergences.md](18-divergences.md) that carries
+the legacy baseline, the dimensions on which the change is better and its demonstration. Where
+the change is to the plan only — DESIGN v6 or CORPUS proposed something the estate never ran —
+the line says so.
+
 ## CF-01 — Two programmes are planned as one · structural
 
 **Record.** CORPUS interleaves building the product with migrating the estate: Phase 1B (shadow
@@ -151,6 +160,8 @@ workflow.
 install and use. The **migration track** (parts of MS0 and MS2, all of MS7) consumes product
 releases. Shadow data stops being the console's subject.
 
+**Divergence.** None. A change to the plan; no behaviour of the estate's system changes.
+
 ## CF-02 — The first end-to-end run is 35 items away · structural
 
 **Record.** Real execution arrives in Phase 3A (11 large tasks) and the first real chain in
@@ -162,6 +173,8 @@ doctrine demands a replica with fake providers.
 **Change.** MS3 delivers a hermetic end-to-end chain: scripted harness (EXE-012), plain-git
 adapter with Sortyard-run checks (MRG-011, EXE-017), on a kind cluster, as the quickstart demo
 and as the test rig for everything after.
+
+**Divergence.** None. A change to the order of the plan.
 
 ## CF-03 — The board is treated as commodity and its write side comes last · structural
 
@@ -175,6 +188,8 @@ available only by API. That contradicts "UI for everything" and "without losing 
 
 **Change.** The tracker is writable in MS1. Every capability ships with its screen in the same
 milestone (UI-002 makes this mechanical). There is no late write-surfaces task.
+
+**Divergence.** DIV-01. The board becomes native where the estate steers on Plane.
 
 ## CF-04 — The built-in workflows and review rules are stale · scope
 
@@ -193,6 +208,8 @@ then the gate became: code review + test-determinism review + design review for 
 **Change.** Ship `change` and `job` (FLW-002, FLW-003) with the review policy that runs
 (FLW-005 to FLW-009). Other workflows are definitions someone may add (FLW-017).
 
+**Divergence.** DIV-30. Not a divergence: the shipped workflow is the one the conductor runs.
+
 ## CF-05 — Context recipes, skills and a six-kind extension registry over-reach · scope
 
 **Record.** DESIGN §3.7: ContextRecipe (allowlists, token budgets, provenance drift), an
@@ -207,8 +224,11 @@ recipes were meant to fix belonged to the retired dispatch path.
 
 **Change.** Packet templates and checklists as versioned definitions (EXE-015); a binding made
 of the checks that exist (EXE-001); extension through definitions, containers and HTTP
-(EXT-001). No registry, SDK, archetypes, roles-as-objects or skills in 1.0. This removes four
-large CORPUS tasks and most of Phase 5.
+(EXT-001). No registry, SDK, archetypes, roles-as-objects or skill objects in 1.0. Skill files
+keep reaching workers as they do today, through the worker image and the repository, and the
+binding records both (EXE-001). This removes four large CORPUS tasks and most of Phase 5.
+
+**Divergence.** DIV-23 for how new behaviour is added; DIV-29 and DIV-31 for the objects that are not built, which the estate never had.
 
 ## CF-06 — Two homes for definitions recreates the drift it is meant to end · scope
 
@@ -220,9 +240,12 @@ writes directly in DB-only mode, with one-way export; controller-down is a named
 paths — the pattern the design sets out to delete for tasks.
 
 **Change.** The database is authoritative for definitions too. Files are a transport: `apply`
-and `export` (DEF-002). Installations that want git review lock definitions to a source
-(DEF-003). The standing default "definition edits via git PRs" becomes that lock on the owner's
-installation (OD-5).
+and `export` (DEF-002). An installation that wants git review locks definitions to a Git
+source, and Sortyard pulls them from it one way, as the legacy conductor reads `repos.yaml`
+on every pass (DEF-003). The standing default "definition edits via git PRs" becomes that
+lock on the owner's installation (OD-5). The two-way synchroniser is still not built.
+
+**Divergence.** DIV-09. Reshaped on 2026-11-12: a locked installation pulls from Git, as the legacy conductor does.
 
 ## CF-07 — "The conductor is a client of the API" · scope
 
@@ -240,6 +263,8 @@ files urgent triage items and the driver claims them with one key.
 in-process; controller-only commands are not public (API-017); the security rule is restated as
 IAM-008.
 
+**Divergence.** DIV-10.
+
 ## CF-08 — One MCP tool and one CLI command per operation · scope
 
 **Record.** The prototype clients generate 194 tools and 194 commands (`get-task`,
@@ -253,6 +278,8 @@ curated read-only set. A person will not type `sortyardctl update-task --body @f
 task-level CLI commands plus `api <operationId>` (CLI-002, CLI-003); MCP served over HTTP by the
 API, not only stdio (MCP-001).
 
+**Divergence.** DIV-16 for how agents operate the system. The prototype's one tool for each operation is plan-only.
+
 ## CF-09 — Sign-in assumes an identity provider · correction
 
 **Record.** DESIGN §3.1: "auth provider (OIDC)"; CORPUS M2.1: "OIDC session handling".
@@ -262,6 +289,8 @@ proxy header that the console team found forgeable from inside the cluster.
 
 **Change.** First-run bootstrap, local accounts, OIDC, and a proxy-header mode that refuses to
 start unless the backend is locked down (IAM-001, IAM-002).
+
+**Divergence.** DIV-16.
 
 ## CF-10 — Six services is three too many · scope
 
@@ -276,6 +305,8 @@ object.
 **Change.** Three workloads split by privilege (A4; DEP-001). Pipeline purity is kept by where
 Jobs run and what they can reach, not by a separate long-lived deployment.
 
+**Divergence.** DIV-19 for the estate's own moving parts; the three stub services are plan-only (DIV-31).
+
 ## CF-11 — Storage assumptions that do not travel · correction
 
 **Record.** DESIGN §4 requires an S3-compatible object store and says workers clone from mirrors
@@ -288,6 +319,8 @@ a place to be lighter). A volume shared by the control plane and every Job needs
 **Change.** A blob store with a volume backend by default and S3 optional (DEP-003); mirrors and
 stage output over the cluster network (EXE-009).
 
+**Divergence.** DIV-04 and DIV-11.
+
 ## CF-12 — SY-DEC-002 measures the old architecture · correction
 
 **Record.** "One conductor loop, or two loops in one service?" — to be decided by replaying a
@@ -297,9 +330,12 @@ week of five-minute claim passes and 500 chain events through a merged loop.
 that reconciles each item on events with a periodic resync has no pass to merge or split; what
 matters is latency and isolation.
 
-**Change.** Close SY-DEC-002 as superseded by requirements: claim within 30 s of a slot freeing
-(SCH-006), per-item failure isolation (SCH-014), restart recovery (REC-014). The instrument is
+**Change.** Close SY-DEC-002 as superseded by requirements: a claim on the event when a slot
+frees (SCH-006), hand-offs on events (FLW-019), per-item failure isolation (SCH-014), restart
+recovery (REC-014). The instrument is
 retired with the other prototypes (MIG-015).
+
+**Divergence.** DIV-05.
 
 ## CF-13 — A live soak is the wrong truth instrument, and it gates the wrong thing · structural
 
@@ -317,6 +353,8 @@ evaluator offline, repeatedly, in CI (MIG-005). Prove the step machine with a pa
 derived from the legacy behaviours and a chaos suite (REC-025). The soak that matters is the
 pilot's hypercare (MIG-009).
 
+**Divergence.** None. A change of instrument, and the one that makes the comparisons possible: replay and the parity suite are two of the demonstration methods.
+
 ## CF-14 — Estate-specific code is in the core · correction
 
 **Record.** DESIGN §1.9: "no NonceLogic-specific assumptions in the core".
@@ -326,6 +364,8 @@ output; the chart ships a shadow-conductor Deployment with those values; the REA
 internal hosts and board links (goldfish GF1-04).
 
 **Change.** A `migration/` tree outside the package, with gates that keep it out (MIG-006).
+
+**Divergence.** None. Repository hygiene.
 
 ## CF-15 — The cutover plan names four projects; nine are driven · correction
 
@@ -339,6 +379,8 @@ radius, and it makes "Sortyard builds Sortyard" true first. HARNESS is never mig
 remaining work is maintenance of the system being retired and it ends with it. Every other
 driven project is in the order (OD-7).
 
+**Divergence.** None. A change to the cutover plan.
+
 ## CF-16 — Plane as a projection after cutover · scope
 
 **Record.** Standing default: "Plane read-only projection for one milestone"; CORPUS M3.12 builds
@@ -348,8 +390,12 @@ a one-way projection.
 operator has just stopped using. The estate's own rule for legacy paths is to shut them down,
 not keep them as fallbacks.
 
-**Change.** At cutover a Plane project is archived read-only with a link to Sortyard. Rollback
-during hypercare uses the frozen snapshot. No outbound sync (OD-4).
+**Change.** At cutover a Plane project is frozen with a link to Sortyard, and archived
+read-only at the hypercare verdict. Rollback during hypercare replays what changed since the
+cutover from a rollback export written by the cutover kit, and is rehearsed (MIG-009). No
+outbound sync (OD-4, which stays open).
+
+**Divergence.** DIV-32. Reshaped on 2026-11-12: a rehearsed rollback export replaces the snapshot-only rollback.
 
 ## CF-17 — "Done" on the board is not "in the product" · correction
 
@@ -363,6 +409,8 @@ soak (72), collect latency data (73), publish the image and install (75, 77), de
 **Change.** MS0 closes this out explicitly (MIG-015), starting with the one item that cannot
 wait: the evidence snapshot (MIG-001).
 
+**Divergence.** None. A correction of the record.
+
 ## CF-18 — The design's "one unverified fact" is answerable today · correction
 
 **Record.** DESIGN §3.6, §10 Q8, CORPUS R1: post-#199 fix-round semantics are unverified because
@@ -374,6 +422,8 @@ is "a backstop only: fix_round parks once the same failure comes back"; `CONFLIC
 `REVIEW_TRIPWIRE = 5`. The driver log describes the same.
 
 **Change.** Close SORTYARD-1 against FLW-010 to FLW-012; drop the provisional markers.
+
+**Divergence.** None. A correction of the record.
 
 ## CF-19 — The design predates a third of what must be preserved · correction
 
@@ -390,6 +440,8 @@ REC-010, REC-017, RDY-013, DLV-003, DLV-001, CIH-007, CIH-003, EXE-011, REC-016)
 system keeps changing; [16-legacy-parity.md](16-legacy-parity.md) is re-run against it before
 each cutover (MIG-010).
 
+**Divergence.** None. These are behaviours the estate has and Sortyard keeps; where one of them changes, its requirement is `FIX` and has its own entry (for example REC-008 in DIV-14).
+
 ## CF-20 — The frozen schema is a draft · correction
 
 **Record.** 44 schemas "frozen" in Phase 0, with 18 schema ambiguities and 20 API ambiguities
@@ -404,13 +456,18 @@ three separate log stores have no common order.
 TRK-011, API-004, API-007, OBS-001). Schemas are versioned and migrated, and freeze with the API
 at 1.0.
 
+**Divergence.** DIV-02.
+
 ## CF-21 — "Never `--admin`" and the quarantine merge disagree · correction
 
 **Evidence.** The driver log and the conductor README: "never `--admin`, never a direct merge".
 JOB-QUARANTINE.md: with only quarantined jobs failing, "`merging` lands the approved head itself
 (`gh pr merge --squash --admin --match-head-commit`), once per head".
 
-**Change.** Make it an explicit policy, off by default (MRG-004), and ask the owner (OD-9).
+**Change.** Make it an explicit policy (MRG-004). The estate bundle keeps it on, as today; new
+installations get it off by default (OD-9).
+
+**Divergence.** DIV-33. The legacy behaviour is kept for the estate.
 
 ## CF-22 — Project governance filed as product features · scope
 
@@ -424,6 +481,8 @@ DCO check.
 **Change.** QLT-013, QLT-040, QLT-042. Sortyard does not need to ship them as features to
 launch.
 
+**Divergence.** DIV-31. Plan-only.
+
 ## CF-23 — The experiment rig, the scorecard battery and the eval grid · scope
 
 **Record.** DESIGN §3.8 makes Eval, EvalRun and the Scorecard Battery first-class; CORPUS M3.10
@@ -433,7 +492,10 @@ builds an eval runner deployment and M4.2 imports battery baselines.
 moved the experiment views under "Lab"; the conductor's gates are reviews and required checks.
 
 **Change.** Reviews and checks are the evaluation mechanism of 1.0, each with a declared
-absent state (FLW-009). The rig gets an explicit fate outside the product (MIG-013).
+absent state (FLW-009). The rig stays outside the product as its own deployment, unless the
+usage census shows it is not used (MIG-013).
+
+**Divergence.** DIV-28 for the rig the estate runs, which is kept outside the product; DIV-31 for the eval-runner service, which is plan-only.
 
 ## CF-24 — Estate rules that must not leak into the public repository · correction
 
@@ -443,6 +505,8 @@ estate runners" in a custom lane.
 
 **Change.** State it once so nobody "fixes" it: the public repository uses provider-hosted
 runners with no secrets (QLT-013). Estate rules apply to the estate's installation as policy.
+
+**Divergence.** None. A rule for the public repository.
 
 ## CF-25 — Credential custody in the design is out of date · correction
 
@@ -455,3 +519,72 @@ date (driver §5).
 
 **Change.** The decision has in effect been made; make it explicit and better: a GitHub App with
 minted, narrow tokens, mounted only in the integrator (CRD-007, OD-6).
+
+**Divergence.** DIV-17.
+
+---
+
+# Part C — What the rules of 2026-11-12 changed
+
+The owner gave two directions on the draft: a divergence from the system in hand must be
+demonstrably better, and the plan should aim at the best outcome imaginable and accept a small
+miss. The rules are QLT-050 and QLT-051; the register is
+[18-divergences.md](18-divergences.md). This part lists what moved.
+
+## C1. Origins now mean "relative to the estate"
+
+The earlier draft tagged a requirement `FIX` when it closed a gap in DESIGN v6 or in the
+prototype as well as when it changed what the estate does. Only the second is a divergence.
+After re-tagging:
+
+- **`FIX` means the estate does this differently.** Each such requirement carries a `Baseline:`
+  line, a `Better on:` line and at least one `Demonstration` criterion with a target and a floor.
+- **Moved to `FIX`,** because the estate does something else today: TRK-014, EXE-009, EXE-020,
+  REC-008, REC-014, REC-015, IAM-002, UI-004, OBS-001, OBS-006, OBS-009, DEF-003, EXT-001,
+  DEP-001, DEP-002, DEP-003.
+- **Moved to `KEEP`,** because the estate already behaves this way and the gap was in the plan:
+  API-007, API-017, QLT-012, MRG-004.
+- **Moved to `NEW`,** because nothing in the estate occupies the place: DEP-007, DEP-012,
+  MIG-006, MIG-015, QLT-002, UI-006, UI-008.
+
+## C2. Divergences that could not show they were better
+
+| What the draft did | What it does now | Reason |
+|---|---|---|
+| Cut the embedded concierge and approval mode | Requirements in MS6 (UI-026, IAM-012) | The feature is built and shipped; "use your own agent" is a different tool, not a measured gain |
+| Locked definitions fed by `apply` from CI, in MS6 | A locked installation pulls from Git itself, in MS3 (DEF-003) | The legacy conductor reads its configuration from Git on every pass; the draft was slower and could fail unseen |
+| Archived Plane at cutover; rolled back from the frozen snapshot | Frozen at cutover, archived at the verdict; rollback from an export of what changed (MIG-009) | A snapshot rollback loses the work done since the cutover |
+| Switched off merging past a quarantined job everywhere | On in the estate bundle (MRG-004) | It would hold changes that merge today, with nothing measured in return |
+| Left the experiment rig's fate to a later decision | Kept as its own deployment unless the census shows no use (MIG-013) | Archiving something in use is a loss |
+| Dropped design-first chains, sentence-to-task intake, issue projection, attachments and other Plane features, and the improvement ledger on the inference that they are unused | Each cut is conditional on the usage census (MIG-017) | Use was inferred, not measured |
+
+The cuts of things the estate never had — the extension registry and SDK, skill and recipe
+objects, a separate eval-runner service, Proposals, the roadmap projection, the fork lane, a
+two-way definitions sync — stand. They are changes to the plan, not to the estate's behaviour,
+and each removes parts with no legacy behaviour behind it. The reasoning for each is in
+[18-divergences.md](18-divergences.md) §5.
+
+## C3. Designs changed to reach the targets
+
+Where a target needed more than the draft built, the design changed; no target was lowered.
+
+| Target | What the draft built | What changed |
+|---|---|---|
+| Upgrade with zero downtime | A skew guard that idled the controller until versions agreed; "under 60 seconds and harmless" with one replica | Adjacent versions run side by side (REC-015); a surge rollout of the API with event-stream resume, on the default storage too (DEP-010, now MUST); leaders hand over on shutdown (REC-014) |
+| Stalls found and healed in minutes | The legacy thresholds: one flat 4-hour stall bound, causes polled every 30 minutes | Bounds from each phase's own history, a no-progress watchdog, an announced self-heal queue (REC-026); causes re-evaluated on the resolving event (REC-008) |
+| The control plane adds almost nothing to a task's time | Event-driven slot reuse only | Every hand-off in a chain happens on its event, and the wait is measured for each chain (FLW-019) |
+| Console interaction within 100 ms | Budgets inherited from the legacy console | A local store fed by the event stream, with optimistic updates (UI-018) |
+| Install in one command and minutes | "At most 8 commands" and 15 minutes | One command that installs and prints the address and setup token; the old figures became the floor (DEP-005) |
+| Every merge running within 10 minutes | Releases from tags only | A development build for every merge to `main` (QLT-024) |
+| Zero operator actions | Not measured | `operator.interventions`, `stall.episodes`, `chain.control_wait` and `upgrade.impact` in the metric catalogue (OBS-004), with a scorecard (QLT-051) |
+
+## C4. What the plan gained
+
+- **A baseline-capture work package in MS0** (WP0.4: MIG-016, MIG-017). Without captured legacy
+  figures no comparison can be made later, and the legacy system changes weekly.
+- **Comparisons in every milestone exit.** Each exit lists the demonstrations due, generated
+  from the criteria, and MS5's 72-hour run and MS7's verdicts are judged against the legacy
+  stall, recovery, intervention, throughput and cost figures.
+- **Two levels in every measured exit,** and a planner rule (rule 12) for filing the gap to
+  target as backlog.
+- **A validator that enforces all of it** ([tools/gen.py](tools/gen.py)).

@@ -32,7 +32,7 @@ Operations are annotated `operator-facing` in the OpenAPI document. A coverage m
 each to the route and control that invokes it. CI fails when an operator-facing operation has no
 UI path, unless it carries a dated exemption.
 
-- AC1: At each milestone exit the exemption list is empty for operations introduced in that milestone or earlier.
+- AC1: Coverage of operator-facing operations by a console control, from the manifest check. Target: 100% at every merge to `main`, with no exemption. Floor: 100% at each milestone exit for the operations introduced in that milestone or earlier.
 - AC2: The manifest is published as a docs page ("where is X in the UI").
 
 Source: Joe's objective ("there is a UI for everything"); CORPUS M5.6 defers every write surface to Phase 5 — see CF-03.
@@ -46,12 +46,12 @@ park and hand-back reasons. Dragging changes rank only; state and priority are c
 item.
 
 - AC1: Every drag has a keyboard equivalent and an undo.
-- AC2: After a drag, every open board and list shows the new order within 5 s without a reload.
+- AC2: The time from a drag to every open board and list showing the new order, without a reload. Target: 1 s. Floor: 5 s.
 
 Source: DESIGN §6 view 1 ("Dragging is defined, not magic"); task-ready ("To reorder delivery, drag top-level tasks on the board").
 
 ### UI-004 — Task detail is one timeline
-**MS1** · WP1.5 · MUST · KEEP
+**MS1** · WP1.5 · MUST · FIX
 
 One page per task: fields and spec, relations, the filing verdict and reasons, and one ordered
 timeline of notes, state changes, decisions and — from MS3 — the chain: stages with attempts,
@@ -60,6 +60,11 @@ durations and outcomes, the change request, checks, review verdicts, usage. Ther
 
 - AC1: (WP3.9) From a task, the stage outcome that explains its current state is on the same page (zero navigation).
 - AC2: Every timeline entry has a stable deep link.
+- AC3: Demonstration (benchmark, MS3) — from a task, a scripted operator finds the stage outcome that explains its current state, on Sortyard and on the legacy pair. Target: zero navigation, shown within 1 s of opening the task. Floor: fewer steps than the legacy route across two tools (BL-18).
+
+Baseline: The ticket is in Plane and its runs are in the harness console: two tools with separate navigation (DESIGN §0; Joe 2026-11-06, the dashboard should connect "tickets with the pipeline"; BL-18).
+
+Better on: operator-actions, latency, failure-visibility.
 
 Source: DESIGN §6.0 ("A task's detail *is* its chain"); Joe 2026-11-06 (the dashboard "connects tickets with the pipeline").
 
@@ -76,7 +81,7 @@ filing.
 Source: task-ready "The task item"; `plane_tasks.py file`.
 
 ### UI-006 — Pickup Preview and "why"
-**MS2** · WP2.7 · MUST · FIX
+**MS2** · WP2.7 · MUST · NEW
 
 Per project: the queue in claim order, slot holders with phase and age, the reason code for
 every task not claimable now, and the next-N simulation. On every task detail page: a "why is
@@ -100,7 +105,7 @@ to a person. Decisions are answered here.
 Source: driver §6 (the owner "answers `decision` items; defaults apply on their date"); conductor README (depends-on-Joe list, `needs-human`, `route:owner`).
 
 ### UI-008 — Lanes and tuning
-**MS2** · WP2.7 · MUST · FIX
+**MS2** · WP2.7 · MUST · NEW
 
 Edit lanes per project, pause and resume, admission caps and the scheduling policy values, with
 the current value, the default, who last changed it and when. Saving shows the diff and its
@@ -116,10 +121,11 @@ Source: driver §1 (knobs in `repos.yaml`, hardcoded copies in three files); DES
 
 The landing page: health state and what drives it; per project running, waiting, parked and
 handed-back counts with oldest ages; slots and heavy-cap use; recent merges; the attention list.
-It updates live and renders within 2 seconds on the reference fixture.
+It updates live.
 
 - AC1: A source that is unknown or stale renders `unknown`, never 0.
 - AC2: Every number links to the list that produces it.
+- AC3: Render time of the Overview on the reference fixture. Target: 500 ms. Floor: 2 s, the legacy console's bar for the same journey.
 
 Source: harness-console J1; FACTORY-DASHBOARD-DESIGN "Screen and feedback loop".
 
@@ -143,7 +149,7 @@ A stage's log and, where captured, its agent trace: live tail with follow mode, 
 multi-megabyte content, searchable, with deep-linkable lines. The basic log view ships in MS3;
 search, trace filtering and deep links are complete by MS6 (WP6.3).
 
-- AC1: A 5 MB log or trace opens without freezing the page (frame time budget in the e2e test).
+- AC1: Opening a 5 MB log or trace. Target: first lines within 300 ms and no frame over 50 ms while scrolling. Floor: no frame over 200 ms (frame budget asserted in the e2e test).
 
 Source: harness-console J3; DESIGN §6 view 4.
 
@@ -166,7 +172,7 @@ Source: harness-console J4; console routes `credentials`, components `add-accoun
 Lists of parked and handed-back work with reason, blocking cause, age and what would bring each
 back; the resolution actions of the self-heal contract (REC-009).
 
-- AC1: Items older than 24 h are marked and match the `SELF-HEAL-STALLED` condition's list.
+- AC1: Items older than the self-heal drain limit (default 24 h) are marked and match the `SELF-HEAL-STALLED` condition's list.
 
 Source: conductor README "Self-heal drain", "Blocking causes".
 
@@ -191,6 +197,7 @@ the records behind it.
 
 - AC1: Every tile's value matches a hand-computed fixture.
 - AC2: No dashboard requires Grafana or any service beyond Sortyard and Postgres.
+- AC3: A tile can show a reference series beside its own: a named baseline for the same metric and window, loaded through the API. The estate loads its legacy baselines this way (MIG-016), and the scorecard shows each criterion's floor and target as lines.
 
 Source: [09-observability.md](09-observability.md) metric catalogue; console route `delivery`, components `stage-timing`, `insights`.
 
@@ -219,14 +226,19 @@ Source: DESIGN §6 view 12; onboarding.md (today: edit `repos.yaml`, push, wait 
 ### UI-018 — Performance budgets
 **MS1** · WP1.5 · MUST · KEEP
 
-Initial JavaScript at most 350 KB gzipped, enforced in CI. Grids are virtualised (about 50 rows
-mounted) and scroll 10,000 fixture rows smoothly. Lists use server cursors. Route code is
-lazy-loaded.
+The console keeps a normalised local store fed by the event stream, applies an operator's change
+optimistically and reconciles with the server's answer, so that no action waits for a round trip
+before it shows. Initial JavaScript is budgeted and enforced in CI. Grids are virtualised (about
+50 rows mounted) and scroll 10,000 fixture rows smoothly. Lists use server cursors. Route code
+is lazy-loaded and the next likely route is preloaded.
 
-- AC1: The budget check fails the build when exceeded.
+- AC1: Initial JavaScript, gzipped, enforced by the budget check. Target: 200 KB. Floor: 350 KB, the legacy console's budget.
 - AC2: An e2e test asserts the mounted-row bound on a 10,000-row fixture.
+- AC3: Interaction latency on the reference workload, from an input (click, key, end of a drag) to its visible result and from a route change to its content. Target: p95 at most 100 ms for an input and 200 ms for a route change. Floor: p95 at most 1 s, and no journey slower than on the legacy console (BL-18).
+- AC4: First load on a cold cache, to interactive, on the reference connection. Target: 1 s. Floor: 2 s.
+- AC5: An optimistic change that the server refuses is rolled back visibly, with the reason.
 
-Source: `console/check_budget.py` (`BUDGET_BYTES = 350 * 1024`); harness-console J2; decided D4.
+Source: `console/check_budget.py` (`BUDGET_BYTES = 350 * 1024`); harness-console J2; decided D4. The local store and optimistic updates are a design change made on 2026-11-12 to reach the latency target (inference: a round trip for every action cannot meet it).
 
 ### UI-019 — Accessibility
 **MS1** · WP1.5 · MUST · KEEP
@@ -299,13 +311,17 @@ All user-visible strings go through a message catalogue with locale-aware dates 
 Source: Plane benchmark (22 locales, an i18n sync check in CI); see [12-quality-bar.md](12-quality-bar.md) for the stance.
 
 ### UI-026 — Embedded concierge
-**LATER** · — · LATER · KEEP
+**MS6** · WP6.6 · SHOULD · KEEP
 
-The embedded chat agent of the existing console (ask a question, get an answer grounded in live
-state with citations, approve proposed actions) is not part of 1.0. Its ambient half — the
-attention list — is (OBS-014). Operators reach the same capability from their own agent through
-MCP.
+The console keeps the embedded concierge of the existing console: ask a question, get an answer
+grounded in live state with citations, and approve proposed actions (IAM-012). It is a client of
+the operator-agent tools (MCP-002) with the signed-in operator's permissions, it has no private
+endpoint, and it is off until a model credential is configured for it. Its ambient half, the
+attention list, ships in MS5 (OBS-014).
 
-- AC1: The read tools the concierge used are present in the operator-agent MCP set (MCP-002), so the feature can return without new API work.
+- AC1: The legacy concierge journeys (J6, and the second concierge journey of J12) pass against Sortyard.
+- AC2: Every statement the concierge makes about state cites the record it came from; text from tasks, logs and traces is treated as data, never as instructions.
+- AC3: With no model credential the entry point says how to enable it, and nothing else in the console changes.
+- AC4: Time to the first token of an answer on the reference workload. Target: 1 s. Floor: no slower than the legacy concierge (BL-18).
 
-Source: harness-console J6–J8, decided D7–D9, D14–D15; console `components/concierge/*`. Owner decision OD-3.
+Source: harness-console J6–J8, decided D7–D9, D14–D15; console `components/concierge/*`, `concierge.py`; e2e `j6-concierge`, `j12-concierge-2`. Cut reversed on 2026-11-12: the feature is built and shipped in the legacy console, and no measured case showed that removing it is better; how much it is used is counted by the census (MIG-017). Owner decision OD-3.

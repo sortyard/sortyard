@@ -28,24 +28,41 @@ Source: `definitions/README.md` (immutable content-hashed versions); DESIGN §5.
 
 All definitions live in the database. `sortyardctl apply -f <dir|file|git-url@ref>` creates
 versions from files through the API; `sortyardctl export` writes the current versions as files.
-Export then apply is a no-op. There is no sync controller and no "definitions: stale" state.
+Export then apply is a no-op. There is no second authority and no two-way synchroniser: an
+installation that keeps its definitions in Git locks them to that source, and Sortyard pulls
+them (DEF-003).
 
 - AC1: Round-trip test: export → apply on a second install yields identical content hashes.
 - AC2: A UI edit and an `apply` of the same content produce the same version.
+- AC3: Demonstration (chaos, MS3) — an invalid definition file, an unreachable source and a half-written change are each applied 100 times. Target: 100% refused as a whole with the reason, the last valid version in force throughout, and the refusal visible within one evaluation. Floor: zero evaluations run on partial or default configuration; a legacy pass did after a failed clone (BL-22).
+
+Baseline: Project configuration is `repos.yaml`, read from a Git clone on every pass. A failed clone made a pass order by priority alone (task-pickup conformance row 3, HARNESS-255); since 2026-11-10 an invalid entry is dropped for the pass (kept as RDY-013). Caps and thresholds are not configuration at all (BL-22, BL-10).
+
+Better on: safety, failure-visibility.
 
 Source: DESIGN §5.1 (git and database both, with a sync controller); CF-06 for why this is changed. Owner decision OD-5.
 
-### DEF-003 — Source lock
-**MS6** · WP6.4 · MUST · NEW
+### DEF-003 — Source lock and pull
+**MS3** · WP3.8 · MUST · FIX
 
-An installation can lock definitions to a source: only `apply` from the configured repository
-and ref (run by a token with the `definitions-source` role, typically from CI) may create
-versions; the UI shows definitions read-only and links to the source.
+An installation can lock definitions to a Git source, for each definition kind separately.
+Sortyard then pulls: it reads the configured repository and ref itself, through the mirror
+mechanism with a read-only credential (poll, default every 60 s, and at once on a webhook),
+validates the bundle (DEF-006) and creates versions from it. Nothing else may create versions of
+a locked kind; the console shows them read-only and links to the source. A bundle that does not
+validate, or a source that cannot be read, changes nothing: the last valid version stays in
+force and the definitions page says why. Sortyard never writes to the source repository.
 
-- AC1: With the lock on, a UI or API edit by an operator is refused with a message naming the source.
-- AC2: The NonceLogic installation runs locked, which keeps "definition edits go through git review".
+- AC1: With the lock on, a console or API edit of a locked kind is refused with a message naming the source.
+- AC2: The estate's installation runs locked, which keeps "definition edits go through git review" and needs no CI job or token to deliver them.
+- AC3: Demonstration (benchmark, MS3) — a change to a project's lanes is merged in the source repository, timing from the merge to the first evaluation that uses it, with webhooks on and off. Target: in force within 30 s, with no operator step. Floor: within 180 s with no operator step, as the legacy pass does today, and a failed read keeps the last valid version in force (BL-10, BL-22).
+- AC4: A pulled version records its source commit; the definitions page shows the commit in force and the time of the last successful read.
 
-Source: INTENDED-USE.md standing default ("definition edits via git PRs").
+Baseline: The conductor reads `repos.yaml` from a Git clone on every pass, so a merged change is in force within one pass with no further step; a failed clone degraded a pass (HARNESS-255; BL-10, BL-22).
+
+Better on: latency, failure-visibility, safety.
+
+Source: INTENDED-USE.md standing default ("definition edits via git PRs"); the conductor's `repos.yaml` clone on each pass. Reshaped on 2026-11-12 from a lock fed by `apply` from CI: that would have been slower and less visible than the legacy pull, so it could not pass the divergence rule (QLT-050).
 
 ### DEF-004 — A running chain keeps the versions it started with
 **MS3** · WP3.1 · MUST · KEEP
@@ -62,7 +79,9 @@ Source: DESIGN §5.1 (a) "pinning wins"; DESIGN §3.6 (policies read at decision
 **MS2** · WP2.6 · MUST · KEEP
 
 No tunable is a literal in code. The table below is the starting key set; each row ships in the
-milestone that introduces its behaviour, and a test asserts the code reads the key.
+milestone that introduces its behaviour, and a test asserts the code reads the key. The estate
+bundle ships every legacy value unchanged unless a divergence entry in
+[18-divergences.md](18-divergences.md) changes it.
 
 | Legacy constant | Value today | Policy key |
 |---|---|---|
@@ -81,7 +100,7 @@ milestone that introduces its behaviour, and a test asserts the code reads the k
 | `CHECKS_GRACE` | 30 min | `merge.missing_check_grace_seconds` |
 | `TRIAGE_TRIES` / `TRIAGE_ROUNDS` | 3 / 2 | `triage.attempts`, `triage.merged_fix_rounds` |
 | `DISPATCH_GRACE` / `PROOF_WAIT` / `CONFIRM_LIMIT` | 20 min / 3 h / 24 h | `triage.dispatch_grace_seconds`, `.run_wait_seconds`, `.confirm_limit_seconds` |
-| causes `POLL` / `RETURNS` | 30 min / 2 | `causes.poll_seconds`, `causes.infra_returns` |
+| causes `POLL` / `RETURNS` | 30 min / 2 | `causes.poll_seconds` (a backstop in Sortyard, shipped default 5 min: REC-008), `causes.infra_returns` |
 | self-heal drain | 24 h | `selfheal.stalled_after_seconds` |
 | grooming alarm | 2 failures / 60 min | `grooming.failed_attempts`, `grooming.empty_queue_seconds` |
 | filing sweep | 30 min | `filing.will_release_limit_seconds` |
@@ -98,6 +117,8 @@ milestone that introduces its behaviour, and a test asserts the code reads the k
 | mirror freshness | 300 s | `mirror.stale_after_seconds` |
 | mechanism check cadence / quota floor | 10 min / 20% | `health.check_seconds`, `quota.low_fraction` |
 | release-verify limits | 15 min pod / 1 h unverifiable | `releaseverify.pod_seconds`, `.unverifiable_after_seconds` |
+| — (new: REC-026) | — | `stall.history_multiple` (default 3), `stage.no_progress_seconds` (default 600), `selfheal.unpicked_seconds` (default 900) |
+| — (new: DEF-003, FLW-019) | — | `definitions.source_poll_seconds` (default 60), `githost.inflight_poll_seconds` (default 10) |
 
 - AC1: The policy reference page is generated from the key registry and shows key, default, legacy name and the requirement that uses it.
 - AC2: A key with no reader, or a reader of an unregistered key, fails CI.
@@ -133,7 +154,8 @@ Source: DESIGN §6 view 7 (simulate); UI-008.
 Each release carries a default bundle: the `change` and `job` workflows, their packet templates,
 the review checklists, harness profiles for the shipped harnesses, and default policies. A fresh
 install applies it. On upgrade, changed defaults are offered as a diff the operator accepts; an
-installation's edits are never overwritten.
+installation's edits are never overwritten. An installation may layer its own bundle on top; the
+estate's does, and keeps the legacy settings that are not defaults for strangers (MIG-010).
 
 - AC1: A fresh install can run the demo with no definition authored by the user.
 - AC2: An upgrade never changes behaviour by silently replacing a definition the operator edited.
@@ -158,7 +180,7 @@ Source: onboarding.md (one `repos.yaml` entry; the onboarding check; "GitHub req
 ## EXT — extension points
 
 ### EXT-001 — Three ways to extend, none of them in-process
-**MS3** · WP3.8 · MUST · NEW
+**MS3** · WP3.8 · MUST · FIX
 
 Sortyard is extended by (1) **definitions** applied as bundles, (2) **containers** that honour a
 published contract (worker images, sensors), and (3) **HTTP** (the API, MCP, the event stream,
@@ -166,6 +188,11 @@ webhooks). 1.0 loads no third-party code into the control plane and has no plugi
 
 - AC1: The architecture page lists every extension point with its contract version.
 - AC2: A change that would require third-party code inside the API or controller process is out of scope for 1.0.
+- AC3: Demonstration (benchmark, MS5) — a new check stage, a new sensor and a changed review checklist are each added to a running installation. Target: each in force within 5 minutes, with zero control-plane restarts and no new control-plane image. Floor: none needs a release of the control plane; in the legacy system each is a code change and a release (BL-11).
+
+Baseline: Every new behaviour of the legacy system — a check, a sensor, a workflow step — is a change to the conductor's code and a release of its bundle. Releases were manual, and the release controller that followed was blocked for about 32 minutes on 2026-11-12 (task-pickup conformance row 8, HARNESS-246; BL-11, BL-10).
+
+Better on: operator-actions, safety, upgrade-effort.
 
 Source: DESIGN §11.1 ("Small core, everything else an extension"); CF-05 for why the six-kind registry and SDK are cut.
 
@@ -240,7 +267,7 @@ Source: DESIGN §11.2 ("an API-stability/versioning commitment").
 ## DEP — install, upgrade, operate
 
 ### DEP-001 — One chart, one image, three control-plane workloads
-**MS1** · WP1.6 · MUST · KEEP
+**MS1** · WP1.6 · MUST · FIX
 
 One Helm chart and one image. Control-plane workloads: `api` (HTTP, console, MCP), `controller`
 (scheduler, chain advancement, mirrors, schedules, health checks) and `integrator` (Git host
@@ -249,11 +276,16 @@ MS3. A single-pod profile for evaluation may run all three in one pod.
 
 - AC1: The default install renders at most: three Deployments, one StatefulSet (bundled Postgres), their Services, Secrets, ConfigMaps, NetworkPolicies and one migration Job.
 - AC2: The eval-runner, sensor-runner and context-assembler stub services in the repo are removed (CF-10).
+- AC3: Demonstration (count, MS3) — the workloads, scheduled jobs, host crons and stores of a default install are counted against the legacy inventory. Target: three Deployments, one StatefulSet and one migration Job, with zero CronJobs and zero host crons. Floor: fewer long-lived workloads, fewer scheduled jobs and fewer stores than the legacy inventory (BL-14).
+
+Baseline: The delivery system is a Plane installation, the dispatcher API, the conductor's CronJobs, a release controller, a mechanism-health job, host crons and a tools pod. `mechanisms.yaml` registers 68 mechanisms across the estate; the pipeline's share is counted by the baseline capture (BL-14).
+
+Better on: simplicity, install-effort, upgrade-effort.
 
 Source: SY-DEC-001 (one codebase, entry points, all-in-one profile); DESIGN §4 (six services); CF-10. Plane benchmark: 13 containers.
 
 ### DEP-002 — Installable by a namespace admin
-**MS1** · WP1.6 · MUST · NEW
+**MS1** · WP1.6 · MUST · FIX
 
 The chart needs no CustomResourceDefinitions and no cluster-scoped objects by default. Optional
 cluster-scoped extras (a PriorityClass, a second namespace for workers) are flags, each
@@ -261,11 +293,16 @@ documented with what is lost without it.
 
 - AC1: `helm install` succeeds with a ServiceAccount that has admin on one namespace only.
 - AC2: From MS3, when the controller ships: its Role is limited to Jobs, Pods, Pods/log, ConfigMaps and Secrets in the worker namespace.
+- AC3: Demonstration (drill, MS3) — a release that adds a workload and a permission is installed by upgrade with a namespace-admin account, on a fresh install and on an upgraded one. Target: one `helm upgrade`, zero objects applied by hand, the controller's Role rendered by the chart. Floor: no release needs an object applied by hand; the legacy release of 2026-11-12 did (BL-11).
+
+Baseline: The legacy RBAC is a hand-maintained Role. On 2026-11-12 a new CronJob could not be applied because the Role did not name it, and the release stalled for about 32 minutes (release note 2026-11-12; `k8s/mh-rbac.yaml`; BL-11).
+
+Better on: upgrade-effort, operator-actions, safety.
 
 Source: 2026-11-12 release stall (a new CronJob could not be applied because a hand-maintained Role did not name it); `k8s/mh-rbac.yaml`.
 
 ### DEP-003 — Postgres and one blob location, nothing else
-**MS1** · WP1.6 · MUST · KEEP
+**MS1** · WP1.6 · MUST · FIX
 
 State, ledger and work queue are in Postgres. Blobs (packets, logs, traces, mirrors) go to a blob
 store with two backends: a PersistentVolume (default) or S3-compatible storage. There is no
@@ -273,6 +310,11 @@ Redis, no message broker and no required object store.
 
 - AC1: The default install has exactly one database and one PersistentVolumeClaim besides Postgres's own.
 - AC2: Switching the blob backend is a values change plus a documented copy step.
+- AC3: Demonstration (drill, MS6) — a seeded installation is backed up and restored into a fresh cluster, timed, and the stores to back up are counted. Target: one database and one blob location, restored to an identical ledger sequence within 5 minutes. Floor: restored within 30 minutes, from fewer stores than the legacy inventory (BL-14).
+
+Baseline: State is in `state.json` and `grooming.json` on a volume, the dispatcher's SQLite database, JSONL ledgers, a shared work volume, and the board's own database and services (BL-14).
+
+Better on: simplicity, recovery-time, install-effort.
 
 Source: SY-DEC-001 ("Postgres is the only database … no Redis, no message broker"); DESIGN §4 storage choices (which adds an S3 store — see CF-11).
 
@@ -291,14 +333,16 @@ Source: README quickstart (`postgres.enabled=false`); goldfish GF1-07.
 ### DEP-005 — Install time
 **MS1** · WP1.6 · MUST · NEW
 
-From a clean kind cluster with the prerequisites present: a running Sortyard with the first task
-filed in at most 15 minutes (MS1); the demo chain finished in at most 30 minutes (MS3). Both are
-scripted and timed in CI on every release candidate, using published artefacts only.
+From a clean cluster with the prerequisites present, one command installs a running Sortyard and
+prints its address and the setup token; one more runs the demo. Both paths are scripted and
+timed in CI on every release candidate, using published artefacts only.
 
-- AC1: The CI job fails when either bar is exceeded on the reference runner.
-- AC2: The documented path has at most 8 commands and no step that requires editing a file.
+- AC1: Install to first task filed, on the reference runner and a kind cluster. Target: one command and 3 minutes. Floor: 8 commands and 15 minutes, with no step that requires editing a file.
+- AC2: (WP3.10) Install to the demo chain finished. Target: one more command and 5 minutes more. Floor: 30 minutes in total.
+- AC3: The CI job fails when a floor is missed and writes the measured times to the scorecard (QLT-051).
+- AC4: The comparison with the estate is recorded once: what a second installation of the legacy system needs (BL-13) beside the measured install.
 
-Source: DESIGN §1.9 ("`helm install` it on a fresh cluster in an afternoon") — tightened; goldfish GF1-05 (no prerequisite check, no one-command replica).
+Source: DESIGN §1.9 ("`helm install` it on a fresh cluster in an afternoon") — tightened; DESIGN §0 (standing the legacy system up elsewhere means about six repositories, a jump box and a private network); goldfish GF1-05 (no prerequisite check, no one-command replica).
 
 ### DEP-006 — Values are few, documented and schema-checked
 **MS1** · WP1.6 · MUST · NEW
@@ -312,7 +356,7 @@ install requires no values. The values reference page is generated.
 Source: `charts/sortyard/values.yaml`; Plane benchmark (58 variables in the self-host env file).
 
 ### DEP-007 — Migrations
-**MS1** · WP1.6 · MUST · FIX
+**MS1** · WP1.6 · MUST · NEW
 
 Numbered, forward-only SQL migrations, each applied in one transaction with its record; a
 released migration is immutable and the runner refuses a changed file. The migration Job runs
@@ -345,18 +389,31 @@ Upgrading or restarting the control plane does not fail running stages. Jobs kee
 their results are accepted afterwards; chains resume. The stage contract of the previous minor
 is accepted by the current one.
 
-- AC1: Upgrade during 20 running chains: all complete with no extra attempt caused by the upgrade.
+- AC1: Demonstration (chaos, MS3) — the control plane is upgraded and restarted eleven times in a day during 20 running chains. Target: zero stages failed or retried because of an upgrade, and zero results lost. Floor: no extra attempt caused by an upgrade; on such a day the legacy system failed reviews and grooming (BL-25).
+
+Baseline: The API's `Recreate` rollout leaves 30 to 40 seconds with nothing listening; eleven rollouts in one day failed reviews, grooming and flake processing (conductor README "API rollouts"; BL-25).
+
+Better on: upgrade-effort, stall-rate, cost.
 
 Source: conductor README "API rollouts" (strategy Recreate leaves 30–40 s with nothing listening; 11 rollouts in a day failed reviews and grooming).
 
-### DEP-010 — Availability during upgrade
-**MS3** · WP3.7 · SHOULD · FIX
+### DEP-010 — Upgrades without downtime
+**MS3** · WP3.7 · MUST · FIX
 
-The API rolls without downtime with two replicas; the controller and integrator hand over
-leadership within 60 seconds. With one replica each, the documented gap is under 60 seconds and
-harmless (REC-016).
+An upgrade is a rolling replacement with a surge: the new API pod is ready before the old one
+stops, connections drain, and event-stream clients resume from their last event id. This must
+hold with the default volume-backed blob store on `ReadWriteOnce` storage as well as with S3.
+The controller and the integrator hand leadership over on shutdown instead of letting a lease
+lapse (REC-014). It holds with one replica of each as well as with two, so the smallest
+installation upgrades without a gap in the API.
 
-- AC1: A continuous read probe during upgrade sees no failed request with two API replicas.
+- AC1: Demonstration (chaos, MS3) — a continuous read and write probe and an event-stream client run during 20 upgrades, with one replica and with two. Target: zero failed requests, zero missed events and at most 15 s without a leader. Floor: failed requests for at most 5 s in an upgrade and no event missed after reconnecting; the legacy rollout has nothing listening for 30 to 40 seconds (BL-25).
+- AC2: No control-plane workload uses the `Recreate` strategy by default; the chart test checks the rendered strategies.
+- AC3: Each upgrade records its own impact (`upgrade.impact`, OBS-004).
+
+Baseline: `replicas: 1` with `strategy: Recreate`, because of a single-writer SQLite database: every rollout is 30 to 40 seconds with nothing listening (`k8s/deployment.yaml`; conductor README "API rollouts"; BL-25).
+
+Better on: upgrade-effort, stall-rate, failure-visibility.
 
 Source: `k8s/deployment.yaml` (`replicas: 1`, `strategy: Recreate` because of a single-writer SQLite database).
 
@@ -373,7 +430,7 @@ elsewhere, run the scenario suite's read checks.
 Source: Plane benchmark (backup option and `restore.sh`, `restore-airgapped.sh` scripts); DESIGN §6 view 12.
 
 ### DEP-012 — Uninstall is documented
-**MS1** · WP1.6 · MUST · FIX
+**MS1** · WP1.6 · MUST · NEW
 
 The docs say exactly what survives `helm uninstall` (the database Secret and volume) and how to
 remove it.
@@ -385,10 +442,10 @@ Source: goldfish GF1-08.
 ### DEP-013 — Footprint
 **MS1** · WP1.6 · SHOULD · NEW
 
-An idle control plane with bundled Postgres requests at most 0.5 CPU and 1 GiB of memory in
-total.
+An idle control plane with bundled Postgres asks for little enough to share a laptop cluster
+with other work.
 
-- AC1: The chart test sums the default requests and fails above the bar.
+- AC1: The sum of the default resource requests of the control plane with bundled Postgres, checked by the chart test. Target: 0.25 CPU and 512 MiB. Floor: 0.5 CPU and 1 GiB.
 
 Source: `values.yaml` today (API 50m/64Mi, Postgres 100m/256Mi); Plane benchmark (minimum 2 vCPU / 4 GB).
 
@@ -466,6 +523,11 @@ the rendered manifests of a release; `/v1/info` and the console footer show vers
 digest.
 
 - AC1: The quickstart never asks the reader to build an image or match a tag by hand.
+- AC2: Demonstration (count, MS1) — the steps to learn what is running and to install an exact release are counted. Target: one call returns version, commit and digest, and one command installs a release by version with no build. Floor: fewer steps than reading the legacy annotation with cluster access, and no size cap on shipped code (BL-28).
+
+Baseline: The legacy control plane ships its code as a bundle in a ConfigMap with a size cap, and the running revision is a cluster annotation (conductor README; MECHANISMS.md "Release bundle"; task-pickup conformance row 7; BL-28).
+
+Better on: failure-visibility, install-effort, safety.
 
 Source: README quickstart (build locally, "the tag must match `appVersion`"); goldfish "Not verified: whether the image is published"; k3s driver (digest annotations on the deployment).
 
@@ -475,7 +537,7 @@ Source: README quickstart (build locally, "the tag must match `appVersion`"); go
 The docs give cap and envelope defaults by node size, with the reasoning, starting from the
 estate's experience.
 
-- AC1: The guidance includes a worked example for a 16 vCPU / 64 GiB node.
+- AC1: The guidance includes a worked example for the estate's node size (D16s_v6).
 
 Source: DESIGN §3.7b (proof-class sizing on D8s_v6 versus D16s_v6); driver §5.
 
@@ -541,13 +603,13 @@ Run Sortyard's real evaluator over the recorded legacy passes (MIG-002) and comp
 decisions. Every divergence is stored and classified: input difference, policy mismatch,
 implementation defect, side effect the replay cannot know, or unclassified with the reason.
 
-- AC1: Over at least 2,000 recorded passes: claim agreement of at least 99%, and 100% of divergences classified, with no open implementation defect.
+- AC1: Replay over at least 2,000 recorded passes, with every divergence classified and no open implementation defect: the share of passes whose claim decisions agree. Target: 100%. Floor: at least 99%.
 - AC2: The comparison is a repeatable offline job (minutes, not weeks) and runs in CI on a fixed sample.
 
 Source: `claim-comparison/README.md` (pairing, classification); DESIGN §8 Phase 1; CF-13 for replacing the live soak.
 
 ### MIG-006 — Migration code stays out of the core
-**MS0** · WP0.2 · MUST · FIX
+**MS0** · WP0.2 · MUST · NEW
 
 Everything specific to the legacy estate (the Plane/`products.json`/gating adapters, the
 comparator, the evidence tool, the cutover kit) lives under a `migration/` tree with its own
@@ -568,6 +630,7 @@ hypercare window; verdict. Each step is recorded and resumable.
 
 - AC1: The kit is first executed end to end in the replica against a copy of the project.
 - AC2: Running a step twice is safe.
+- AC3: The kit carries the settings the legacy configuration implies for the project — lanes, build and release switches, the container sidecar where it is used today, the estate bundle's packs — and lists them in the dry-run report.
 
 Source: CORPUS M4.1; SY-DEC-003 (the proven registration sequence).
 
@@ -586,12 +649,16 @@ Source: driver §6 ("Nothing else should build or merge for a project that has `
 **MS7** · WP7.1 · MUST · KEEP
 
 Each cutover has a hypercare window (default 7 days; 14 for the pilot) with a written verdict:
-claims correct, landings fenced, hand-backs owned. Until the verdict, rollback is possible: stop
-Sortyard for the project, re-enable the legacy driver from the frozen snapshot. After the
-verdict the legacy side for that project is switched off, not kept as a fallback.
+claims correct, landings fenced, hand-backs owned, and every divergence the project relies on at
+or above its floor (QLT-050). Until the verdict, rollback is possible: stop Sortyard for the
+project, write what changed since the cutover (states, order, relations, notes) back to the
+legacy board from a rollback export, using the cutover kit and not Sortyard itself, and
+re-enable the legacy driver. After the verdict the legacy side for that project is switched off,
+not kept as a fallback.
 
 - AC1: The rollback path is rehearsed once in the replica before the pilot.
 - AC2: A verdict lists every operator intervention during the window.
+- AC3: Demonstration (drill, MS7) — in the replica a project is cut over, worked through a day of recorded activity and rolled back, timing from the decision to the legacy driver claiming again. Target: within 5 minutes, with zero tasks lost, duplicated or claimed by both systems. Floor: within 30 minutes with the same zero, and with no sync component running during hypercare; a projection would keep a second copy of every task, and second copies have drifted (BL-24).
 
 Source: CORPUS M3.14, M4.5–M4.7; the estate's standing rule that legacy paths are shut down or cut over, never kept as a fallback.
 
@@ -605,6 +672,7 @@ templates and the skills before the first product cutover.
 
 - AC1: No row is left "unmapped" at the pilot's verdict.
 - AC2: Before each cutover, every KEEP and FIX row the project relies on has a passing parity scenario (REC-025) or a dated waiver by the owner.
+- AC3: The estate bundle exists in the estate's Git source before the pilot: its definitions, the packs it switches on, and the legacy value of every policy key except those a divergence entry changes ([18-divergences.md](18-divergences.md)). Applying it to a default install reproduces the settings that [16-legacy-parity.md](16-legacy-parity.md) and DEF-005 record, checked by a parity scenario.
 
 Source: CORPUS M5.1, M5.5 ("each prose rule either becomes a Policy or is consciously retired").
 
@@ -635,8 +703,10 @@ Source: `mechanisms.yaml` (68 entries across HARNESS, DEVOPS, ROVE, CPV2, LOOP b
 **MS7** · WP7.5 · MUST · KEEP
 
 The experiment rig that shares the legacy control plane (corpus, treatments, compare and eval
-views, the scorecard battery) is inventoried and, by a recorded decision, either archived or kept
-as its own deployment. It is not carried into Sortyard.
+views, the scorecard battery) is inventoried and kept as its own deployment, outside Sortyard,
+when the legacy control plane is retired. It is archived instead only by a recorded decision,
+and only if the usage census (MIG-017) shows no use in its window. It is not carried into
+Sortyard.
 
 - AC1: The decision record exists before the legacy control plane is removed.
 
@@ -653,7 +723,7 @@ snapshot (MIG-001) stays the record.
 Source: CORPUS M4.2; DESIGN §8 non-goals ("migrating historical ledger data beyond an import of open work").
 
 ### MIG-015 — Close out the Phase 1 prototypes
-**MS0** · WP0.2 · MUST · FIX
+**MS0** · WP0.2 · MUST · NEW
 
 Each Phase 1 deliverable that was merged into meta-harness instead of the product repository is
 either ported into `sortyard/sortyard` with its tests or recorded as retired: the identity matrix
@@ -665,3 +735,42 @@ either ported into `sortyard/sortyard` with its tests or recorded as retired: th
 - AC2: `pytest spec` gates CI.
 
 Source: meta-harness `projects/sortyard/` (about 5,000 lines across six folders); `ci.yml` (`spec` job fails on main); board: SORTYARD-9, 10, 11, 12, 14, 15 are Done while the product repo holds only PRs #1–#4.
+
+### MIG-016 — Legacy baselines are captured before anything changes
+**MS0** · WP0.4 · MUST · NEW
+
+Every baseline in [18-divergences.md](18-divergences.md) (the `BL` ids) gets a value, the
+method that produced it and the evidence it came from, taken from the frozen evidence
+(MIG-001), the recorded passes (MIG-002), the Git host's history and a board export. A baseline
+that cannot be measured is recorded as `unmeasurable` with the reason, and the demonstrations
+that cite it fall back to their absolute floor. The capture scripts live under
+`migration/baselines/` and are re-run for each project before its cutover, because the legacy
+system keeps changing. The values are loaded into Sortyard as reference series, so dashboards
+and the scorecard show the legacy figure beside Sortyard's.
+
+- AC1: Each baseline has a value file with value, unit, window, cohort, method, script, evidence digest and capture date, under the id used in [18-divergences.md](18-divergences.md).
+- AC2: The capture is repeatable: a script run twice on the same frozen evidence gives the same value.
+- AC3: Every baseline marked "to capture" has a value or an `unmeasurable` record before the MS1 gate; none is filled in from memory.
+- AC4: A demonstration never passes against a missing baseline: the scorecard shows `no baseline`, and the gate treats it as a missed floor unless the criterion states an absolute floor.
+
+Source: the owner, 2026-11-12 (a divergence must be shown better than "the cobbled solution we have in hand"); CORPUS R5 (the baseline moves); conductor README, driver log and task-pickup for the figures known today. Inference: which baselines are measurable from the frozen evidence is not yet verified ([17-evidence.md](17-evidence.md)).
+
+### MIG-017 — A usage census decides the conditional cuts
+**MS0** · WP0.4 · MUST · NEW
+
+For every legacy feature that this specification does not carry and whose use is not known —
+the `conditional on use` entries of [18-divergences.md](18-divergences.md) — the census counts
+real use in the frozen evidence and the board export over its window (default the last 90
+days): design chains started, sentence-to-task requests, projected issue and pull-request items
+that someone acted on, experiment-rig runs, concierge sessions and approvals, improvement-ledger
+entries, attachments, and each Plane feature marked dropped in
+[01-product-definition.md](01-product-definition.md) §5.1. A count of zero confirms the cut:
+nothing is lost and there is less to run. A count above zero reverses it: the feature is
+scheduled (its requirement is re-tagged into the milestone its entry names), or a named
+replacement is demonstrated on the recorded uses, before the first cutover that would lose it.
+
+- AC1: Demonstration (usage, MS0) — the census runs over the frozen evidence and the board export, one count for each conditional entry. Target: 100% of conditional entries have a count and a recorded outcome before the MS1 gate, and zero used features are left without a schedule or a demonstrated replacement. Floor: no feature with a count above zero is dropped at any cutover (BL-21).
+- AC2: The census is re-run with the baselines before each cutover; a feature that has come into use since is treated the same way.
+- AC3: Each outcome is recorded on its divergence entry and, where a cut is reversed, in the plan by re-tagging the requirement.
+
+Source: the owner, 2026-11-12 (divergence rule); inference — use of these features was not measured for this specification ([17-evidence.md](17-evidence.md), "Not verified").
