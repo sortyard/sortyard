@@ -104,3 +104,37 @@ jobs:
         run: |
           docker run --rm ghcr.io/sortyard/sortyard:ci sortyard-conductor --once
           docker run --rm ghcr.io/sortyard/sortyard:ci sortyard-api --help
+
+  replica:
+    # The one-command local replica (replica/replica.sh) boots and passes its smoke test on a
+    # fresh kind cluster, with the tool versions AGENTS.md documents.
+    name: local replica (kind)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.3
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: v1.31.4
+      - name: Install kind
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSLo "$HOME/.local/bin/kind" \
+            https://github.com/kubernetes-sigs/kind/releases/download/v0.25.0/kind-linux-amd64
+          echo "b22ff7e5c02b8011e82cc3223d069d178b9e1543f1deb21e936d11764780a3d8  $HOME/.local/bin/kind" | sha256sum -c -
+          chmod +x "$HOME/.local/bin/kind"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Boot + smoke
+        run: ./replica/replica.sh up
+      - name: Diagnostics
+        if: failure()
+        run: |
+          ./replica/replica.sh status || true
+          kubectl --context kind-sortyard -n sortyard describe pods || true
+          kubectl --context kind-sortyard -n sortyard logs --all-containers --prefix -l app.kubernetes.io/name=sortyard --tail=100 || true
+      - name: Tear down
+        if: always()
+        run: ./replica/replica.sh down
