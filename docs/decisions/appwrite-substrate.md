@@ -1,7 +1,7 @@
 # SY-DEC-004 — Appwrite as the persistence and identity substrate
 
 Date: 2026-11-15. Owner direction: prefer the existing Appwrite substrate unless a concrete
-requirement prevents it. Status: planning decision; technical review pending.
+requirement prevents it. Status: approved planning design. Independent technical review: appwrite_auth, 2026-11-15, PASS.
 
 ## Decision and scope
 
