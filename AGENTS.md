@@ -5,6 +5,13 @@ agent or a new contributor to make a first change without anyone briefing them. 
 here is wrong or missing, that is a bug: fix it in the same change, or file it (see
 [Known gaps](#known-gaps)).
 
+## Substrate planning amendment
+
+[SY-DEC-004](docs/decisions/appwrite-substrate.md) selects Appwrite as the preferred future
+persistence/auth substrate. This brief's Postgres commands and architecture describe the
+current code and replica; they remain valid until a reviewed migration implements the new
+backend. Preserve transaction, history and authorization guarantees during that work.
+
 ## What this is
 
 Sortyard is an open-source delivery harness: a conductor, a control plane and a task manager,

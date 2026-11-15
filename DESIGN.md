@@ -2,6 +2,15 @@
 **Name: DECIDED — Sortyard (Joe, 2026-11-06). Domain `sortyard.ai` registered by Joe the same day.**
 **Date:** 2026-11-06 · **Author:** Juno (draft for Joe) · **Status:** DRAFT v6 — v5 plus the tech-stack decision (§4a, decided by Joe 2026-11-07). v3 corrected by the second frontier cross-check (`NAME-AND-V3-CHECK.md`): one §5.2 rewrite, two softened claims, “lease” terminology killed, §11 made honest about what the design does not yet have. Name ranking in §10a — **Sortyard** leads, pending Joe's pick and a formal trademark/domain check.
 
+## Current planning amendment — Appwrite substrate (2026-11-15)
+
+[SY-DEC-004](docs/decisions/appwrite-substrate.md) amends this historical draft's
+Postgres-only persistence and generic identity-provider assumptions. The preferred target is
+self-hosted Appwrite persistence, Auth and Teams, with native transaction/history/authorization
+proofs before migration. The current implementation remains Postgres-backed. The original
+architecture and diagram below describe the baseline; the amendment governs new substrate
+planning and preserves the broader project/archetype/skill/extension product scope.
+
 ## 0.2 v3 changes — Plane, the dashboard, and no unbound agents (Joe, 2026-11-06 08:26 EST)
 Joe raised three connected points, all applied:
 1. **Plane: include it, or fork it and take the parts we want?** — analysed properly in §5.2 with grounded facts (licence, stack, edition split). Recommendation: **neither bundle nor fork — build the board natively in the harness console, take Plane's *concepts*, keep Plane as an optional connector during migration.** Rationale in §5.2; Joe's confirmation asked in §10.
