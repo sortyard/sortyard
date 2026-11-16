@@ -4,7 +4,27 @@ Decisions live here as records, not as prose inside other documents (premise pol
 
 ## SY-DEC-001 — Tech stack (2026-11-07, decided by Joe)
 
+The persistence portion is amended for future implementation by SY-DEC-004 below.
+The current code and deployed release still use the original Postgres backend.
+
 - **Question:** implementation language(s) for the Sortyard backend.
 - **Decision:** Python backend (one codebase; the six services as separate entry points; all-in-one single-pod profile for small installs, split services for larger ones). Console in TypeScript + React (Vite SPA, static files served by the API service). Postgres is the only database (state, event ledger, work queue — no Redis, no message broker). Data models generated from the Phase 0 JSON Schemas, so schema and implementation cannot drift. Strict typing enforced. Helm chart deployment; workers are language-agnostic Kubernetes Jobs.
 - **Alternative considered:** Go backend. Rejected for v1: the working conductor/dispatcher logic is Python (thousands of proven lines), and Phase 1's shadow-mode comparison against the old conductor is only meaningful if the port stays close to the original; a rewrite risks silent behaviour drift in a language the estate doesn't use. Go's install-story advantages don't outweigh port fidelity for v1; revisit only if install weight demonstrably bites.
 - **Source:** Sortyard design draft v6 §4a (~/workspace/harness-reboot/HARNESS-REBOOT-DRAFT-v6.md).
+
+## SY-DEC-004 — Appwrite substrate (2026-11-15)
+
+- **Owner direction:** use the existing Appwrite substrate for persistence and auth unless a
+  concrete requirement prevents it.
+- **Planning decision:** Appwrite persistence, Auth and Teams are the preferred target; retain
+  Sortyard's business authorization, scoped agent credentials and domain invariants. Python,
+  React, schema-led models and Kubernetes workers remain the selected implementation stack.
+- **Assessment:** no inherent atomicity or human-auth blocker was found in self-hosted2.6.1.
+  Native transaction, append-only permission, replay and collaborator-isolation proofs are
+  required before replacing the current store. Hybrid Auth+Postgres is an exception for a
+  reproducible unsupported requirement, not the default.
+- **Alternatives, evidence and migration order:**
+  [Appwrite substrate assessment and plan](docs/decisions/appwrite-substrate.md).
+- **Current implementation:** Postgres remains authoritative until the reviewed migration;
+  this decision provisions no credentials, changes no live data and does not adopt Cloud-only
+  OAuth-server features.

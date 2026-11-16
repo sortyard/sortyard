@@ -1,0 +1,145 @@
+{
+  "_comment": "Replica fixtures: Plane responses by request path, and the production conductor's pass log. Pass replica-pass-1 retained its inputs (replayed: DEMO-1 still in progress); replica-pass-2 is the newest pass and reads the live board.",
+  "plane": {
+    "/api/v1/workspaces/replica/projects/5f1e0c3a-0000-4000-8000-000000000001/": {
+      "id": "5f1e0c3a-0000-4000-8000-000000000001",
+      "identifier": "DEMO",
+      "name": "Demo"
+    },
+    "/api/v1/workspaces/replica/projects/5f1e0c3a-0000-4000-8000-000000000001/states/": {
+      "results": [
+        {
+          "id": "st-back",
+          "name": "Backlog",
+          "group": "backlog"
+        },
+        {
+          "id": "st-todo",
+          "name": "Todo",
+          "group": "unstarted"
+        },
+        {
+          "id": "st-prog",
+          "name": "In Progress",
+          "group": "started"
+        },
+        {
+          "id": "st-done",
+          "name": "Done",
+          "group": "completed"
+        }
+      ]
+    },
+    "/api/v1/workspaces/replica/projects/5f1e0c3a-0000-4000-8000-000000000001/labels/": {
+      "results": []
+    },
+    "/api/v1/workspaces/replica/projects/5f1e0c3a-0000-4000-8000-000000000001/issues/": {
+      "results": [
+        {
+          "id": "issue-1",
+          "sequence_id": 1,
+          "name": "schema",
+          "state": "st-done",
+          "priority": "high",
+          "labels": [],
+          "description_stripped": "",
+          "created_at": "2026-11-01T00:00:01Z"
+        },
+        {
+          "id": "issue-2",
+          "sequence_id": 2,
+          "name": "api",
+          "state": "st-todo",
+          "priority": "high",
+          "labels": [],
+          "description_stripped": "Depends: DEMO-1.",
+          "created_at": "2026-11-01T00:00:02Z"
+        }
+      ],
+      "next_page_results": true,
+      "next_cursor": "100:1:0"
+    },
+    "/api/v1/workspaces/replica/projects/5f1e0c3a-0000-4000-8000-000000000001/issues/?cursor=100:1:0": {
+      "results": [
+        {
+          "id": "issue-3",
+          "sequence_id": 3,
+          "name": "console",
+          "state": "st-todo",
+          "priority": "medium",
+          "labels": [],
+          "description_stripped": "Depends: DEMO-2.",
+          "created_at": "2026-11-01T00:00:03Z"
+        },
+        {
+          "id": "issue-4",
+          "sequence_id": 4,
+          "name": "docs",
+          "state": "st-todo",
+          "priority": "low",
+          "labels": [],
+          "description_stripped": "",
+          "created_at": "2026-11-01T00:00:04Z"
+        }
+      ],
+      "next_page_results": false,
+      "next_cursor": "100:2:0"
+    }
+  },
+  "passes": {
+    "passes": [
+      {
+        "production_pass_id": "replica-pass-1",
+        "inputs": {
+          "taken_at": "2026-11-12T09:00:00Z",
+          "issues": {
+            "5f1e0c3a-0000-4000-8000-000000000001": [
+              {
+                "id": "issue-1",
+                "sequence_id": 1,
+                "name": "schema",
+                "state": "st-prog",
+                "priority": "high",
+                "labels": [],
+                "description_stripped": "",
+                "created_at": "2026-11-01T00:00:01Z"
+              },
+              {
+                "id": "issue-2",
+                "sequence_id": 2,
+                "name": "api",
+                "state": "st-todo",
+                "priority": "high",
+                "labels": [],
+                "description_stripped": "Depends: DEMO-1.",
+                "created_at": "2026-11-01T00:00:02Z"
+              },
+              {
+                "id": "issue-3",
+                "sequence_id": 3,
+                "name": "console",
+                "state": "st-todo",
+                "priority": "medium",
+                "labels": [],
+                "description_stripped": "Depends: DEMO-2.",
+                "created_at": "2026-11-01T00:00:03Z"
+              },
+              {
+                "id": "issue-4",
+                "sequence_id": 4,
+                "name": "docs",
+                "state": "st-todo",
+                "priority": "low",
+                "labels": [],
+                "description_stripped": "",
+                "created_at": "2026-11-01T00:00:04Z"
+              }
+            ]
+          },
+          "gating": {}
+        }
+      },
+      "replica-pass-2"
+    ]
+  }
+}

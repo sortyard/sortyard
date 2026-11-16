@@ -1,5 +1,12 @@
 # Sortyard — Milestone Map
 
+Current substrate planning: [SY-DEC-004](docs/decisions/appwrite-substrate.md) selects
+Appwrite persistence and human auth as the preferred target. Qualify transactions and immutable
+history, implement the native adapter/schema, integrate Auth/Teams, then rehearse a one-writer
+migration. Read-only console work can proceed alongside qualification. Existing SQL code and
+deployments remain current until that implementation ships. Work state is read from Plane;
+phase descriptions below are historical planning, not current task-state evidence.
+
 The corpus of groomed work, by milestone. The full task corpus is `CORPUS.md` in this folder (frontier design pass, 2026-11-07); this map is its phase-level view. Tracking is on the Sortyard Plane project (identifier `SORTYARD`,
 https://plane.ts.noncelogic.com/noncelogic/projects/10d493fb-4cef-4ef1-ab70-a0aefca87d59/issues/),
 which has tasks:off and no plan file, so each filed task below is a SORTYARD board item created directly (the item is the filing). Sortyard was migrated off the HARNESS board on 2026-11-09; the identifiers below are SORTYARD board items. Design record: `DESIGN.md` in this folder (draft v6; working copy `~/workspace/harness-reboot/HARNESS-REBOOT-DRAFT-v6.md`), §8 for the original phase definitions. Decisions: `DECISIONS.md` in this folder. Charter: `README.md`.

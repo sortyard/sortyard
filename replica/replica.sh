@@ -1,0 +1,301 @@
+#!/usr/bin/env bash
+# Sortyard local replica: the deployment's shape on a throwaway kind cluster, in one command.
+#
+#   ./replica/replica.sh up        check tools, create the cluster, build + load the image,
+#                                  deploy the fake providers and the chart, then smoke-test
+#   ./replica/replica.sh smoke     re-run the smoke test against a running replica
+#   ./replica/replica.sh forward   expose the API on localhost:8080 (foreground; Ctrl-C stops)
+#   ./replica/replica.sh status    pods, jobs and the Helm release
+#   ./replica/replica.sh logs [C]  follow a component's logs (default shadow-conductor; api)
+#   ./replica/replica.sh down      delete the cluster and everything in it
+#   ./replica/replica.sh check     only check the prerequisites
+#
+# What it deploys is charts/sortyard itself (with replica/values.yaml layered on): the API
+# Deployment + Service, Postgres StatefulSet + Service + password Secret, the migration Job and
+# the shadow conductor. Only outside third-party providers are faked (replica/fakes.yaml:
+# Plane's REST API and the production conductor's pass log, behind the same read-only API key
+# Secret shape production uses). Re-running `up` rebuilds the image and rolls out the change.
+#
+# Every kubectl/helm call is pinned to the replica's own context (kind-$CLUSTER): the script
+# never touches whatever cluster your current kube-context points at.
+#
+# Environment: SORTYARD_REPLICA_CLUSTER (default sortyard), SORTYARD_REPLICA_NAMESPACE (default
+# sortyard), SORTYARD_REPLICA_TIMEOUT (seconds per wait, default 300).
+set -euo pipefail
+
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+CLUSTER=${SORTYARD_REPLICA_CLUSTER:-sortyard}
+NAMESPACE=${SORTYARD_REPLICA_NAMESPACE:-sortyard}
+TIMEOUT=${SORTYARD_REPLICA_TIMEOUT:-300}
+RELEASE=sortyard
+IMAGE_REPO=ghcr.io/sortyard/sortyard
+API_KEY_SECRET=sortyard-replica-plane-read
+FAKES_CONFIGMAP=sortyard-replica-fakes
+FAKES=sortyard-fake-providers
+
+# Tool: minimum supported version, the version CI and this script are tested with, install docs.
+KIND_MIN=0.20.0 KIND_TESTED=v0.25.0 KIND_URL=https://kind.sigs.k8s.io/docs/user/quick-start/#installation
+KUBECTL_MIN=1.27.0 KUBECTL_TESTED=v1.31.4 KUBECTL_URL=https://kubernetes.io/docs/tasks/tools/
+HELM_MIN=3.12.0 HELM_TESTED=v3.16.3 HELM_URL=https://helm.sh/docs/intro/install/
+DOCKER_URL=https://docs.docker.com/get-docker/
+CURL_URL=https://curl.se/download.html
+
+say() { printf '==> %s\n' "$*"; }
+die() { printf 'replica: %s\n' "$*" >&2; exit 1; }
+
+usage() {
+    sed -n '3,10p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2
+    printf 'usage: %s {up|smoke|forward|status|logs|down|check}\n' "$0" >&2
+    exit 2
+}
+
+# The replica's own cluster, never the ambient kube-context.
+k() { kubectl --context "kind-$CLUSTER" --namespace "$NAMESPACE" "$@"; }
+h() { helm --kube-context "kind-$CLUSTER" --namespace "$NAMESPACE" "$@"; }
+
+# version_ge A B: true when dotted version A >= B (leading "v" ignored).
+version_ge() {
+    local IFS=.
+    local -a a b
+    read -r -a a <<<"${1#v}"
+    read -r -a b <<<"${2#v}"
+    local i
+    for i in 0 1 2; do
+        local x=${a[i]:-0} y=${b[i]:-0}
+        if ((10#$x > 10#$y)); then return 0; fi
+        if ((10#$x < 10#$y)); then return 1; fi
+    done
+    return 0
+}
+
+semver() { grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -n 1; }
+
+# check_prereqs: every problem is reported, then the script stops before changing anything.
+check_prereqs() {
+    local problems=0 v
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "docker: not found — install Docker ($DOCKER_URL)"
+        problems=$((problems + 1))
+    elif ! docker info >/dev/null 2>&1; then
+        echo "docker: the daemon is not reachable (is Docker running, and may this user use it?)"
+        problems=$((problems + 1))
+    fi
+    check_tool kind "$KIND_MIN" "$KIND_TESTED" "$KIND_URL" version || problems=$((problems + 1))
+    check_tool kubectl "$KUBECTL_MIN" "$KUBECTL_TESTED" "$KUBECTL_URL" version --client ||
+        problems=$((problems + 1))
+    check_tool helm "$HELM_MIN" "$HELM_TESTED" "$HELM_URL" version --short ||
+        problems=$((problems + 1))
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "curl: not found — install curl ($CURL_URL)"
+        problems=$((problems + 1))
+    fi
+    if ((problems > 0)); then
+        echo
+        echo "replica: $problems prerequisite problem(s); nothing was changed."
+        echo "Tested with kind $KIND_TESTED, kubectl $KUBECTL_TESTED, helm $HELM_TESTED."
+        return 1
+    fi
+    v=$(helm version --short 2>/dev/null | semver)
+    say "prerequisites ok (helm $v; tested with kind $KIND_TESTED, kubectl $KUBECTL_TESTED, helm $HELM_TESTED)"
+}
+
+check_tool() {
+    local tool=$1 min=$2 tested=$3 url=$4
+    shift 4
+    if ! command -v "$tool" >/dev/null 2>&1; then
+        echo "$tool: not found — install $tool $tested (minimum v$min): $url"
+        return 1
+    fi
+    local v
+    v=$("$tool" "$@" 2>/dev/null | semver || true)
+    if [[ -z $v ]]; then
+        echo "$tool: could not read its version from '$tool $*'"
+        return 1
+    fi
+    if ! version_ge "$v" "$min"; then
+        echo "$tool: $tool v${v#v} is older than the minimum v$min — install $tested: $url"
+        return 1
+    fi
+}
+
+ensure_cluster() {
+    if kind get clusters 2>/dev/null | grep -qx "$CLUSTER"; then
+        say "kind cluster '$CLUSTER' exists"
+    else
+        say "creating kind cluster '$CLUSTER'"
+        kind create cluster --name "$CLUSTER" --config "$ROOT/replica/kind.yaml" --wait "${TIMEOUT}s"
+    fi
+    k create namespace "$NAMESPACE" --dry-run=client -o yaml | k apply -f - >/dev/null
+}
+
+# build_image: builds the one Sortyard image and tags it by content, so a rebuilt image rolls
+# out (a fixed tag with pullPolicy IfNotPresent would keep the old one running).
+build_image() {
+    say "building $IMAGE_REPO"
+    docker build -q -t "$IMAGE_REPO:replica" "$ROOT" >/dev/null
+    local id
+    id=$(docker image inspect -f '{{.Id}}' "$IMAGE_REPO:replica")
+    TAG=replica-${id#sha256:}
+    TAG=${TAG:0:20}
+    docker tag "$IMAGE_REPO:replica" "$IMAGE_REPO:$TAG"
+    say "loading $IMAGE_REPO:$TAG into the cluster"
+    kind load docker-image "$IMAGE_REPO:$TAG" --name "$CLUSTER" >/dev/null
+}
+
+deploy_fakes() {
+    say "deploying the fake providers (Plane, production pass log)"
+    if ! k get secret "$API_KEY_SECRET" >/dev/null 2>&1; then
+        local key
+        key=$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')
+        k create secret generic "$API_KEY_SECRET" --from-literal=api-key="$key" >/dev/null
+    fi
+    k create configmap "$FAKES_CONFIGMAP" \
+        --from-file="$ROOT/replica/fakes/fake_plane.py" \
+        --from-file="$ROOT/replica/fakes/fixtures.json" \
+        --dry-run=client -o yaml | k apply -f - >/dev/null
+    local sha
+    sha=$(cat "$ROOT/replica/fakes/fake_plane.py" "$ROOT/replica/fakes/fixtures.json" |
+        od -An -tx1 | cksum | cut -d ' ' -f 1)
+    sed -e "s|__IMAGE__|$IMAGE_REPO:$TAG|" -e "s|__FAKES_SHA__|$sha|" "$ROOT/replica/fakes.yaml" |
+        k apply -f - >/dev/null
+    k rollout status "deployment/$FAKES" --timeout="${TIMEOUT}s"
+}
+
+deploy_chart() {
+    say "installing charts/sortyard as release '$RELEASE' (namespace $NAMESPACE)"
+    # Helm returns once the post-install/upgrade migration Job has finished.
+    h upgrade --install "$RELEASE" "$ROOT/charts/sortyard" \
+        -f "$ROOT/replica/values.yaml" \
+        --set image.tag="$TAG" \
+        --timeout "${TIMEOUT}s"
+    k rollout status "statefulset/$RELEASE-postgres" --timeout="${TIMEOUT}s"
+    k rollout status "deployment/$RELEASE-api" --timeout="${TIMEOUT}s"
+    k rollout status "deployment/$RELEASE-shadow-conductor" --timeout="${TIMEOUT}s"
+}
+
+psql_value() {
+    k exec "statefulset/$RELEASE-postgres" -- psql -X -q -tA -U sortyard sortyard -c "$1"
+}
+
+# start_forward SVC PORT: port-forward to a free local port; sets FORWARD_PORT, FORWARD_PID.
+start_forward() {
+    local log
+    log=$(mktemp)
+    # exec: $! must be kubectl itself, not a subshell that would orphan it when killed.
+    (exec kubectl --context "kind-$CLUSTER" --namespace "$NAMESPACE" port-forward "svc/$1" ":$2") \
+        >"$log" 2>&1 &
+    FORWARD_PID=$!
+    local _
+    for _ in $(seq 1 50); do
+        FORWARD_PORT=$(grep -oE '127\.0\.0\.1:[0-9]+' "$log" | head -n 1 | cut -d: -f2 || true)
+        [[ -n $FORWARD_PORT ]] && break
+        if ! kill -0 "$FORWARD_PID" 2>/dev/null; then
+            cat "$log" >&2
+            die "port-forward to svc/$1 failed"
+        fi
+        sleep 0.2
+    done
+    rm -f "$log"
+    [[ -n $FORWARD_PORT ]] || die "port-forward to svc/$1 did not start"
+}
+
+stop_forward() { kill "$FORWARD_PID" 2>/dev/null || true; wait "$FORWARD_PID" 2>/dev/null || true; }
+
+smoke() {
+    say "smoke: API through its Service (port-forward, as the README's quickstart does)"
+    start_forward "$RELEASE-api" 8080
+    local api="http://127.0.0.1:$FORWARD_PORT" ready info
+    trap stop_forward EXIT
+    curl -fsS "$api/healthz" >/dev/null || die "GET /healthz failed"
+    ready=$(curl -fsS "$api/readyz") || die "GET /readyz is not ready"
+    [[ $ready == *'"database": "ok"'* ]] || die "GET /readyz: $ready"
+    info=$(curl -fsS "$api/v1/info") || die "GET /v1/info failed"
+    for service in api conductor context-assembler eval-runner integrator sensor-runner; do
+        [[ $info == *"\"$service\""* ]] || die "GET /v1/info does not list $service: $info"
+    done
+    stop_forward
+    trap - EXIT
+    echo "    /healthz ok, /readyz $ready"
+    echo "    /v1/info $info"
+
+    say "smoke: migrations applied by the chart's Job"
+    local migrations
+    migrations=$(psql_value "SELECT count(*) FROM sortyard.schema_migration")
+    ((migrations > 0)) || die "no migrations recorded in sortyard.schema_migration"
+    echo "    $migrations migration(s) recorded"
+
+    say "smoke: the shadow conductor records every pass of the (fake) production pass log"
+    # replica/fakes/fixtures.json's pass log holds two passes: one replayed from its retained
+    # inputs, one (the newest) read live.
+    local want=2 passes=0 _
+    for _ in $(seq 1 $((TIMEOUT / 5))); do
+        passes=$(psql_value "SELECT count(DISTINCT doc->'facts'->>'production_pass_id')
+            FROM sortyard.event WHERE transition = 'shadow_pass'")
+        ((passes >= want)) && break
+        sleep 5
+    done
+    if ((passes < want)); then
+        k logs "deployment/$RELEASE-shadow-conductor" --tail=40 >&2 || true
+        die "the shadow recorded $passes of $want passes within ${TIMEOUT}s"
+    fi
+    psql_value "SELECT conductor_pass_id, task_id, decision FROM sortyard.decision_log
+        ORDER BY recorded_at, (doc->'inputs'->>'preview_position')::int" | sed 's/^/    /'
+
+    say "smoke: the shadow stayed read-only and authenticated against the fakes"
+    start_forward "$FAKES" 8080
+    trap stop_forward EXIT
+    local audit
+    audit=$(curl -fsS "http://127.0.0.1:$FORWARD_PORT/_fake/audit") || die "fake audit failed"
+    stop_forward
+    trap - EXIT
+    [[ $audit == *'"writes": 0'* ]] || die "the shadow attempted writes: $audit"
+    [[ $audit == *'"unauthorized": 0'* ]] || die "unauthenticated reads reached Plane: $audit"
+    echo "    $audit"
+    say "replica is up and smoke-tested"
+}
+
+forward() {
+    say "API on http://localhost:8080 (Ctrl-C stops)"
+    k port-forward "svc/$RELEASE-api" 8080:8080
+}
+
+logs() { k logs -f "deployment/$RELEASE-${1:-shadow-conductor}"; }
+
+status() {
+    h status "$RELEASE" || true
+    k get pods,jobs,services
+}
+
+up() {
+    check_prereqs || exit 1
+    ensure_cluster
+    build_image
+    deploy_fakes
+    deploy_chart
+    smoke
+    cat <<EOF
+
+Next:
+  ./replica/replica.sh forward                       # API on http://localhost:8080
+  ./replica/replica.sh logs                          # follow the shadow conductor
+  ./replica/replica.sh up                            # after a change: rebuild + roll out
+  ./replica/replica.sh down                          # delete the cluster
+EOF
+}
+
+down() {
+    command -v kind >/dev/null 2>&1 || die "kind: not found ($KIND_URL)"
+    say "deleting kind cluster '$CLUSTER'"
+    kind delete cluster --name "$CLUSTER"
+}
+
+case "${1:-}" in
+    up) up ;;
+    smoke) smoke ;;
+    forward) forward ;;
+    status) status ;;
+    logs) logs "${2:-}" ;;
+    down) down ;;
+    check) check_prereqs ;;
+    *) usage ;;
+esac
