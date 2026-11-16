@@ -1,0 +1,2783 @@
+{
+  "schema_version": "1",
+  "status": "planned_contract",
+  "resource_types": [
+    {
+      "kind": "Installation",
+      "authority": "sortyard",
+      "scope": "installation",
+      "required_domain_fields": [
+        "name",
+        "substrate_connection_ref",
+        "operator_base_url",
+        "authority_registry_ref"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "configured",
+        "ready",
+        "degraded",
+        "disabled"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transition_guard": "Only registered owner commands or verified observations choose the transition; no generic state PATCH. Policy activation/promotion retains owner lifecycle and enforcement guards.",
+      "transitions": {
+        "configured": [
+          "ready",
+          "degraded",
+          "disabled"
+        ],
+        "ready": [
+          "degraded",
+          "disabled"
+        ],
+        "degraded": [
+          "ready",
+          "disabled"
+        ],
+        "disabled": [
+          "configured"
+        ]
+      },
+      "data_schema": "#/$defs/DomainInstallation"
+    },
+    {
+      "kind": "Workspace",
+      "authority": "sortyard",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "name",
+        "membership_team_ref",
+        "owner_ref"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "active",
+        "suspended",
+        "archived"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transition_guard": "Only registered owner commands or verified observations choose the transition; no generic state PATCH. Policy activation/promotion retains owner lifecycle and enforcement guards.",
+      "transitions": {
+        "active": [
+          "suspended",
+          "archived"
+        ],
+        "suspended": [
+          "active",
+          "archived"
+        ],
+        "archived": []
+      },
+      "data_schema": "#/$defs/DomainWorkspace"
+    },
+    {
+      "kind": "Project",
+      "authority": "sortyard",
+      "scope": "project",
+      "required_domain_fields": [
+        "key",
+        "name",
+        "repo_refs",
+        "archetype_ref",
+        "owner_ref",
+        "source_authority_ref"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "discovery",
+        "active",
+        "maintain",
+        "archived"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {
+        "discovery": [
+          "active",
+          "archived"
+        ],
+        "active": [
+          "maintain",
+          "archived"
+        ],
+        "maintain": [
+          "active",
+          "archived"
+        ],
+        "archived": []
+      },
+      "data_schema": "#/$defs/DomainProject"
+    },
+    {
+      "kind": "Repository",
+      "authority": "sortyard",
+      "scope": "project",
+      "required_domain_fields": [
+        "url_ref",
+        "default_branch",
+        "role",
+        "observed_head",
+        "connection_ref"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "unconfigured",
+        "ready",
+        "degraded",
+        "disabled",
+        "archived"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transition_guard": "Only registered owner commands or verified observations choose the transition; no generic state PATCH. Policy activation/promotion retains owner lifecycle and enforcement guards.",
+      "transitions": {
+        "unconfigured": [
+          "ready",
+          "disabled",
+          "archived"
+        ],
+        "ready": [
+          "degraded",
+          "disabled",
+          "archived"
+        ],
+        "degraded": [
+          "ready",
+          "disabled",
+          "archived"
+        ],
+        "disabled": [
+          "ready",
+          "archived"
+        ],
+        "archived": []
+      },
+      "data_schema": "#/$defs/DomainRepository"
+    },
+    {
+      "kind": "Milestone",
+      "authority": "sortyard",
+      "scope": "project",
+      "required_domain_fields": [
+        "title",
+        "sequence",
+        "outcome_ref",
+        "task_refs"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "planned",
+        "active",
+        "completed",
+        "cancelled"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {
+        "planned": [
+          "active",
+          "cancelled"
+        ],
+        "active": [
+          "completed",
+          "cancelled"
+        ],
+        "completed": [],
+        "cancelled": []
+      },
+      "data_schema": "#/$defs/DomainMilestone"
+    },
+    {
+      "kind": "Task",
+      "authority": "sortyard-or-registered-tracker",
+      "scope": "project",
+      "required_domain_fields": [
+        "title",
+        "outcome",
+        "spec_ref",
+        "depends_on",
+        "parent_ref",
+        "milestone_ref",
+        "priority",
+        "sequence",
+        "workflow_ref",
+        "queue_status",
+        "queue_reason",
+        "queue_evidence_refs",
+        "queue_route_refs"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "backlog",
+        "todo",
+        "in_progress",
+        "in_review",
+        "done",
+        "cancelled"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {
+        "backlog": [
+          "todo",
+          "cancelled"
+        ],
+        "todo": [
+          "backlog",
+          "in_progress",
+          "cancelled"
+        ],
+        "in_progress": [
+          "todo",
+          "in_review",
+          "done",
+          "cancelled"
+        ],
+        "in_review": [
+          "todo",
+          "in_progress",
+          "done",
+          "cancelled"
+        ],
+        "done": [],
+        "cancelled": []
+      },
+      "data_schema": "#/$defs/DomainTask",
+      "queue_lifecycle": [
+        "unreleased",
+        "released",
+        "claimed",
+        "parked",
+        "handed_back",
+        "needs_human"
+      ],
+      "queue_transitions": {
+        "unreleased": [
+          "released",
+          "claimed",
+          "parked",
+          "handed_back",
+          "needs_human"
+        ],
+        "released": [
+          "unreleased",
+          "claimed",
+          "parked",
+          "handed_back",
+          "needs_human"
+        ],
+        "claimed": [
+          "unreleased",
+          "released",
+          "parked",
+          "handed_back",
+          "needs_human"
+        ],
+        "parked": [
+          "unreleased",
+          "released",
+          "claimed",
+          "handed_back",
+          "needs_human"
+        ],
+        "handed_back": [
+          "unreleased",
+          "released",
+          "claimed",
+          "parked",
+          "needs_human"
+        ],
+        "needs_human": [
+          "unreleased",
+          "released",
+          "claimed",
+          "parked",
+          "handed_back"
+        ]
+      },
+      "transition_guard": "Board state and queue status change atomically through named owner commands. A claim sets board in_progress and queue claimed; no todo/claimed pair. Queue holds require reasons, handback evidence and owner routes as applicable. Terminal tasks hold no claim."
+    },
+    {
+      "kind": "Decision",
+      "authority": "sortyard",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "question",
+        "default_ref",
+        "decide_by",
+        "premise_class",
+        "authority_ref",
+        "application_operation_ref",
+        "decision_kind",
+        "approval_binding"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "proposed",
+        "pending",
+        "decided",
+        "applied",
+        "rejected",
+        "expired"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {
+        "proposed": [
+          "pending",
+          "rejected"
+        ],
+        "pending": [
+          "decided",
+          "expired",
+          "rejected"
+        ],
+        "decided": [
+          "applied",
+          "pending"
+        ],
+        "applied": [],
+        "rejected": [],
+        "expired": []
+      },
+      "data_schema": "#/$defs/DomainDecision",
+      "scope_variants": [
+        "workspace",
+        "project"
+      ],
+      "scope_guard": "An action-plan approval Decision inherits the exact authenticated target workspace and optional project binding of its ActionPlan; ordinary task decisions retain their project binding. Workspace approvals do not invent a delivery project."
+    },
+    {
+      "kind": "ArchetypeVersion",
+      "authority": "sortyard-or-git",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "version",
+        "content_hash",
+        "workflow_refs",
+        "role_refs",
+        "skill_slots",
+        "context_recipe_refs",
+        "quality_bar_refs",
+        "substrate_profile_ref"
+      ],
+      "identity": "installation+workspace+kind+domain_id+version",
+      "lifecycle": [
+        "immutable"
+      ],
+      "immutable": true,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {},
+      "transition_guard": "Content/version immutable; activation is a separate assignment.",
+      "data_schema": "#/$defs/DomainArchetypeVersion"
+    },
+    {
+      "kind": "WorkflowVersion",
+      "authority": "sortyard-or-git",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "version",
+        "content_hash",
+        "stages",
+        "transitions",
+        "role_refs",
+        "policy_refs"
+      ],
+      "identity": "installation+workspace+kind+domain_id+version",
+      "lifecycle": [
+        "immutable"
+      ],
+      "immutable": true,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {},
+      "transition_guard": "Content/version immutable; activation is a separate assignment.",
+      "data_schema": "#/$defs/DomainWorkflowVersion"
+    },
+    {
+      "kind": "RoleDefinitionVersion",
+      "authority": "sortyard-or-git",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "version",
+        "content_hash",
+        "persona_ref",
+        "context_recipe_ref",
+        "tool_requirements",
+        "model_policy_ref"
+      ],
+      "identity": "installation+workspace+kind+domain_id+version",
+      "lifecycle": [
+        "immutable"
+      ],
+      "immutable": true,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {},
+      "transition_guard": "Content/version immutable; activation is a separate assignment.",
+      "data_schema": "#/$defs/DomainRoleDefinitionVersion"
+    },
+    {
+      "kind": "SkillVersion",
+      "authority": "sortyard-or-git",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "version",
+        "content_hash",
+        "artifact_ref",
+        "required_capabilities",
+        "compatibility",
+        "provenance_refs",
+        "verification_refs"
+      ],
+      "identity": "installation+workspace+kind+domain_id+version",
+      "lifecycle": [
+        "immutable"
+      ],
+      "immutable": true,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {},
+      "transition_guard": "Content/version immutable; activation is a separate assignment.",
+      "data_schema": "#/$defs/DomainSkillVersion"
+    },
+    {
+      "kind": "ContextRecipeVersion",
+      "authority": "sortyard-or-git",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "version",
+        "content_hash",
+        "allowlist",
+        "token_budget",
+        "provenance_rules",
+        "sensitivity_rules"
+      ],
+      "identity": "installation+workspace+kind+domain_id+version",
+      "lifecycle": [
+        "immutable"
+      ],
+      "immutable": true,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {},
+      "transition_guard": "Content/version immutable; activation is a separate assignment.",
+      "data_schema": "#/$defs/DomainContextRecipeVersion"
+    },
+    {
+      "kind": "QualityBarVersion",
+      "authority": "sortyard-or-git",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "version",
+        "content_hash",
+        "contract_refs",
+        "eval_pack_refs",
+        "absent_state_rules"
+      ],
+      "identity": "installation+workspace+kind+domain_id+version",
+      "lifecycle": [
+        "immutable"
+      ],
+      "immutable": true,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {},
+      "transition_guard": "Content/version immutable; activation is a separate assignment.",
+      "data_schema": "#/$defs/DomainQualityBarVersion"
+    },
+    {
+      "kind": "DefinitionProposal",
+      "authority": "sortyard",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "target_kind",
+        "proposed_content_hash",
+        "source_ref",
+        "review_ref",
+        "published_version_ref"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "draft",
+        "validated",
+        "in_review",
+        "accepted",
+        "published",
+        "rejected",
+        "withdrawn"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {
+        "draft": [
+          "validated",
+          "withdrawn"
+        ],
+        "validated": [
+          "in_review",
+          "withdrawn"
+        ],
+        "in_review": [
+          "accepted",
+          "rejected",
+          "withdrawn"
+        ],
+        "accepted": [
+          "published",
+          "withdrawn"
+        ],
+        "published": [],
+        "rejected": [],
+        "withdrawn": []
+      },
+      "data_schema": "#/$defs/DomainDefinitionProposal"
+    },
+    {
+      "kind": "DefinitionAssignment",
+      "authority": "registered-definition-owner",
+      "scope": "project",
+      "required_domain_fields": [
+        "definition_ref",
+        "project_ref",
+        "overrides",
+        "activation_epoch",
+        "effective_at",
+        "source_ref"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "proposed",
+        "validated",
+        "active",
+        "superseded",
+        "revoked"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {
+        "proposed": [
+          "validated",
+          "revoked"
+        ],
+        "validated": [
+          "active",
+          "revoked"
+        ],
+        "active": [
+          "superseded",
+          "revoked"
+        ],
+        "superseded": [],
+        "revoked": []
+      },
+      "data_schema": "#/$defs/DomainDefinitionAssignment"
+    },
+    {
+      "kind": "Policy",
+      "authority": "registered-policy-owner",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "family",
+        "scope",
+        "scope_ref",
+        "current_version_ref",
+        "active_variant_refs",
+        "consumer_refs"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "candidate",
+        "pending_owner",
+        "active",
+        "retired"
+      ],
+      "immutable": false,
+      "external_state_contract": true,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transition_guard": "Registered policy owner lifecycle/enforcement ladder; no native mutable policy shadow.",
+      "transitions": {},
+      "data_schema": "#/$defs/DomainPolicy"
+    },
+    {
+      "kind": "PolicyVersion",
+      "authority": "registered-policy-owner",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "version",
+        "content_hash",
+        "scope",
+        "scope_ref",
+        "parameters",
+        "enforcement",
+        "absent_state",
+        "history_refs",
+        "import_provenance_refs"
+      ],
+      "identity": "installation+workspace+kind+domain_id+version",
+      "lifecycle": [
+        "immutable"
+      ],
+      "immutable": true,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {},
+      "transition_guard": "Content/version immutable; activation is a separate assignment.",
+      "data_schema": "#/$defs/DomainPolicyVersion"
+    },
+    {
+      "kind": "PolicyDecision",
+      "authority": "sortyard-or-decision-owner",
+      "scope": "project",
+      "required_domain_fields": [
+        "decision_point",
+        "consumer_ref",
+        "policy_version_refs",
+        "input_snapshot_ref",
+        "verdict",
+        "reason_codes",
+        "fallback",
+        "conflict_refs"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "immutable"
+      ],
+      "immutable": true,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {},
+      "transition_guard": "Content/version immutable; activation is a separate assignment.",
+      "data_schema": "#/$defs/DomainPolicyDecision"
+    },
+    {
+      "kind": "ContextPacket",
+      "authority": "sortyard",
+      "scope": "project",
+      "required_domain_fields": [
+        "content_hash",
+        "artifact_ref",
+        "recipe_ref",
+        "definition_refs",
+        "policy_refs",
+        "provenance_refs",
+        "redaction_receipt"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "immutable"
+      ],
+      "immutable": true,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {},
+      "transition_guard": "Content/version immutable; activation is a separate assignment.",
+      "data_schema": "#/$defs/DomainContextPacket"
+    },
+    {
+      "kind": "AgentDefinition",
+      "authority": "sortyard",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "harness",
+        "model_policy_ref",
+        "tool_requirements",
+        "credential_pool_ref",
+        "capability_requirements"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "draft",
+        "enabled",
+        "disabled",
+        "retired"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {
+        "draft": [
+          "enabled",
+          "retired"
+        ],
+        "enabled": [
+          "disabled",
+          "retired"
+        ],
+        "disabled": [
+          "enabled",
+          "retired"
+        ],
+        "retired": []
+      },
+      "data_schema": "#/$defs/DomainAgentDefinition"
+    },
+    {
+      "kind": "AgentRun",
+      "authority": "sortyard-or-execution-owner",
+      "scope": "project",
+      "required_domain_fields": [
+        "definition_ref",
+        "executor_ref",
+        "authority_ref",
+        "delegation_ref",
+        "binding_ref",
+        "stage_ref",
+        "attempt",
+        "started_at",
+        "finished_at",
+        "outcome_ref"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "queued",
+        "running",
+        "waiting",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {
+        "queued": [
+          "running",
+          "cancelled"
+        ],
+        "running": [
+          "waiting",
+          "succeeded",
+          "failed",
+          "cancelled"
+        ],
+        "waiting": [
+          "running",
+          "succeeded",
+          "failed",
+          "cancelled"
+        ],
+        "succeeded": [],
+        "failed": [],
+        "cancelled": []
+      },
+      "data_schema": "#/$defs/DomainAgentRun"
+    },
+    {
+      "kind": "Lane",
+      "authority": "sortyard-or-execution-owner",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "capacity",
+        "project_refs",
+        "resource_envelope_ref",
+        "occupancy_revision",
+        "source_ref"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "enabled",
+        "paused",
+        "draining",
+        "disabled"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {
+        "enabled": [
+          "paused",
+          "draining",
+          "disabled"
+        ],
+        "paused": [
+          "enabled",
+          "draining",
+          "disabled"
+        ],
+        "draining": [
+          "paused",
+          "disabled"
+        ],
+        "disabled": [
+          "enabled"
+        ]
+      },
+      "data_schema": "#/$defs/DomainLane"
+    },
+    {
+      "kind": "ExecutionBinding",
+      "authority": "sortyard-or-execution-owner",
+      "scope": "project",
+      "required_domain_fields": [
+        "task_ref",
+        "stage",
+        "workflow_ref",
+        "role_ref",
+        "skill_refs",
+        "context_packet_ref",
+        "policy_refs",
+        "lane_ref",
+        "place",
+        "resource_envelope",
+        "unbound_reasons"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "unbound",
+        "bound",
+        "revoked",
+        "expired"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {
+        "unbound": [
+          "bound",
+          "revoked"
+        ],
+        "bound": [
+          "revoked",
+          "expired"
+        ],
+        "revoked": [],
+        "expired": []
+      },
+      "data_schema": "#/$defs/DomainExecutionBinding"
+    },
+    {
+      "kind": "Chain",
+      "authority": "sortyard-or-execution-owner",
+      "scope": "project",
+      "required_domain_fields": [
+        "task_ref",
+        "workflow_ref",
+        "stage_refs",
+        "epoch",
+        "owner_lease_ref",
+        "outcome_ref"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "queued",
+        "running",
+        "stalled",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {
+        "queued": [
+          "running",
+          "cancelled"
+        ],
+        "running": [
+          "stalled",
+          "succeeded",
+          "failed",
+          "cancelled"
+        ],
+        "stalled": [
+          "running",
+          "failed",
+          "cancelled"
+        ],
+        "succeeded": [],
+        "failed": [],
+        "cancelled": []
+      },
+      "data_schema": "#/$defs/DomainChain"
+    },
+    {
+      "kind": "StageRun",
+      "authority": "sortyard-or-execution-owner",
+      "scope": "project",
+      "required_domain_fields": [
+        "chain_ref",
+        "binding_ref",
+        "attempt",
+        "epoch",
+        "agent_run_ref",
+        "result_ref",
+        "verification_refs"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "queued",
+        "running",
+        "waiting",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {
+        "queued": [
+          "running",
+          "cancelled"
+        ],
+        "running": [
+          "waiting",
+          "succeeded",
+          "failed",
+          "cancelled"
+        ],
+        "waiting": [
+          "running",
+          "succeeded",
+          "failed",
+          "cancelled"
+        ],
+        "succeeded": [],
+        "failed": [],
+        "cancelled": []
+      },
+      "data_schema": "#/$defs/DomainStageRun"
+    },
+    {
+      "kind": "GroomingPass",
+      "authority": "sortyard-or-execution-owner",
+      "scope": "project",
+      "required_domain_fields": [
+        "input_snapshot_ref",
+        "model_policy_ref",
+        "lease_ref",
+        "proposal_refs",
+        "applied_operation_refs",
+        "reason",
+        "queue_key"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "queued",
+        "leased",
+        "evaluating",
+        "proposed",
+        "applying",
+        "succeeded",
+        "failed",
+        "handed_back",
+        "cancelled"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {
+        "queued": [
+          "leased",
+          "cancelled"
+        ],
+        "leased": [
+          "evaluating",
+          "failed",
+          "handed_back",
+          "cancelled"
+        ],
+        "evaluating": [
+          "proposed",
+          "failed",
+          "handed_back"
+        ],
+        "proposed": [
+          "applying",
+          "succeeded",
+          "handed_back",
+          "cancelled"
+        ],
+        "applying": [
+          "succeeded",
+          "failed",
+          "handed_back"
+        ],
+        "succeeded": [],
+        "failed": [],
+        "handed_back": [],
+        "cancelled": []
+      },
+      "data_schema": "#/$defs/DomainGroomingPass",
+      "transition_guard": "Registered owner validates expected revisions and the current fenced lease. Queue/lease identity is authority service+installation+canonical source board/project ID, never a local alias; only independent boards may groom concurrently."
+    },
+    {
+      "kind": "TriageCase",
+      "authority": "sortyard-or-execution-owner",
+      "scope": "project",
+      "required_domain_fields": [
+        "condition_ref",
+        "evidence_refs",
+        "classification",
+        "owner_ref",
+        "repair_budget",
+        "attempt_refs",
+        "resolution_ref"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "open",
+        "classified",
+        "repairing",
+        "waiting",
+        "verified",
+        "closed",
+        "dismissed"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {
+        "open": [
+          "classified",
+          "dismissed"
+        ],
+        "classified": [
+          "repairing",
+          "waiting",
+          "dismissed"
+        ],
+        "repairing": [
+          "waiting",
+          "verified",
+          "dismissed"
+        ],
+        "waiting": [
+          "repairing",
+          "verified",
+          "dismissed"
+        ],
+        "verified": [
+          "closed",
+          "repairing"
+        ],
+        "closed": [
+          "open"
+        ],
+        "dismissed": [
+          "open"
+        ]
+      },
+      "data_schema": "#/$defs/DomainTriageCase"
+    },
+    {
+      "kind": "RepairAttempt",
+      "authority": "sortyard-or-execution-owner",
+      "scope": "project",
+      "required_domain_fields": [
+        "case_ref",
+        "action_plan_ref",
+        "operation_ref",
+        "observed_result_ref",
+        "remaining_budget"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "planned",
+        "running",
+        "waiting",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {
+        "planned": [
+          "running",
+          "cancelled"
+        ],
+        "running": [
+          "waiting",
+          "succeeded",
+          "failed",
+          "cancelled"
+        ],
+        "waiting": [
+          "running",
+          "succeeded",
+          "failed",
+          "cancelled"
+        ],
+        "succeeded": [],
+        "failed": [],
+        "cancelled": []
+      },
+      "data_schema": "#/$defs/DomainRepairAttempt"
+    },
+    {
+      "kind": "Mechanism",
+      "authority": "registered-mechanism-owner",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "owner_ref",
+        "schedule",
+        "expected_freshness",
+        "observer_ref",
+        "last_observation_ref",
+        "absence_policy_ref"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "configured",
+        "active",
+        "stale",
+        "unknown",
+        "failed",
+        "disabled"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transition_guard": "Only registered owner commands or verified observations choose the transition; no generic state PATCH. Policy activation/promotion retains owner lifecycle and enforcement guards.",
+      "transitions": {
+        "configured": [
+          "active",
+          "stale",
+          "unknown",
+          "failed",
+          "disabled"
+        ],
+        "active": [
+          "configured",
+          "stale",
+          "unknown",
+          "failed",
+          "disabled"
+        ],
+        "stale": [
+          "configured",
+          "active",
+          "unknown",
+          "failed",
+          "disabled"
+        ],
+        "unknown": [
+          "configured",
+          "active",
+          "stale",
+          "failed",
+          "disabled"
+        ],
+        "failed": [
+          "configured",
+          "active",
+          "stale",
+          "unknown",
+          "disabled"
+        ],
+        "disabled": [
+          "configured",
+          "active",
+          "stale",
+          "unknown",
+          "failed"
+        ]
+      },
+      "data_schema": "#/$defs/DomainMechanism"
+    },
+    {
+      "kind": "DeliveryObservation",
+      "authority": "sortyard-projection",
+      "scope": "project",
+      "required_domain_fields": [
+        "task_ref",
+        "source_ref",
+        "artifact_ref",
+        "desired_revision",
+        "reconciled_revision",
+        "health",
+        "observed_at",
+        "coverage",
+        "evidence_refs"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "immutable"
+      ],
+      "immutable": true,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {},
+      "transition_guard": "Content/version immutable; activation is a separate assignment.",
+      "data_schema": "#/$defs/DomainDeliveryObservation"
+    },
+    {
+      "kind": "CapabilityGrant",
+      "authority": "sortyard",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "authority_ref",
+        "executor_ref",
+        "scope",
+        "actions",
+        "audience",
+        "parent_grant_ref",
+        "issued_at",
+        "expires_at",
+        "revoked_at",
+        "limits"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "issued",
+        "active",
+        "expired",
+        "revoked"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {
+        "issued": [
+          "active",
+          "expired",
+          "revoked"
+        ],
+        "active": [
+          "expired",
+          "revoked"
+        ],
+        "expired": [],
+        "revoked": []
+      },
+      "data_schema": "#/$defs/DomainCapabilityGrant"
+    },
+    {
+      "kind": "Operation",
+      "authority": "sortyard",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "action_id",
+        "target_refs",
+        "authority_ref",
+        "executor_ref",
+        "idempotency_ref",
+        "commit_state",
+        "source_receipt_refs",
+        "result_ref",
+        "error_ref"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "accepted",
+        "running",
+        "waiting_external",
+        "waiting_verification",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {
+        "accepted": [
+          "running",
+          "waiting_external",
+          "waiting_verification",
+          "failed",
+          "cancelled"
+        ],
+        "running": [
+          "waiting_external",
+          "waiting_verification",
+          "succeeded",
+          "failed",
+          "cancelled"
+        ],
+        "waiting_external": [
+          "running",
+          "waiting_verification",
+          "succeeded",
+          "failed",
+          "cancelled"
+        ],
+        "waiting_verification": [
+          "running",
+          "succeeded",
+          "failed",
+          "cancelled"
+        ],
+        "succeeded": [],
+        "failed": [],
+        "cancelled": []
+      },
+      "data_schema": "#/$defs/DomainOperation"
+    },
+    {
+      "kind": "ActionPlan",
+      "authority": "sortyard",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "action_id",
+        "target_refs",
+        "normalized_arguments",
+        "expected_revisions",
+        "policy_refs",
+        "impact_refs",
+        "plan_hash",
+        "expires_at",
+        "approval_ref",
+        "approval_required"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "proposed",
+        "ready",
+        "approval_required",
+        "approved",
+        "expired",
+        "superseded",
+        "executed",
+        "rejected"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {
+        "proposed": [
+          "ready",
+          "approval_required",
+          "rejected"
+        ],
+        "ready": [
+          "executed",
+          "expired",
+          "superseded"
+        ],
+        "approval_required": [
+          "approved",
+          "rejected",
+          "expired",
+          "superseded"
+        ],
+        "approved": [
+          "executed",
+          "expired",
+          "superseded"
+        ],
+        "executed": [],
+        "expired": [],
+        "superseded": [],
+        "rejected": []
+      },
+      "data_schema": "#/$defs/DomainActionPlan"
+    },
+    {
+      "kind": "ServiceConnection",
+      "authority": "sortyard",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "service",
+        "installation",
+        "endpoint_ref",
+        "contract_version",
+        "custody_ref",
+        "scope_mapping",
+        "capability_manifest",
+        "observed_at"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "unconfigured",
+        "configured",
+        "healthy",
+        "degraded",
+        "unavailable",
+        "disabled"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transition_guard": "Only registered owner commands or verified observations choose the transition; no generic state PATCH. Policy activation/promotion retains owner lifecycle and enforcement guards.",
+      "transitions": {
+        "unconfigured": [
+          "configured",
+          "disabled"
+        ],
+        "configured": [
+          "healthy",
+          "degraded",
+          "unavailable",
+          "disabled"
+        ],
+        "healthy": [
+          "degraded",
+          "unavailable",
+          "disabled"
+        ],
+        "degraded": [
+          "healthy",
+          "unavailable",
+          "disabled"
+        ],
+        "unavailable": [
+          "healthy",
+          "degraded",
+          "disabled"
+        ],
+        "disabled": [
+          "configured"
+        ]
+      },
+      "data_schema": "#/$defs/DomainServiceConnection"
+    },
+    {
+      "kind": "ExternalReference",
+      "authority": "sortyard-projection",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "owner_service",
+        "owner_installation",
+        "external_id",
+        "external_scope",
+        "external_version",
+        "source_link",
+        "observed_at"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "observed",
+        "stale",
+        "unknown",
+        "unavailable"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transition_guard": "Only registered owner commands or verified observations choose the transition; no generic state PATCH. Policy activation/promotion retains owner lifecycle and enforcement guards.",
+      "transitions": {
+        "observed": [
+          "stale",
+          "unknown",
+          "unavailable"
+        ],
+        "stale": [
+          "observed",
+          "unknown",
+          "unavailable"
+        ],
+        "unknown": [
+          "observed",
+          "stale",
+          "unavailable"
+        ],
+        "unavailable": [
+          "observed",
+          "stale",
+          "unknown"
+        ]
+      },
+      "data_schema": "#/$defs/DomainExternalReference"
+    },
+    {
+      "kind": "Discovery",
+      "authority": "sortyard-or-ranker",
+      "scope": "project",
+      "required_domain_fields": [
+        "source_ref",
+        "content_hash",
+        "classification",
+        "provenance_refs",
+        "ranked_candidate_ref"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "captured",
+        "classified",
+        "ranked",
+        "superseded",
+        "rejected"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transition_guard": "Only registered owner commands or verified observations choose the transition; no generic state PATCH. Policy activation/promotion retains owner lifecycle and enforcement guards.",
+      "transitions": {
+        "captured": [
+          "classified",
+          "rejected",
+          "superseded"
+        ],
+        "classified": [
+          "ranked",
+          "rejected",
+          "superseded"
+        ],
+        "ranked": [
+          "superseded",
+          "rejected"
+        ],
+        "superseded": [],
+        "rejected": []
+      },
+      "data_schema": "#/$defs/DomainDiscovery"
+    },
+    {
+      "kind": "ImprovementProposal",
+      "authority": "sortyard",
+      "scope": "project",
+      "required_domain_fields": [
+        "discovery_ref",
+        "applicability",
+        "expected_outcome_ref",
+        "evidence_refs",
+        "ranked_candidate_ref",
+        "loop_ref",
+        "task_refs"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "proposed",
+        "evaluated",
+        "accepted",
+        "rejected",
+        "superseded",
+        "withdrawn"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {
+        "proposed": [
+          "evaluated",
+          "rejected",
+          "superseded",
+          "withdrawn"
+        ],
+        "evaluated": [
+          "accepted",
+          "rejected",
+          "superseded",
+          "withdrawn"
+        ],
+        "accepted": [
+          "superseded",
+          "withdrawn"
+        ],
+        "rejected": [],
+        "superseded": [],
+        "withdrawn": []
+      },
+      "data_schema": "#/$defs/DomainImprovementProposal"
+    },
+    {
+      "kind": "Adoption",
+      "authority": "sortyard",
+      "scope": "project",
+      "required_domain_fields": [
+        "proposal_ref",
+        "version_ref",
+        "project_ref",
+        "prior_assignment_ref",
+        "operation_ref",
+        "usage_refs",
+        "outcome_refs"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "proposed",
+        "validated",
+        "applying",
+        "applied",
+        "observing",
+        "verified",
+        "reverted",
+        "failed"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {
+        "proposed": [
+          "validated",
+          "failed"
+        ],
+        "validated": [
+          "applying",
+          "failed"
+        ],
+        "applying": [
+          "applied",
+          "failed"
+        ],
+        "applied": [
+          "observing",
+          "reverted"
+        ],
+        "observing": [
+          "verified",
+          "reverted",
+          "failed"
+        ],
+        "verified": [
+          "reverted"
+        ],
+        "reverted": [],
+        "failed": []
+      },
+      "data_schema": "#/$defs/DomainAdoption"
+    },
+    {
+      "kind": "OutcomeObservation",
+      "authority": "sortyard-projection",
+      "scope": "project",
+      "required_domain_fields": [
+        "adoption_ref",
+        "metric_ref",
+        "measurement_window",
+        "input_refs",
+        "result",
+        "coverage",
+        "confounders",
+        "evidence_strength"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "immutable"
+      ],
+      "immutable": true,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {},
+      "transition_guard": "Content/version immutable; activation is a separate assignment.",
+      "data_schema": "#/$defs/DomainOutcomeObservation"
+    },
+    {
+      "kind": "DocumentArtifact",
+      "authority": "registered-source-owner",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "source_ref",
+        "source_version",
+        "content_hash",
+        "media_type",
+        "sensitivity",
+        "provenance_refs"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "immutable"
+      ],
+      "immutable": true,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {},
+      "transition_guard": "Content/version immutable; activation is a separate assignment.",
+      "data_schema": "#/$defs/DomainDocumentArtifact"
+    },
+    {
+      "kind": "Intent",
+      "authority": "cortexplane",
+      "scope": "external",
+      "required_domain_fields": [
+        "owner_ref",
+        "external_ref"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "external"
+      ],
+      "immutable": false,
+      "external_state_contract": true,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {},
+      "transition_guard": "State/transition contract delegated to the registered owner; no native writable copy.",
+      "data_schema": "#/$defs/DomainIntent"
+    },
+    {
+      "kind": "Goal",
+      "authority": "cortexplane",
+      "scope": "external",
+      "required_domain_fields": [
+        "owner_ref",
+        "external_ref",
+        "parent_ref",
+        "key_result_refs"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "external"
+      ],
+      "immutable": false,
+      "external_state_contract": true,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {},
+      "transition_guard": "State/transition contract delegated to the registered owner; no native writable copy.",
+      "data_schema": "#/$defs/DomainGoal"
+    },
+    {
+      "kind": "KeyResult",
+      "authority": "cortexplane",
+      "scope": "external",
+      "required_domain_fields": [
+        "owner_ref",
+        "external_ref",
+        "goal_ref",
+        "observation_refs"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "external"
+      ],
+      "immutable": false,
+      "external_state_contract": true,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {},
+      "transition_guard": "State/transition contract delegated to the registered owner; no native writable copy.",
+      "data_schema": "#/$defs/DomainKeyResult"
+    },
+    {
+      "kind": "MemoryObservation",
+      "authority": "walwarden",
+      "scope": "external",
+      "required_domain_fields": [
+        "external_ref",
+        "provenance_refs",
+        "observed_at"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "external"
+      ],
+      "immutable": false,
+      "external_state_contract": true,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {},
+      "transition_guard": "State/transition contract delegated to the registered owner; no native writable copy.",
+      "data_schema": "#/$defs/DomainMemoryObservation"
+    },
+    {
+      "kind": "KnowledgeFact",
+      "authority": "walwarden",
+      "scope": "external",
+      "required_domain_fields": [
+        "external_ref",
+        "valid_time",
+        "supersedes_ref",
+        "provenance_refs"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "external"
+      ],
+      "immutable": false,
+      "external_state_contract": true,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {},
+      "transition_guard": "State/transition contract delegated to the registered owner; no native writable copy.",
+      "data_schema": "#/$defs/DomainKnowledgeFact"
+    },
+    {
+      "kind": "Corpus",
+      "authority": "corpus-ranker",
+      "scope": "external",
+      "required_domain_fields": [
+        "external_ref",
+        "owner_ref"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "external"
+      ],
+      "immutable": false,
+      "external_state_contract": true,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {},
+      "transition_guard": "State/transition contract delegated to the registered owner; no native writable copy.",
+      "data_schema": "#/$defs/DomainCorpus"
+    },
+    {
+      "kind": "RankedCandidate",
+      "authority": "corpus-ranker",
+      "scope": "external",
+      "required_domain_fields": [
+        "external_ref",
+        "corpus_ref",
+        "scoring_policy_ref",
+        "score_evidence_refs",
+        "applicability"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "external"
+      ],
+      "immutable": false,
+      "external_state_contract": true,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {},
+      "transition_guard": "State/transition contract delegated to the registered owner; no native writable copy.",
+      "data_schema": "#/$defs/DomainRankedCandidate"
+    },
+    {
+      "kind": "Loop",
+      "authority": "loop-closer",
+      "scope": "external",
+      "required_domain_fields": [
+        "external_ref",
+        "owner_ref",
+        "goal_or_key_result_ref",
+        "who_refs",
+        "what_refs",
+        "when_refs"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "external"
+      ],
+      "immutable": false,
+      "external_state_contract": true,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {},
+      "transition_guard": "State/transition contract delegated to the registered owner; no native writable copy.",
+      "data_schema": "#/$defs/DomainLoop"
+    },
+    {
+      "kind": "Experiment",
+      "authority": "product-lab",
+      "scope": "external",
+      "required_domain_fields": [
+        "external_ref",
+        "hypothesis_ref",
+        "treatment_refs",
+        "baseline_refs",
+        "result_refs"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "external"
+      ],
+      "immutable": false,
+      "external_state_contract": true,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {},
+      "transition_guard": "State/transition contract delegated to the registered owner; no native writable copy.",
+      "data_schema": "#/$defs/DomainExperiment"
+    },
+    {
+      "kind": "NotificationCondition",
+      "authority": "notification-service",
+      "scope": "external",
+      "required_domain_fields": [
+        "external_ref",
+        "owner_ref",
+        "source_condition_ref",
+        "acknowledgement_ref",
+        "escalation_ref"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "external"
+      ],
+      "immutable": false,
+      "external_state_contract": true,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {},
+      "transition_guard": "State/transition contract delegated to the registered owner; no native writable copy.",
+      "data_schema": "#/$defs/DomainNotificationCondition"
+    },
+    {
+      "kind": "BrowserOperation",
+      "authority": "rove",
+      "scope": "external",
+      "required_domain_fields": [
+        "external_ref",
+        "authority_ref",
+        "approval_ref",
+        "source_receipt_ref"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "external"
+      ],
+      "immutable": false,
+      "external_state_contract": true,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "company/BIG-PICTURE.md, INTENTS.md I5; original DESIGN3; SY-DEC-004; requirements catalog",
+      "transitions": {},
+      "transition_guard": "State/transition contract delegated to the registered owner; no native writable copy.",
+      "data_schema": "#/$defs/DomainBrowserOperation"
+    },
+    {
+      "kind": "Requirement",
+      "authority": "sortyard-or-registered-source-owner",
+      "scope": "project",
+      "required_domain_fields": [
+        "statement",
+        "acceptance",
+        "source_refs",
+        "version",
+        "design_refs",
+        "coverage_refs"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "proposed",
+        "active",
+        "superseded",
+        "retired"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "Meta-harness artifact conformance and owner ecosystem requirements",
+      "transitions": {
+        "proposed": [
+          "active",
+          "retired"
+        ],
+        "active": [
+          "superseded",
+          "retired"
+        ],
+        "superseded": [],
+        "retired": []
+      },
+      "data_schema": "#/$defs/DomainRequirement"
+    },
+    {
+      "kind": "DesignRecord",
+      "authority": "sortyard-or-registered-source-owner",
+      "scope": "project",
+      "required_domain_fields": [
+        "document_ref",
+        "approved_source_revision",
+        "review_refs",
+        "decision_refs",
+        "requirement_refs"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "proposed",
+        "in_review",
+        "approved",
+        "superseded",
+        "rejected"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "Meta-harness artifact conformance and owner ecosystem requirements",
+      "transitions": {
+        "proposed": [
+          "in_review",
+          "rejected"
+        ],
+        "in_review": [
+          "approved",
+          "rejected"
+        ],
+        "approved": [
+          "superseded"
+        ],
+        "superseded": [],
+        "rejected": []
+      },
+      "data_schema": "#/$defs/DomainDesignRecord"
+    },
+    {
+      "kind": "ContractVersion",
+      "authority": "sortyard-or-registered-source-owner",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "version",
+        "content_hash",
+        "schema_ref",
+        "boundary",
+        "compatibility",
+        "owner_ref"
+      ],
+      "identity": "installation+workspace+kind+domain_id+version",
+      "lifecycle": [
+        "immutable"
+      ],
+      "immutable": true,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "Meta-harness artifact conformance and owner ecosystem requirements",
+      "transitions": {},
+      "transition_guard": "Content/version immutable; activation is a separate assignment.",
+      "data_schema": "#/$defs/DomainContractVersion"
+    },
+    {
+      "kind": "ProcedureVersion",
+      "authority": "sortyard-or-registered-source-owner",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "version",
+        "content_hash",
+        "steps_ref",
+        "required_capabilities",
+        "authority_policy_ref"
+      ],
+      "identity": "installation+workspace+kind+domain_id+version",
+      "lifecycle": [
+        "immutable"
+      ],
+      "immutable": true,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "Meta-harness artifact conformance and owner ecosystem requirements",
+      "transitions": {},
+      "transition_guard": "Content/version immutable; activation is a separate assignment.",
+      "data_schema": "#/$defs/DomainProcedureVersion"
+    },
+    {
+      "kind": "IntendedUseRecord",
+      "authority": "sortyard-or-registered-source-owner",
+      "scope": "project",
+      "required_domain_fields": [
+        "version",
+        "content_hash",
+        "project_ref",
+        "intent_refs",
+        "scope_constraints",
+        "non_goals"
+      ],
+      "identity": "installation+workspace+kind+domain_id+version",
+      "lifecycle": [
+        "immutable"
+      ],
+      "immutable": true,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "Meta-harness artifact conformance and owner ecosystem requirements",
+      "transitions": {},
+      "transition_guard": "Content/version immutable; activation is a separate assignment.",
+      "data_schema": "#/$defs/DomainIntendedUseRecord"
+    },
+    {
+      "kind": "Need",
+      "authority": "sortyard-or-registered-source-owner",
+      "scope": "project",
+      "required_domain_fields": [
+        "capability_ref",
+        "owner_ref",
+        "source_ref",
+        "satisfaction_evidence_ref",
+        "observed_at"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "open",
+        "awaiting_owner",
+        "satisfiable",
+        "satisfied",
+        "revoked",
+        "superseded"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "Meta-harness artifact conformance and owner ecosystem requirements",
+      "transitions": {
+        "open": [
+          "awaiting_owner",
+          "satisfiable",
+          "superseded"
+        ],
+        "awaiting_owner": [
+          "satisfiable",
+          "superseded"
+        ],
+        "satisfiable": [
+          "satisfied",
+          "revoked",
+          "superseded"
+        ],
+        "satisfied": [
+          "revoked",
+          "superseded"
+        ],
+        "revoked": [
+          "open",
+          "superseded"
+        ],
+        "superseded": []
+      },
+      "data_schema": "#/$defs/DomainNeed"
+    },
+    {
+      "kind": "ExtensionRegistration",
+      "authority": "sortyard-or-registered-source-owner",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "version_ref",
+        "compatibility",
+        "capability_requirements",
+        "owner_ref",
+        "health_ref"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "registered",
+        "validated",
+        "enabled",
+        "disabled",
+        "retired"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "Meta-harness artifact conformance and owner ecosystem requirements",
+      "transitions": {
+        "registered": [
+          "validated",
+          "disabled",
+          "retired"
+        ],
+        "validated": [
+          "enabled",
+          "disabled",
+          "retired"
+        ],
+        "enabled": [
+          "disabled",
+          "retired"
+        ],
+        "disabled": [
+          "validated",
+          "enabled",
+          "retired"
+        ],
+        "retired": []
+      },
+      "data_schema": "#/$defs/DomainExtensionRegistration"
+    },
+    {
+      "kind": "Operator",
+      "authority": "appwrite",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "external_ref",
+        "issuer",
+        "appwrite_project_id",
+        "appwrite_user_id",
+        "display_name"
+      ],
+      "identity": "installation+appwrite_project+user_or_membership_id",
+      "lifecycle": [
+        "external"
+      ],
+      "immutable": false,
+      "external_state_contract": true,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "SY-DEC-004",
+      "transitions": {},
+      "transition_guard": "State/transition contract delegated to the registered owner; no native writable copy.",
+      "data_schema": "#/$defs/DomainOperator"
+    },
+    {
+      "kind": "Membership",
+      "authority": "appwrite",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "external_ref",
+        "operator_ref",
+        "team_ref",
+        "workspace_ref",
+        "project_ref",
+        "role"
+      ],
+      "identity": "installation+appwrite_project+user_or_membership_id",
+      "lifecycle": [
+        "external"
+      ],
+      "immutable": false,
+      "external_state_contract": true,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "SY-DEC-004",
+      "transitions": {},
+      "transition_guard": "State/transition contract delegated to the registered owner; no native writable copy.",
+      "data_schema": "#/$defs/DomainMembership"
+    }
+  ],
+  "edge_types": [
+    {
+      "type": "inherits_from",
+      "source_kinds": [
+        "Project"
+      ],
+      "target_kinds": [
+        "ArchetypeVersion"
+      ],
+      "required": [
+        "owner",
+        "source_ref",
+        "provenance",
+        "observed_at",
+        "access_scope"
+      ],
+      "constraints": [
+        "authorize both endpoints and relationship on every hop",
+        "no raw client-supplied authority",
+        "same-kind supersession and acyclic replacement chains",
+        "cross-scope edges require explicit authorized mount"
+      ]
+    },
+    {
+      "type": "assigns",
+      "source_kinds": [
+        "DefinitionAssignment"
+      ],
+      "target_kinds": [
+        "SkillVersion",
+        "WorkflowVersion",
+        "RoleDefinitionVersion",
+        "ContextRecipeVersion",
+        "QualityBarVersion",
+        "ArchetypeVersion"
+      ],
+      "required": [
+        "owner",
+        "source_ref",
+        "provenance",
+        "observed_at",
+        "access_scope"
+      ],
+      "constraints": [
+        "authorize both endpoints and relationship on every hop",
+        "no raw client-supplied authority",
+        "same-kind supersession and acyclic replacement chains",
+        "cross-scope edges require explicit authorized mount"
+      ]
+    },
+    {
+      "type": "depends_on",
+      "source_kinds": [
+        "Task"
+      ],
+      "target_kinds": [
+        "Task"
+      ],
+      "required": [
+        "owner",
+        "source_ref",
+        "provenance",
+        "observed_at",
+        "access_scope"
+      ],
+      "constraints": [
+        "authorize both endpoints and relationship on every hop",
+        "no raw client-supplied authority",
+        "same-kind supersession and acyclic replacement chains",
+        "cross-scope edges require explicit authorized mount"
+      ]
+    },
+    {
+      "type": "runs_as",
+      "source_kinds": [
+        "AgentRun"
+      ],
+      "target_kinds": [
+        "AgentDefinition"
+      ],
+      "required": [
+        "owner",
+        "source_ref",
+        "provenance",
+        "observed_at",
+        "access_scope"
+      ],
+      "constraints": [
+        "authorize both endpoints and relationship on every hop",
+        "no raw client-supplied authority",
+        "same-kind supersession and acyclic replacement chains",
+        "cross-scope edges require explicit authorized mount"
+      ]
+    },
+    {
+      "type": "on_behalf_of",
+      "source_kinds": [
+        "AgentRun",
+        "Operation",
+        "CapabilityGrant"
+      ],
+      "target_kinds": [
+        "ExternalReference"
+      ],
+      "required": [
+        "owner",
+        "source_ref",
+        "provenance",
+        "observed_at",
+        "access_scope"
+      ],
+      "constraints": [
+        "authorize both endpoints and relationship on every hop",
+        "no raw client-supplied authority",
+        "same-kind supersession and acyclic replacement chains",
+        "cross-scope edges require explicit authorized mount"
+      ]
+    },
+    {
+      "type": "governed_by",
+      "source_kinds": [
+        "ExecutionBinding",
+        "PolicyDecision",
+        "GroomingPass",
+        "Operation"
+      ],
+      "target_kinds": [
+        "PolicyVersion"
+      ],
+      "required": [
+        "owner",
+        "source_ref",
+        "provenance",
+        "observed_at",
+        "access_scope"
+      ],
+      "constraints": [
+        "authorize both endpoints and relationship on every hop",
+        "no raw client-supplied authority",
+        "same-kind supersession and acyclic replacement chains",
+        "cross-scope edges require explicit authorized mount"
+      ]
+    },
+    {
+      "type": "used_by",
+      "source_kinds": [
+        "SkillVersion",
+        "RoleDefinitionVersion",
+        "ContextPacket"
+      ],
+      "target_kinds": [
+        "ExecutionBinding",
+        "StageRun",
+        "AgentRun"
+      ],
+      "required": [
+        "owner",
+        "source_ref",
+        "provenance",
+        "observed_at",
+        "access_scope"
+      ],
+      "constraints": [
+        "authorize both endpoints and relationship on every hop",
+        "no raw client-supplied authority",
+        "same-kind supersession and acyclic replacement chains",
+        "cross-scope edges require explicit authorized mount"
+      ]
+    },
+    {
+      "type": "derived_from",
+      "source_kinds": [
+        "DocumentArtifact",
+        "Discovery",
+        "ImprovementProposal",
+        "KnowledgeFact",
+        "MemoryObservation",
+        "ContextPacket"
+      ],
+      "target_kinds": [
+        "ExternalReference",
+        "DocumentArtifact",
+        "KnowledgeFact",
+        "MemoryObservation",
+        "Discovery",
+        "RankedCandidate"
+      ],
+      "required": [
+        "owner",
+        "source_ref",
+        "provenance",
+        "observed_at",
+        "access_scope"
+      ],
+      "constraints": [
+        "authorize both endpoints and relationship on every hop",
+        "no raw client-supplied authority",
+        "same-kind supersession and acyclic replacement chains",
+        "cross-scope edges require explicit authorized mount"
+      ]
+    },
+    {
+      "type": "supersedes",
+      "source_kinds": [
+        "PolicyVersion",
+        "SkillVersion",
+        "WorkflowVersion",
+        "RoleDefinitionVersion",
+        "ContextRecipeVersion",
+        "ArchetypeVersion",
+        "KnowledgeFact",
+        "ImprovementProposal"
+      ],
+      "target_kinds": [
+        "PolicyVersion",
+        "SkillVersion",
+        "WorkflowVersion",
+        "RoleDefinitionVersion",
+        "ContextRecipeVersion",
+        "ArchetypeVersion",
+        "KnowledgeFact",
+        "ImprovementProposal"
+      ],
+      "required": [
+        "owner",
+        "source_ref",
+        "provenance",
+        "observed_at",
+        "access_scope"
+      ],
+      "constraints": [
+        "authorize both endpoints and relationship on every hop",
+        "no raw client-supplied authority",
+        "same-kind supersession and acyclic replacement chains",
+        "cross-scope edges require explicit authorized mount"
+      ]
+    },
+    {
+      "type": "pursues",
+      "source_kinds": [
+        "ImprovementProposal"
+      ],
+      "target_kinds": [
+        "Loop",
+        "Task"
+      ],
+      "required": [
+        "owner",
+        "source_ref",
+        "provenance",
+        "observed_at",
+        "access_scope"
+      ],
+      "constraints": [
+        "authorize both endpoints and relationship on every hop",
+        "no raw client-supplied authority",
+        "same-kind supersession and acyclic replacement chains",
+        "cross-scope edges require explicit authorized mount"
+      ]
+    },
+    {
+      "type": "adopts",
+      "source_kinds": [
+        "Adoption"
+      ],
+      "target_kinds": [
+        "SkillVersion",
+        "WorkflowVersion",
+        "ArchetypeVersion",
+        "PolicyVersion",
+        "ContextRecipeVersion"
+      ],
+      "required": [
+        "owner",
+        "source_ref",
+        "provenance",
+        "observed_at",
+        "access_scope"
+      ],
+      "constraints": [
+        "authorize both endpoints and relationship on every hop",
+        "no raw client-supplied authority",
+        "same-kind supersession and acyclic replacement chains",
+        "cross-scope edges require explicit authorized mount"
+      ]
+    },
+    {
+      "type": "evidence_for",
+      "source_kinds": [
+        "OutcomeObservation",
+        "DeliveryObservation",
+        "PolicyDecision",
+        "DocumentArtifact"
+      ],
+      "target_kinds": [
+        "Task",
+        "Adoption",
+        "Goal",
+        "KeyResult",
+        "TriageCase",
+        "ImprovementProposal"
+      ],
+      "required": [
+        "owner",
+        "source_ref",
+        "provenance",
+        "observed_at",
+        "access_scope"
+      ],
+      "constraints": [
+        "authorize both endpoints and relationship on every hop",
+        "no raw client-supplied authority",
+        "same-kind supersession and acyclic replacement chains",
+        "cross-scope edges require explicit authorized mount"
+      ]
+    },
+    {
+      "type": "serves",
+      "source_kinds": [
+        "Task",
+        "Loop",
+        "ImprovementProposal"
+      ],
+      "target_kinds": [
+        "Goal",
+        "KeyResult"
+      ],
+      "required": [
+        "owner",
+        "source_ref",
+        "provenance",
+        "observed_at",
+        "access_scope"
+      ],
+      "constraints": [
+        "authorize both endpoints and relationship on every hop",
+        "no raw client-supplied authority",
+        "same-kind supersession and acyclic replacement chains",
+        "cross-scope edges require explicit authorized mount"
+      ]
+    },
+    {
+      "type": "observes",
+      "source_kinds": [
+        "Mechanism"
+      ],
+      "target_kinds": [
+        "ServiceConnection",
+        "Chain",
+        "Task",
+        "DeliveryObservation"
+      ],
+      "required": [
+        "owner",
+        "source_ref",
+        "provenance",
+        "observed_at",
+        "access_scope"
+      ],
+      "constraints": [
+        "authorize both endpoints and relationship on every hop",
+        "no raw client-supplied authority",
+        "same-kind supersession and acyclic replacement chains",
+        "cross-scope edges require explicit authorized mount"
+      ]
+    },
+    {
+      "type": "repairs",
+      "source_kinds": [
+        "RepairAttempt"
+      ],
+      "target_kinds": [
+        "TriageCase"
+      ],
+      "required": [
+        "owner",
+        "source_ref",
+        "provenance",
+        "observed_at",
+        "access_scope"
+      ],
+      "constraints": [
+        "authorize both endpoints and relationship on every hop",
+        "no raw client-supplied authority",
+        "same-kind supersession and acyclic replacement chains",
+        "cross-scope edges require explicit authorized mount"
+      ]
+    },
+    {
+      "type": "publishes",
+      "source_kinds": [
+        "DefinitionProposal"
+      ],
+      "target_kinds": [
+        "ArchetypeVersion",
+        "WorkflowVersion",
+        "SkillVersion",
+        "RoleDefinitionVersion",
+        "ContextRecipeVersion",
+        "QualityBarVersion"
+      ],
+      "required": [
+        "owner",
+        "source_ref",
+        "provenance",
+        "observed_at",
+        "access_scope"
+      ],
+      "constraints": [
+        "authorize both endpoints and relationship on every hop",
+        "no raw client-supplied authority",
+        "same-kind supersession and acyclic replacement chains",
+        "cross-scope edges require explicit authorized mount"
+      ]
+    },
+    {
+      "type": "implements",
+      "source_kinds": [
+        "Task",
+        "DesignRecord"
+      ],
+      "target_kinds": [
+        "Requirement",
+        "ContractVersion"
+      ],
+      "required": [
+        "owner",
+        "source_ref",
+        "provenance",
+        "observed_at",
+        "access_scope"
+      ],
+      "constraints": [
+        "authorize both endpoints"
+      ]
+    },
+    {
+      "type": "requires",
+      "source_kinds": [
+        "Task",
+        "ExecutionBinding",
+        "SkillVersion",
+        "ProcedureVersion"
+      ],
+      "target_kinds": [
+        "Need",
+        "ContractVersion",
+        "ServiceConnection"
+      ],
+      "required": [
+        "owner",
+        "source_ref",
+        "provenance",
+        "observed_at",
+        "access_scope"
+      ],
+      "constraints": [
+        "not a prose citation gate; declared dependency only"
+      ]
+    }
+  ]
+}

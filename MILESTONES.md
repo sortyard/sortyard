@@ -1,5 +1,9 @@
 # Sortyard — Milestone Map
 
+> Historical architecture/planning record. The current requirements and dependency order
+> are in the [ecosystem requirements baseline](docs/requirements/README.md). Read this record for provenance;
+> it does not override the consolidated baseline or current Plane execution state.
+
 Current substrate planning: [SY-DEC-004](docs/decisions/appwrite-substrate.md) selects
 Appwrite persistence and human auth as the preferred target. Qualify transactions and immutable
 history, implement the native adapter/schema, integrate Auth/Teams, then rehearse a one-writer

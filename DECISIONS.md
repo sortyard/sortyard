@@ -28,3 +28,22 @@ The current code and deployed release still use the original Postgres backend.
 - **Current implementation:** Postgres remains authoritative until the reviewed migration;
   this decision provisions no credentials, changes no live data and does not adopt Cloud-only
   OAuth-server features.
+
+## SY-DEC-005 — Composed ecosystem control plane (2026-11-15)
+
+- **Owner direction:** one control plane for the harness ecosystem, with both an operator
+  UI and public APIs through which agents act on the operator's behalf.
+- **Decision:** formalize scoped, versioned resources and relationships; route UI, REST,
+  MCP and CLI through the same authorized actions. Retain each service's authority until
+  an explicit single-writer handover. Standing delegation narrows live operator grants.
+- **Boundaries:** CortexPlane owns outer goals/processes; Walwarden owns memory; Ranker
+  owns ranking; Closer owns commitments. Existing policy families remain with the policy
+  engine while Sortyard integrates inspection, evaluation and attributable scoped writes.
+- **Alternatives:** a dashboard alone leaves agents and automation fragmented; copying all
+  partner data and logic into Sortyard creates competing writers and loses owner semantics.
+  A composed API provides one discoverable surface without either limitation.
+- **Requirements and contracts:** [consolidated baseline](docs/requirements/README.md).
+  Its capability catalog is planned, not evidence that handlers are installed.
+- **Delivery:** connected project operations precede native execution replacement; reviewed
+  CI/GitOps remains the release path. Appwrite qualification is substrate evidence, not
+  authorization to migrate production state or retire meta-harness.

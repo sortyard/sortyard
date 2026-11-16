@@ -1,0 +1,1792 @@
+{
+  "status": "planned_contract",
+  "actions": [
+    {
+      "id": "task.create",
+      "target_kind": "Project",
+      "arguments_schema": "TaskArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-tracker",
+      "allowed_roles": [
+        "operator",
+        "admin",
+        "intake",
+        "groomer"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": false,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "server resolves identity, delegation and current scope",
+        "registered owner validates authoritative transition",
+        "replay rechecks authority",
+        "no direct client-supplied upstream URL or system actor"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "task.requeue",
+      "target_kind": "Task",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-tracker",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "server resolves identity, delegation and current scope",
+        "registered owner validates authoritative transition",
+        "replay rechecks authority",
+        "no direct client-supplied upstream URL or system actor"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "task.cancel",
+      "target_kind": "Task",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-tracker",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "server resolves identity, delegation and current scope",
+        "registered owner validates authoritative transition",
+        "replay rechecks authority",
+        "no direct client-supplied upstream URL or system actor"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "task.request_release",
+      "target_kind": "Task",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-tracker",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "server resolves identity, delegation and current scope",
+        "registered owner validates authoritative transition",
+        "replay rechecks authority",
+        "no direct client-supplied upstream URL or system actor"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "grooming.request",
+      "target_kind": "Project",
+      "arguments_schema": "GroomArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-execution",
+      "allowed_roles": [
+        "operator",
+        "admin",
+        "groomer"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": false,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "server resolves identity, delegation and current scope",
+        "registered owner validates authoritative transition",
+        "replay rechecks authority",
+        "no direct client-supplied upstream URL or system actor"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "triage.request_repair",
+      "target_kind": "TriageCase",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-execution",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "server resolves identity, delegation and current scope",
+        "registered owner validates authoritative transition",
+        "replay rechecks authority",
+        "no direct client-supplied upstream URL or system actor"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "policy.propose",
+      "target_kind": "Policy",
+      "arguments_schema": "PolicyArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-policy",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "server resolves identity, delegation and current scope",
+        "registered owner validates authoritative transition",
+        "replay rechecks authority",
+        "no direct client-supplied upstream URL or system actor"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "policy.edit",
+      "target_kind": "Policy",
+      "arguments_schema": "PolicyArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-policy",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "server resolves identity, delegation and current scope",
+        "registered owner validates authoritative transition",
+        "replay rechecks authority",
+        "no direct client-supplied upstream URL or system actor"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "policy.promote",
+      "target_kind": "Policy",
+      "arguments_schema": "PolicyArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-policy",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "policy-governed",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "server resolves identity, delegation and current scope",
+        "registered owner validates authoritative transition",
+        "replay rechecks authority",
+        "no direct client-supplied upstream URL or system actor"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "policy.evaluate",
+      "target_kind": "Project",
+      "arguments_schema": "EvaluatePolicyArguments",
+      "result_schema": "PolicyDecision",
+      "authority_owner": "registered-decision-consumer",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "server resolves identity, delegation and current scope",
+        "registered owner validates authoritative transition",
+        "replay rechecks authority",
+        "no direct client-supplied upstream URL or system actor"
+      ],
+      "read_only": true,
+      "api_operation_id": "evaluatePolicySnapshot"
+    },
+    {
+      "id": "definition.propose",
+      "target_kind": "Project",
+      "arguments_schema": "DefinitionArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-definition",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": false,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "server resolves identity, delegation and current scope",
+        "registered owner validates authoritative transition",
+        "replay rechecks authority",
+        "no direct client-supplied upstream URL or system actor"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "definition.publish",
+      "target_kind": "DefinitionProposal",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-definition",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "policy-governed",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "server resolves identity, delegation and current scope",
+        "registered owner validates authoritative transition",
+        "replay rechecks authority",
+        "no direct client-supplied upstream URL or system actor"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "definition.adopt",
+      "target_kind": "Project",
+      "arguments_schema": "AdoptArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-definition",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "policy-governed",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "server resolves identity, delegation and current scope",
+        "registered owner validates authoritative transition",
+        "replay rechecks authority",
+        "no direct client-supplied upstream URL or system actor"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "delegation.issue",
+      "target_kind": "Workspace",
+      "arguments_schema": "GrantArguments",
+      "result_schema": "Operation",
+      "authority_owner": "sortyard",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "authorization-governed",
+      "requires_expected_revision": false,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "server resolves identity, delegation and current scope",
+        "registered owner validates authoritative transition",
+        "replay rechecks authority",
+        "no direct client-supplied upstream URL or system actor"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "delegation.revoke",
+      "target_kind": "CapabilityGrant",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "sortyard",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "authorization-governed",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "server resolves identity, delegation and current scope",
+        "registered owner validates authoritative transition",
+        "replay rechecks authority",
+        "no direct client-supplied upstream URL or system actor"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "improvement.pursue",
+      "target_kind": "ImprovementProposal",
+      "arguments_schema": "PursueArguments",
+      "result_schema": "Operation",
+      "authority_owner": "sortyard+partner-services",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "server resolves identity, delegation and current scope",
+        "registered owner validates authoritative transition",
+        "replay rechecks authority",
+        "no direct client-supplied upstream URL or system actor"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "adoption.observe",
+      "target_kind": "Adoption",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-observer",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "server resolves identity, delegation and current scope",
+        "registered owner validates authoritative transition",
+        "replay rechecks authority",
+        "no direct client-supplied upstream URL or system actor"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "deployment.request_promotion",
+      "target_kind": "Project",
+      "arguments_schema": "ReleaseArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-native-release",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "release-governed",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "server resolves identity, delegation and current scope",
+        "registered owner validates authoritative transition",
+        "replay rechecks authority",
+        "no direct client-supplied upstream URL or system actor"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "operation.request_cancel",
+      "target_kind": "Operation",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "sortyard",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "server resolves identity, delegation and current scope",
+        "registered owner validates authoritative transition",
+        "replay rechecks authority",
+        "no direct client-supplied upstream URL or system actor"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "lane.configure",
+      "target_kind": "Lane",
+      "arguments_schema": "LaneArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-execution",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "policy-governed",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "current issuer, scope, membership and source-owner policy intersect",
+        "no privileged backdoor for a transport",
+        "execute at registered authoritative owner"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "agent.configure",
+      "target_kind": "AgentDefinition",
+      "arguments_schema": "AgentArguments",
+      "result_schema": "Operation",
+      "authority_owner": "sortyard",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "policy-governed",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "current issuer, scope, membership and source-owner policy intersect",
+        "no privileged backdoor for a transport",
+        "execute at registered authoritative owner"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "mechanism.configure",
+      "target_kind": "Mechanism",
+      "arguments_schema": "MechanismArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-mechanism",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "policy-governed",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "current issuer, scope, membership and source-owner policy intersect",
+        "no privileged backdoor for a transport",
+        "execute at registered authoritative owner"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "triage.classify",
+      "target_kind": "TriageCase",
+      "arguments_schema": "TriageArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-execution",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "current issuer, scope, membership and source-owner policy intersect",
+        "no privileged backdoor for a transport",
+        "execute at registered authoritative owner"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "triage.close",
+      "target_kind": "TriageCase",
+      "arguments_schema": "TriageArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-execution",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "current issuer, scope, membership and source-owner policy intersect",
+        "no privileged backdoor for a transport",
+        "execute at registered authoritative owner"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "membership.invite",
+      "target_kind": "Workspace",
+      "arguments_schema": "MembershipArguments",
+      "result_schema": "Operation",
+      "authority_owner": "appwrite-membership",
+      "allowed_roles": [
+        "admin"
+      ],
+      "risk": "authorization-governed",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "current issuer, scope, membership and source-owner policy intersect",
+        "no privileged backdoor for a transport",
+        "execute at registered authoritative owner"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "membership.change_role",
+      "target_kind": "Workspace",
+      "arguments_schema": "MembershipArguments",
+      "result_schema": "Operation",
+      "authority_owner": "appwrite-membership",
+      "allowed_roles": [
+        "admin"
+      ],
+      "risk": "authorization-governed",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "current issuer, scope, membership and source-owner policy intersect",
+        "no privileged backdoor for a transport",
+        "execute at registered authoritative owner"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "membership.remove",
+      "target_kind": "Workspace",
+      "arguments_schema": "MembershipArguments",
+      "result_schema": "Operation",
+      "authority_owner": "appwrite-membership",
+      "allowed_roles": [
+        "admin"
+      ],
+      "risk": "authorization-governed",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "current issuer, scope, membership and source-owner policy intersect",
+        "no privileged backdoor for a transport",
+        "execute at registered authoritative owner"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "connection.configure",
+      "target_kind": "ServiceConnection",
+      "arguments_schema": "ConnectionArguments",
+      "result_schema": "Operation",
+      "authority_owner": "sortyard",
+      "allowed_roles": [
+        "admin"
+      ],
+      "risk": "authorization-governed",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "current issuer, scope, membership and source-owner policy intersect",
+        "no privileged backdoor for a transport",
+        "execute at registered authoritative owner"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "adoption.revert",
+      "target_kind": "Adoption",
+      "arguments_schema": "AdoptArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-definition",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "policy-governed",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "implementation": "planned",
+      "invariants": [
+        "current issuer, scope, membership and source-owner policy intersect",
+        "no privileged backdoor for a transport",
+        "execute at registered authoritative owner"
+      ],
+      "api_operation_id": "executeOperatorAction"
+    },
+    {
+      "id": "task.update",
+      "target_kind": "Task",
+      "arguments_schema": "TaskPatchArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-tracker",
+      "allowed_roles": [
+        "operator",
+        "admin",
+        "groomer"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "current scope and state authorization",
+        "protected fields and system actor cannot be client-edited",
+        "registered source retains authority"
+      ]
+    },
+    {
+      "id": "task.sequence",
+      "target_kind": "Project",
+      "arguments_schema": "SequenceArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-tracker",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "current scope and state authorization",
+        "protected fields and system actor cannot be client-edited",
+        "registered source retains authority"
+      ]
+    },
+    {
+      "id": "task.link",
+      "target_kind": "Task",
+      "arguments_schema": "LinkArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-tracker",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "current scope and state authorization",
+        "protected fields and system actor cannot be client-edited",
+        "registered source retains authority"
+      ]
+    },
+    {
+      "id": "task.note",
+      "target_kind": "Task",
+      "arguments_schema": "NoteArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-tracker",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": false,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "current scope and state authorization",
+        "protected fields and system actor cannot be client-edited",
+        "registered source retains authority"
+      ]
+    },
+    {
+      "id": "task.block",
+      "target_kind": "Task",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-tracker",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "current scope and state authorization",
+        "protected fields and system actor cannot be client-edited",
+        "registered source retains authority"
+      ]
+    },
+    {
+      "id": "task.unblock",
+      "target_kind": "Task",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-tracker",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "current scope and state authorization",
+        "protected fields and system actor cannot be client-edited",
+        "registered source retains authority"
+      ]
+    },
+    {
+      "id": "decision.answer",
+      "target_kind": "Decision",
+      "arguments_schema": "DecisionArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-decision",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "current scope and state authorization",
+        "protected fields and system actor cannot be client-edited",
+        "registered source retains authority",
+        "Action-plan approval Decisions require approval.plan_ref/hash/revision matching the stored immutable approval binding; ordinary Decisions reject approval payloads",
+        "Only an authorized approver can approve/reject a current unexpired exact plan; edits supersede the old plan and invalidate its Decision",
+        "Approval Decision answer atomically moves its plan from approval_required to approved or rejected; no expiry/default can grant approval",
+        "Approval Decision scope must match the bound ActionPlan workspace and optional project; a project grant cannot authorize a workspace action"
+      ]
+    },
+    {
+      "id": "project.create",
+      "target_kind": "Workspace",
+      "arguments_schema": "ProjectArguments",
+      "result_schema": "Operation",
+      "authority_owner": "sortyard",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": false,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "current scope and state authorization",
+        "protected fields and system actor cannot be client-edited",
+        "registered source retains authority"
+      ]
+    },
+    {
+      "id": "extension.register",
+      "target_kind": "Workspace",
+      "arguments_schema": "DefinitionArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-definition",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": false,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "current scope and state authorization",
+        "protected fields and system actor cannot be client-edited",
+        "registered source retains authority"
+      ]
+    },
+    {
+      "id": "extension.enable",
+      "target_kind": "ExtensionRegistration",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-definition",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "current scope and state authorization",
+        "protected fields and system actor cannot be client-edited",
+        "registered source retains authority"
+      ]
+    },
+    {
+      "id": "extension.disable",
+      "target_kind": "ExtensionRegistration",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-definition",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "ordinary",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "current scope and state authorization",
+        "protected fields and system actor cannot be client-edited",
+        "registered source retains authority"
+      ]
+    },
+    {
+      "id": "project.pause",
+      "target_kind": "Project",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-execution",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "policy-governed",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "resolve current actor, delegation, target revision and registered owner capability",
+        "owner performs the fenced effect and returns observed receipt; unsupported owner capability is unavailable, never a shell fallback",
+        "Pause new project admissions through the registered owner; existing attempts are not falsely reported stopped. Resume re-evaluates readiness/current policy before new admissions."
+      ]
+    },
+    {
+      "id": "project.resume",
+      "target_kind": "Project",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-execution",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "policy-governed",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "resolve current actor, delegation, target revision and registered owner capability",
+        "owner performs the fenced effect and returns observed receipt; unsupported owner capability is unavailable, never a shell fallback",
+        "Resume project admissions through the registered owner; does not release work past current readiness/policy guards."
+      ]
+    },
+    {
+      "id": "chain.stop",
+      "target_kind": "Chain",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-execution",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "policy-governed",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "resolve current actor, delegation, target revision and registered owner capability",
+        "owner performs the fenced effect and returns observed receipt; unsupported owner capability is unavailable, never a shell fallback",
+        "Request bounded stop at the registered controller; owner records whether attempts actually stopped. No client-supplied chain epoch or fabricated system actor."
+      ]
+    },
+    {
+      "id": "chain.resume",
+      "target_kind": "Chain",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-execution",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "policy-governed",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "resolve current actor, delegation, target revision and registered owner capability",
+        "owner performs the fenced effect and returns observed receipt; unsupported owner capability is unavailable, never a shell fallback",
+        "Resume only an owner-confirmed stopped/stalled chain with current lease/epoch and preflight; never replay a completed stage result as a fresh attempt."
+      ]
+    },
+    {
+      "id": "job.run",
+      "target_kind": "Project",
+      "arguments_schema": "JobArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-execution",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "policy-governed",
+      "requires_expected_revision": false,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "resolve current actor, delegation, target revision and registered owner capability",
+        "owner performs the fenced effect and returns observed receipt; unsupported owner capability is unavailable, never a shell fallback",
+        "Create one kind=job task on the default branch and request ordinary guarded release. No branch/change request and no direct claim bypass."
+      ]
+    },
+    {
+      "id": "need.discharge",
+      "target_kind": "Need",
+      "arguments_schema": "NeedArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-need-owner",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "policy-governed",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "resolve current actor, delegation, target revision and registered owner capability",
+        "owner performs the fenced effect and returns observed receipt; unsupported owner capability is unavailable, never a shell fallback",
+        "Registered need owner verifies declared satisfaction evidence and authority; cannot discharge a credential/public/spending premise by agent assertion."
+      ]
+    },
+    {
+      "id": "workspace.export",
+      "target_kind": "Workspace",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-export-owner",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "policy-governed",
+      "requires_expected_revision": false,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "resolve current actor, delegation, target revision and registered owner capability",
+        "owner performs the fenced effect and returns observed receipt; unsupported owner capability is unavailable, never a shell fallback",
+        "Create a permission-filtered immutable export artifact through the owner; retain each source checkpoint and current authorization."
+      ]
+    },
+    {
+      "id": "workspace.backup",
+      "target_kind": "Workspace",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-native-backup",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "provider-governed",
+      "requires_expected_revision": false,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "resolve current actor, delegation, target revision and registered owner capability",
+        "owner performs the fenced effect and returns observed receipt; unsupported owner capability is unavailable, never a shell fallback",
+        "Request native provider backup only if the installed owner contract supports it. Provider snapshot/custody and authorization remain with that owner; no custom backup shell path."
+      ]
+    }
+  ],
+  "approval_contract": {
+    "resource_kind": "Decision",
+    "decision_kind": "action_plan_approval",
+    "answer_action": "decision.answer",
+    "answer_schema": "DecisionArguments",
+    "binding_schema": "PlanApprovalBinding",
+    "plan_kind": "ActionPlan",
+    "options": {
+      "approve": "approved",
+      "reject": "rejected"
+    },
+    "guards": [
+      "exact_plan_hash",
+      "exact_plan_revision",
+      "unexpired",
+      "current_approver_authority",
+      "no_default_approval"
+    ],
+    "editing": "prepareActionPlan with plan_ref creates a new normalized plan, supersedes the prior plan and invalidates its approval Decision; it does not edit approved content in place",
+    "scope": "Decision inherits the exact ActionPlan workspace and optional project binding; workspace actions require workspace authority, never a dummy project."
+  },
+  "operator_capability_coverage": [
+    {
+      "capability": "task.file",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "executeOperatorAction"
+      ],
+      "action_ids": [
+        "task.create"
+      ],
+      "semantics": "Execute through the same current-authority public domain contract."
+    },
+    {
+      "capability": "task.add",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "executeOperatorAction"
+      ],
+      "action_ids": [
+        "task.create"
+      ],
+      "semantics": "Execute through the same current-authority public domain contract."
+    },
+    {
+      "capability": "task.edit",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "executeOperatorAction"
+      ],
+      "action_ids": [
+        "task.update"
+      ],
+      "semantics": "Execute through the same current-authority public domain contract."
+    },
+    {
+      "capability": "task.move",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "executeOperatorAction"
+      ],
+      "action_ids": [
+        "task.sequence"
+      ],
+      "semantics": "Execute through the same current-authority public domain contract."
+    },
+    {
+      "capability": "task.note",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "executeOperatorAction"
+      ],
+      "action_ids": [
+        "task.note"
+      ],
+      "semantics": "Execute through the same current-authority public domain contract."
+    },
+    {
+      "capability": "requeue",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "executeOperatorAction"
+      ],
+      "action_ids": [
+        "task.requeue"
+      ],
+      "semantics": "Execute through the same current-authority public domain contract."
+    },
+    {
+      "capability": "cancel",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "executeOperatorAction"
+      ],
+      "action_ids": [
+        "task.cancel"
+      ],
+      "semantics": "Execute through the same current-authority public domain contract."
+    },
+    {
+      "capability": "job.run",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "executeOperatorAction"
+      ],
+      "action_ids": [
+        "job.run"
+      ],
+      "semantics": "Execute through the same current-authority public domain contract."
+    },
+    {
+      "capability": "decision.answer",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "executeOperatorAction"
+      ],
+      "action_ids": [
+        "decision.answer"
+      ],
+      "semantics": "Execute through the same current-authority public domain contract."
+    },
+    {
+      "capability": "needs.discharge",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "executeOperatorAction"
+      ],
+      "action_ids": [
+        "need.discharge"
+      ],
+      "semantics": "Execute through the same current-authority public domain contract."
+    },
+    {
+      "capability": "lanes.set",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "executeOperatorAction"
+      ],
+      "action_ids": [
+        "lane.configure"
+      ],
+      "semantics": "Execute through the same current-authority public domain contract."
+    },
+    {
+      "capability": "pause",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "executeOperatorAction"
+      ],
+      "action_ids": [
+        "project.pause"
+      ],
+      "semantics": "Execute through the same current-authority public domain contract."
+    },
+    {
+      "capability": "resume",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "executeOperatorAction"
+      ],
+      "action_ids": [
+        "project.resume"
+      ],
+      "semantics": "Execute through the same current-authority public domain contract."
+    },
+    {
+      "capability": "export",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "executeOperatorAction"
+      ],
+      "action_ids": [
+        "workspace.export"
+      ],
+      "semantics": "Execute through the same current-authority public domain contract."
+    },
+    {
+      "capability": "backup",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "executeOperatorAction"
+      ],
+      "action_ids": [
+        "workspace.backup"
+      ],
+      "semantics": "Execute through the same current-authority public domain contract."
+    },
+    {
+      "capability": "task.get",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "listScopedResources",
+        "getScopedResource"
+      ],
+      "action_ids": [],
+      "semantics": "Read the authorized Task/Lane/Decision/Need/Mechanism/PolicyDecision or audit resources relevant to this command; unknown coverage remains explicit."
+    },
+    {
+      "capability": "task.list",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "listScopedResources",
+        "getScopedResource"
+      ],
+      "action_ids": [],
+      "semantics": "Read the authorized Task/Lane/Decision/Need/Mechanism/PolicyDecision or audit resources relevant to this command; unknown coverage remains explicit."
+    },
+    {
+      "capability": "pickup.status",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "listScopedResources",
+        "getScopedResource"
+      ],
+      "action_ids": [],
+      "semantics": "Read the authorized Task/Lane/Decision/Need/Mechanism/PolicyDecision or audit resources relevant to this command; unknown coverage remains explicit."
+    },
+    {
+      "capability": "queue",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "listScopedResources",
+        "getScopedResource"
+      ],
+      "action_ids": [],
+      "semantics": "Read the authorized Task/Lane/Decision/Need/Mechanism/PolicyDecision or audit resources relevant to this command; unknown coverage remains explicit."
+    },
+    {
+      "capability": "why",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "listScopedResources",
+        "getScopedResource"
+      ],
+      "action_ids": [],
+      "semantics": "Read the authorized Task/Lane/Decision/Need/Mechanism/PolicyDecision or audit resources relevant to this command; unknown coverage remains explicit."
+    },
+    {
+      "capability": "decision.list",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "listScopedResources",
+        "getScopedResource"
+      ],
+      "action_ids": [],
+      "semantics": "Read the authorized Task/Lane/Decision/Need/Mechanism/PolicyDecision or audit resources relevant to this command; unknown coverage remains explicit."
+    },
+    {
+      "capability": "needs.list",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "listScopedResources",
+        "getScopedResource"
+      ],
+      "action_ids": [],
+      "semantics": "Read the authorized Task/Lane/Decision/Need/Mechanism/PolicyDecision or audit resources relevant to this command; unknown coverage remains explicit."
+    },
+    {
+      "capability": "lanes.get",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "listScopedResources",
+        "getScopedResource"
+      ],
+      "action_ids": [],
+      "semantics": "Read the authorized Task/Lane/Decision/Need/Mechanism/PolicyDecision or audit resources relevant to this command; unknown coverage remains explicit."
+    },
+    {
+      "capability": "audit",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "listScopedResources",
+        "getScopedResource"
+      ],
+      "action_ids": [],
+      "semantics": "Read the authorized Task/Lane/Decision/Need/Mechanism/PolicyDecision or audit resources relevant to this command; unknown coverage remains explicit."
+    },
+    {
+      "capability": "health",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "listScopedResources",
+        "getScopedResource"
+      ],
+      "action_ids": [],
+      "semantics": "Read the authorized Task/Lane/Decision/Need/Mechanism/PolicyDecision or audit resources relevant to this command; unknown coverage remains explicit."
+    },
+    {
+      "capability": "apply",
+      "requirement_ids": [
+        "CLI-002"
+      ],
+      "api_operations": [
+        "prepareActionPlan",
+        "executeOperatorAction"
+      ],
+      "action_ids": [
+        "definition.propose",
+        "definition.publish",
+        "definition.adopt"
+      ],
+      "semantics": "Validate/propose each definition, observe reviewed publication, then separately adopt pinned versions; source-owner gates and child receipts remain explicit."
+    },
+    {
+      "capability": "lanes.configure",
+      "requirement_ids": [
+        "UI-008"
+      ],
+      "api_operations": [
+        "prepareActionPlan",
+        "executeOperatorAction"
+      ],
+      "action_ids": [
+        "lane.configure",
+        "project.pause",
+        "project.resume"
+      ],
+      "semantics": "Execute through the same current-authority public domain contract."
+    },
+    {
+      "capability": "chain.requeue",
+      "requirement_ids": [
+        "UI-010"
+      ],
+      "api_operations": [
+        "listScopedResources",
+        "getScopedResource",
+        "executeOperatorAction"
+      ],
+      "action_ids": [
+        "task.requeue"
+      ],
+      "semantics": "Resolve the chain task_ref and current task revision, then request guarded requeue."
+    },
+    {
+      "capability": "chain.cancel",
+      "requirement_ids": [
+        "UI-010"
+      ],
+      "api_operations": [
+        "listScopedResources",
+        "getScopedResource",
+        "executeOperatorAction"
+      ],
+      "action_ids": [
+        "task.cancel"
+      ],
+      "semantics": "Resolve the chain task_ref and current revision, then request cancellation; observed effects remain explicit."
+    },
+    {
+      "capability": "chain.stop",
+      "requirement_ids": [
+        "UI-010"
+      ],
+      "api_operations": [
+        "executeOperatorAction"
+      ],
+      "action_ids": [
+        "chain.stop"
+      ],
+      "semantics": "Execute through the same current-authority public domain contract."
+    },
+    {
+      "capability": "chain.resume",
+      "requirement_ids": [
+        "UI-010"
+      ],
+      "api_operations": [
+        "executeOperatorAction"
+      ],
+      "action_ids": [
+        "chain.resume"
+      ],
+      "semantics": "Execute through the same current-authority public domain contract."
+    },
+    {
+      "capability": "plan.approve",
+      "requirement_ids": [
+        "IAM-012",
+        "UI-026"
+      ],
+      "api_operations": [
+        "prepareActionPlan",
+        "executeOperatorAction"
+      ],
+      "action_ids": [
+        "decision.answer"
+      ],
+      "semantics": "Resolve the plan approval_ref Decision; answer approve with exact binding hash/revision and live approver authority."
+    },
+    {
+      "capability": "plan.reject",
+      "requirement_ids": [
+        "IAM-012",
+        "UI-026"
+      ],
+      "api_operations": [
+        "executeOperatorAction"
+      ],
+      "action_ids": [
+        "decision.answer"
+      ],
+      "semantics": "Answer the approval Decision reject; invalidate execution permission for that plan."
+    },
+    {
+      "capability": "plan.edit",
+      "requirement_ids": [
+        "IAM-012",
+        "UI-026"
+      ],
+      "api_operations": [
+        "prepareActionPlan"
+      ],
+      "action_ids": [],
+      "semantics": "Prepare a replacement with prior plan_ref; supersede/invalidate the old plan and its approval atomically, then obtain a new approval only if policy requires one."
+    }
+  ]
+}
