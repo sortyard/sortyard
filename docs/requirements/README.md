@@ -1,6 +1,7 @@
 # Sortyard ecosystem requirements baseline
 
-Status: approved. Independent [technical review](evidence/technical-review.md) passed. This is the current consolidated planning baseline. It replaces
+Status: approved. The [operating-process extension review](evidence/operating-process-review.md)
+and [prior baseline review](evidence/technical-review.md) are preserved. This is the current consolidated planning baseline. It replaces
 PR7's November12 draft assumptions and incorporates the owner's November15 operator/agent,
 meta-harness domain and Appwrite directions, plus the current company ownership map (source date
 November16). The existing product is still the Phase1 implementation; this baseline declares
@@ -20,6 +21,7 @@ families. Sortyard formalizes harness governance, delivery and the relationships
 | [Requirements catalog](catalog.md) / [machine index](requirements.json) | Every retained requirement ID, explicit amendment and new requirement, with acceptance/provenance |
 | [Domain model](domain-model.md) | Meta-harness artifacts as typed resources; fields, scope, lifecycle, inheritance and graph |
 | [API and delegation](operator-api.md) | Equal UI/agent action surface, standing delegation, revisions, events and evidence |
+| [Operating processes](operating-processes.md) | First-class triage/self-heal actors, versioned processes, seeds and consumer coverage |
 | [Service integrations](integrations.md) | Policy engine and partner ownership, contracts, gaps and authority handover |
 | [Delivery plan](delivery-plan.md) / [machine plan](plan.json) | Dependency-ordered increments and their acceptance; no calendar/task-count estimates |
 | [Legacy reconciliation](reconciliation.json) | All original333 IDs retained or explicitly amended; none silently removed |

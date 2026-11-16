@@ -1,7 +1,7 @@
 # Current requirements catalog
 
 Generated from requirements-source.json; historical draft is provenance only.
-378 requirements; 333 original IDs preserved; 46 explicit amendments.
+384 requirements; 333 original IDs preserved; 46 explicit amendments.
 
 Implementation status is requirement-only. Native/runtime capability discovery is separate.
 
@@ -5993,3 +5993,75 @@ The policy owner exposes a policy-only authenticated writer scope and verified g
 - AC3: An accepted proposal/edit/promotion links original authority, gateway identity and source version/receipt.
 
 Source: Inspected current policy API _policy_post: conductor writer and hard-coded conductor actor; current owner operator-agent requirements.
+
+<a id="OPS-005"></a>
+## OPS-005 — First-class operational actors
+
+**MS2 · MUST · new**
+
+Named detector, classifier, diagnostician, repair executor, verifier, groomer and coordinator actors have stable identity, responsible operator, executor binding, scoped grants and enabled/paused/retired lifecycle. Actors may be deterministic services or agents; a persona grants no privileges.
+
+- AC1: The same actor status/configuration/actions are visible through operator UI and delegated-agent discovery.
+- AC2: Actor registration cannot mint grants or inherit cluster/conductor credentials; revocation prevents new effects.
+
+Source: Owner operating-process direction, 2026-11-16 UTC; operating-processes.md and pinned legacy source evidence.
+
+<a id="OPS-006"></a>
+## OPS-006 — Versioned operating processes and runs
+
+**MS2 · MUST · new**
+
+OperationalProcessVersion declares trigger correlation, actor roles, stage graph, owner actions, policy decision points, verification and escalation. OperationalProcessRun pins it and records actual bindings, lease epoch, budgets and evidence while linking existing cases/attempts/operations.
+
+- AC1: A run displays which actor owns each stage and the policy/definition versions used.
+- AC2: Duplicate trigger delivery creates one active owner/run; alias/restart cannot erase history or budget.
+
+Source: Owner operating-process direction, 2026-11-16 UTC; operating-processes.md and pinned legacy source evidence.
+
+<a id="OPS-007"></a>
+## OPS-007 — Seeded policies with consumer coverage
+
+**MS2 · MUST · new**
+
+Install source-neutral versioned triage/self-heal seed templates with provenance, typed parameters, compatible consumer contracts and absent-policy behavior. Installation, proposal, adoption and enforcement activation are distinct. A parameter is effective only when its bound consumer declares and tests that exact parameter.
+
+- AC1: A copied policy with no compatible installed consumer is visibly unsupported, never an active guard.
+- AC2: Upgrades preserve local overrides and approved policy authority; no auto-promotion or overwriting live families.
+
+Source: Owner operating-process direction, 2026-11-16 UTC; operating-processes.md and pinned legacy source evidence.
+
+<a id="OPS-008"></a>
+## OPS-008 — Explicit triage and self-heal process catalog
+
+**MS2 · MUST · new**
+
+Seed delivery triage, diagnosis, bounded repair, cause-cleared return and mechanism-liveness processes. Classify product, infrastructure, transient, missing evidence/access, owner input and obsolete premise separately; preserve project holds and shared fault-domain incidents.
+
+- AC1: Infrastructure diagnosis cannot silently become infrastructure mutation; effect routes to a separately authorized owner.
+- AC2: Shared outages correlate without producing one speculative code fix per project; missing evidence stays unknown.
+
+Source: Owner operating-process direction, 2026-11-16 UTC; operating-processes.md and pinned legacy source evidence.
+
+<a id="OPS-009"></a>
+## OPS-009 — Cumulative budgets and ambiguous-effect recovery
+
+**MS5 · MUST · new**
+
+Execute processes under one fenced owner with stage and cumulative attempt/time/token/external-effect budgets; owner command receipts retain committed/not_committed/unknown. Reconciliation precedes replay. Pauses, new leases, process versions and child runs cannot reset the originating case budget.
+
+- AC1: Restart/lease takeover/child run cannot exceed the same original case budget or duplicate an unknown effect.
+- AC2: Exhaustion parks/escalates to a named owner under existing authority without a hidden infinite repair loop.
+
+Source: Owner operating-process direction, 2026-11-16 UTC; operating-processes.md and pinned legacy source evidence.
+
+<a id="OPS-010"></a>
+## OPS-010 — Evidence-based recovery and process improvement
+
+**MS5 · MUST · new**
+
+A registered verifier must observe fresh positive evidence for the exact condition/revision before recovery. Agent exit, merged code, acknowledgement, cancelled workflow and healthy API do not prove recovered product delivery. Failed processes emit owned conditions and improvement proposals through the normal version/publication/adoption loop.
+
+- AC1: Obsolete premise closes as premise_removed rather than recovered; verification cannot consume the actor self-attestation alone.
+- AC2: Changed policy/procedure requires normal publication/adoption; repair actors cannot weaken their own guards.
+
+Source: Owner operating-process direction, 2026-11-16 UTC; operating-processes.md and pinned legacy source evidence.

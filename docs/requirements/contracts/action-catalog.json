@@ -1320,6 +1320,288 @@
         "owner performs the fenced effect and returns observed receipt; unsupported owner capability is unavailable, never a shell fallback",
         "Request native provider backup only if the installed owner contract supports it. Provider snapshot/custody and authorization remain with that owner; no custom backup shell path."
       ]
+    },
+    {
+      "id": "actor.register",
+      "target_kind": "Workspace",
+      "arguments_schema": "OperationalActorArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-process-owner",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "governed-operation",
+      "requires_expected_revision": false,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "Server resolves live authority and actor grants; registration is not permission issuance.",
+        "Process owner validates pinned version, trigger identity, subject scope, fence and cumulative budget.",
+        "Pause/cancel records actual effect; it does not undo an accepted owner operation.",
+        "Resume cannot reset budgets, revive revoked grants or replay an unknown external effect."
+      ]
+    },
+    {
+      "id": "actor.configure",
+      "target_kind": "OperationalActor",
+      "arguments_schema": "OperationalActorArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-process-owner",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "governed-operation",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "Server resolves live authority and actor grants; registration is not permission issuance.",
+        "Process owner validates pinned version, trigger identity, subject scope, fence and cumulative budget.",
+        "Pause/cancel records actual effect; it does not undo an accepted owner operation.",
+        "Resume cannot reset budgets, revive revoked grants or replay an unknown external effect."
+      ]
+    },
+    {
+      "id": "actor.pause",
+      "target_kind": "OperationalActor",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-process-owner",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "governed-operation",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "Server resolves live authority and actor grants; registration is not permission issuance.",
+        "Process owner validates pinned version, trigger identity, subject scope, fence and cumulative budget.",
+        "Pause/cancel records actual effect; it does not undo an accepted owner operation.",
+        "Resume cannot reset budgets, revive revoked grants or replay an unknown external effect."
+      ]
+    },
+    {
+      "id": "actor.resume",
+      "target_kind": "OperationalActor",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-process-owner",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "governed-operation",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "Server resolves live authority and actor grants; registration is not permission issuance.",
+        "Process owner validates pinned version, trigger identity, subject scope, fence and cumulative budget.",
+        "Pause/cancel records actual effect; it does not undo an accepted owner operation.",
+        "Resume cannot reset budgets, revive revoked grants or replay an unknown external effect."
+      ]
+    },
+    {
+      "id": "process.start",
+      "target_kind": "OperationalProcessVersion",
+      "arguments_schema": "ProcessStartArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-process-owner",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "governed-operation",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "Server resolves live authority and actor grants; registration is not permission issuance.",
+        "Process owner validates pinned version, trigger identity, subject scope, fence and cumulative budget.",
+        "Pause/cancel records actual effect; it does not undo an accepted owner operation.",
+        "Resume cannot reset budgets, revive revoked grants or replay an unknown external effect."
+      ]
+    },
+    {
+      "id": "process.pause",
+      "target_kind": "OperationalProcessRun",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-process-owner",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "governed-operation",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "Server resolves live authority and actor grants; registration is not permission issuance.",
+        "Process owner validates pinned version, trigger identity, subject scope, fence and cumulative budget.",
+        "Pause/cancel records actual effect; it does not undo an accepted owner operation.",
+        "Resume cannot reset budgets, revive revoked grants or replay an unknown external effect."
+      ]
+    },
+    {
+      "id": "process.resume",
+      "target_kind": "OperationalProcessRun",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-process-owner",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "governed-operation",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "Server resolves live authority and actor grants; registration is not permission issuance.",
+        "Process owner validates pinned version, trigger identity, subject scope, fence and cumulative budget.",
+        "Pause/cancel records actual effect; it does not undo an accepted owner operation.",
+        "Resume cannot reset budgets, revive revoked grants or replay an unknown external effect."
+      ]
+    },
+    {
+      "id": "process.cancel",
+      "target_kind": "OperationalProcessRun",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-process-owner",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "governed-operation",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "Server resolves live authority and actor grants; registration is not permission issuance.",
+        "Process owner validates pinned version, trigger identity, subject scope, fence and cumulative budget.",
+        "Pause/cancel records actual effect; it does not undo an accepted owner operation.",
+        "Resume cannot reset budgets, revive revoked grants or replay an unknown external effect."
+      ]
+    },
+    {
+      "id": "actor.enable",
+      "target_kind": "OperationalActor",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-process-owner",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "governed-operation",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "Server resolves live authority and actor grants; registration is not permission issuance.",
+        "Process owner validates pinned version, trigger identity, subject scope, fence and cumulative budget.",
+        "Pause/cancel records actual effect; it does not undo an accepted owner operation.",
+        "Resume cannot reset budgets, revive revoked grants or replay an unknown external effect.",
+        "Draft -> enabled only after executor/capability/consumer qualification and live narrow grants."
+      ]
+    },
+    {
+      "id": "actor.retire",
+      "target_kind": "OperationalActor",
+      "arguments_schema": "ReasonArguments",
+      "result_schema": "Operation",
+      "authority_owner": "registered-process-owner",
+      "allowed_roles": [
+        "operator",
+        "admin"
+      ],
+      "risk": "governed-operation",
+      "requires_expected_revision": true,
+      "idempotency_required": true,
+      "transports": [
+        "ui",
+        "rest",
+        "mcp",
+        "cli"
+      ],
+      "api_operation_id": "executeOperatorAction",
+      "implementation": "planned",
+      "invariants": [
+        "Server resolves live authority and actor grants; registration is not permission issuance.",
+        "Process owner validates pinned version, trigger identity, subject scope, fence and cumulative budget.",
+        "Pause/cancel records actual effect; it does not undo an accepted owner operation.",
+        "Resume cannot reset budgets, revive revoked grants or replay an unknown external effect.",
+        "Draft/enabled/paused -> retired; refuse new work and preserve recorded in-flight effect disposition."
+      ]
     }
   ],
   "approval_contract": {

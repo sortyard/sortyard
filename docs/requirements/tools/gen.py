@@ -340,6 +340,54 @@ def render(source: dict, plan: dict) -> dict[str, str]:
     }
 
 
+def validate_operating_seeds(bundle: dict) -> list[str]:
+    """Seed files describe unbound templates, never live policy authority or grants."""
+    errors: list[str] = []
+    roles = {a["role"] for a in bundle["actor_templates"]}
+    policies = {p["id"] for p in bundle["policy_templates"]}
+    for category in ("actor_templates", "policy_templates", "process_templates"):
+        for identity in duplicates([item["id"] for item in bundle[category]]):
+            errors.append(f"duplicate operating seed {category}:{identity}")
+        for item in bundle[category]:
+            if item.get("binding_status") != "unbound":
+                errors.append(f"operating seed must remain unbound: {item['id']}")
+    for actor in bundle["actor_templates"]:
+        if actor.get("grants"):
+            errors.append(f"actor seed cannot grant authority: {actor['id']}")
+    for policy in bundle["policy_templates"]:
+        if policy.get("default_mode") != "record":
+            errors.append(f"seed cannot activate enforcement: {policy['id']}")
+        fields = set(policy["parameter_schema"]["properties"])
+        if fields != set(policy["consumer_contract"]["parameter_names"]):
+            errors.append(f"policy consumer parameter coverage differs: {policy['id']}")
+        if not set(policy["parameter_schema"]["required"]) <= fields:
+            errors.append(f"unknown required policy parameter: {policy['id']}")
+        if not set(policy["parameter_values"]) <= fields:
+            errors.append(f"unknown seed policy parameter: {policy['id']}")
+        if not policy.get("source_refs") or not policy.get("activation_requirements"):
+            errors.append(f"unproven operating policy seed: {policy['id']}")
+    dispositions = {"waiting", "recovered", "escalated", "premise_removed", "failed", "cancelled"}
+    for process in bundle["process_templates"]:
+        steps = {step["id"]: step for step in process["steps"]}
+        if len(steps) != len(process["steps"]) or process["initial_step"] not in steps:
+            errors.append(f"invalid process seed graph: {process['id']}")
+        if not set(process["required_policy_template_ids"]) <= policies:
+            errors.append(f"unknown process seed policy: {process['id']}")
+        for step in process["steps"]:
+            if step["role"] not in roles:
+                errors.append(f"unbound process seed role: {process['id']}:{step['id']}")
+            for verdict, targets in step["on"].items():
+                if not set(targets) <= set(steps) | dispositions:
+                    errors.append(f"unknown process seed transition: {process['id']}:{step['id']}")
+                if "recovered" in targets and (
+                    step["role"] != "verifier" or step["kind"] != "verify" or verdict != "success"
+                ):
+                    errors.append(
+                        f"recovery needs successful verifier: {process['id']}:{step['id']}"
+                    )
+    return errors
+
+
 def main() -> int:
     inputs = [
         read(ROOT, name)
@@ -355,6 +403,7 @@ def main() -> int:
         )
     ]
     errors = validate(*inputs)
+    errors.extend(validate_operating_seeds(read(ROOT, "seeds/operating-processes.json")))
     if errors:
         print("\n".join(errors), file=sys.stderr)
         return 1

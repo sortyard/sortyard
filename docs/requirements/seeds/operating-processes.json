@@ -1,0 +1,1098 @@
+{
+  "schema_version": "1",
+  "status": "approved_templates",
+  "implementation": "planned_not_installed",
+  "source_evidence": {
+    "harness": "noncelogic/k3s-harness@f7b4623d915ed183789ef1c35aa62ccfefd03bf2",
+    "paths": [
+      "control-plane/conductor/self_heal.py",
+      "control-plane/conductor/drive.py",
+      "control-plane/conductor/plane_sync.py",
+      "control-plane/conductor/recovery.py"
+    ],
+    "meta": "noncelogic/meta-harness@387ca00d37971dac78cce7e6ca7f6449f6926491",
+    "coverage_warning": "Declared policy fields are not necessarily consumed; contracts above are proposed normalized mappings, not installed capabilities."
+  },
+  "actor_templates": [
+    {
+      "id": "detector",
+      "role": "detector",
+      "executor_kinds_allowed": [
+        "controller",
+        "service",
+        "agent"
+      ],
+      "binding_status": "unbound",
+      "grants": [],
+      "responsibility": "Bind responsible operator and narrowly scoped executor before enabling. No authority follows from installing this template."
+    },
+    {
+      "id": "classifier",
+      "role": "classifier",
+      "executor_kinds_allowed": [
+        "controller",
+        "service",
+        "agent"
+      ],
+      "binding_status": "unbound",
+      "grants": [],
+      "responsibility": "Bind responsible operator and narrowly scoped executor before enabling. No authority follows from installing this template."
+    },
+    {
+      "id": "diagnostician",
+      "role": "diagnostician",
+      "executor_kinds_allowed": [
+        "agent"
+      ],
+      "binding_status": "unbound",
+      "grants": [],
+      "responsibility": "Bind responsible operator and narrowly scoped executor before enabling. No authority follows from installing this template."
+    },
+    {
+      "id": "repair_executor",
+      "role": "repair_executor",
+      "executor_kinds_allowed": [
+        "controller",
+        "service",
+        "agent"
+      ],
+      "binding_status": "unbound",
+      "grants": [],
+      "responsibility": "Bind responsible operator and narrowly scoped executor before enabling. No authority follows from installing this template."
+    },
+    {
+      "id": "verifier",
+      "role": "verifier",
+      "executor_kinds_allowed": [
+        "controller",
+        "service",
+        "agent"
+      ],
+      "binding_status": "unbound",
+      "grants": [],
+      "responsibility": "Bind responsible operator and narrowly scoped executor before enabling. No authority follows from installing this template."
+    },
+    {
+      "id": "groomer",
+      "role": "groomer",
+      "executor_kinds_allowed": [
+        "controller",
+        "service",
+        "agent"
+      ],
+      "binding_status": "unbound",
+      "grants": [],
+      "responsibility": "Bind responsible operator and narrowly scoped executor before enabling. No authority follows from installing this template."
+    },
+    {
+      "id": "coordinator",
+      "role": "coordinator",
+      "executor_kinds_allowed": [
+        "controller",
+        "service",
+        "agent"
+      ],
+      "binding_status": "unbound",
+      "grants": [],
+      "responsibility": "Bind responsible operator and narrowly scoped executor before enabling. No authority follows from installing this template."
+    }
+  ],
+  "policy_templates": [
+    {
+      "id": "handback-gets-a-worker",
+      "version": "1.0.0",
+      "classification": "retained_rule",
+      "decision_point": "diagnosis-admission",
+      "default_mode": "record",
+      "binding_status": "unbound",
+      "parameter_schema": {
+        "type": "object",
+        "properties": {
+          "attempt_limit": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "escalation_after_seconds": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "attempt_limit",
+          "escalation_after_seconds"
+        ],
+        "additionalProperties": false
+      },
+      "parameter_values": {},
+      "consumer_contract": {
+        "capability": "policy.consume.handback-gets-a-worker.v1",
+        "status": "proposed_mapping",
+        "parameter_names": [
+          "attempt_limit",
+          "escalation_after_seconds"
+        ]
+      },
+      "absent_behavior": "Record unsupported coverage; do not admit any effect whose mandatory authority/fence/budget/verification capability is missing. Preserve existing owner behavior during read-only integration.",
+      "activation_requirements": [
+        "approved owner policy proposal and scope binding",
+        "all required typed parameters configured",
+        "exact installed consumer contract with local positive/negative evidence",
+        "explicit adoption and existing promotion ladder"
+      ],
+      "source_refs": [
+        "noncelogic/meta-harness@387ca00d37971dac78cce7e6ca7f6449f6926491:policies/handback-gets-a-worker.yaml"
+      ]
+    },
+    {
+      "id": "retries-carry-reasons",
+      "version": "1.0.0",
+      "classification": "retained_rule",
+      "decision_point": "repair-admission",
+      "default_mode": "record",
+      "binding_status": "unbound",
+      "parameter_schema": {
+        "type": "object",
+        "properties": {
+          "attempt_limit": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "attempt_limit"
+        ],
+        "additionalProperties": false
+      },
+      "parameter_values": {},
+      "consumer_contract": {
+        "capability": "policy.consume.retries-carry-reasons.v1",
+        "status": "proposed_mapping",
+        "parameter_names": [
+          "attempt_limit"
+        ]
+      },
+      "absent_behavior": "Record unsupported coverage; do not admit any effect whose mandatory authority/fence/budget/verification capability is missing. Preserve existing owner behavior during read-only integration.",
+      "activation_requirements": [
+        "approved owner policy proposal and scope binding",
+        "all required typed parameters configured",
+        "exact installed consumer contract with local positive/negative evidence",
+        "explicit adoption and existing promotion ladder"
+      ],
+      "source_refs": [
+        "noncelogic/meta-harness@387ca00d37971dac78cce7e6ca7f6449f6926491:policies/retries-carry-reasons.yaml"
+      ]
+    },
+    {
+      "id": "transient-errors-retry",
+      "version": "1.0.0",
+      "classification": "retained_rule",
+      "decision_point": "retry-or-reconcile",
+      "default_mode": "record",
+      "binding_status": "unbound",
+      "parameter_schema": {
+        "type": "object",
+        "properties": {
+          "read_retry_limit": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "read_retry_limit"
+        ],
+        "additionalProperties": false
+      },
+      "parameter_values": {},
+      "consumer_contract": {
+        "capability": "policy.consume.transient-errors-retry.v1",
+        "status": "proposed_mapping",
+        "parameter_names": [
+          "read_retry_limit"
+        ]
+      },
+      "absent_behavior": "Record unsupported coverage; do not admit any effect whose mandatory authority/fence/budget/verification capability is missing. Preserve existing owner behavior during read-only integration.",
+      "activation_requirements": [
+        "approved owner policy proposal and scope binding",
+        "all required typed parameters configured",
+        "exact installed consumer contract with local positive/negative evidence",
+        "explicit adoption and existing promotion ladder"
+      ],
+      "source_refs": [
+        "noncelogic/meta-harness@387ca00d37971dac78cce7e6ca7f6449f6926491:policies/transient-errors-retry.yaml"
+      ]
+    },
+    {
+      "id": "premise-gone-closes",
+      "version": "1.0.0",
+      "classification": "retained_rule",
+      "decision_point": "operating-transition",
+      "default_mode": "record",
+      "binding_status": "unbound",
+      "parameter_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "parameter_values": {},
+      "consumer_contract": {
+        "capability": "policy.consume.premise-gone-closes.v1",
+        "status": "proposed_mapping",
+        "parameter_names": []
+      },
+      "absent_behavior": "Record unsupported coverage; do not admit any effect whose mandatory authority/fence/budget/verification capability is missing. Preserve existing owner behavior during read-only integration.",
+      "activation_requirements": [
+        "approved owner policy proposal and scope binding",
+        "all required typed parameters configured",
+        "exact installed consumer contract with local positive/negative evidence",
+        "explicit adoption and existing promotion ladder"
+      ],
+      "source_refs": [
+        "noncelogic/meta-harness@387ca00d37971dac78cce7e6ca7f6449f6926491:policies/premise-gone-closes.yaml"
+      ]
+    },
+    {
+      "id": "red-main-fix-owns-landing",
+      "version": "1.0.0",
+      "classification": "retained_rule",
+      "decision_point": "delivery-priority",
+      "default_mode": "record",
+      "binding_status": "unbound",
+      "parameter_schema": {
+        "type": "object",
+        "properties": {
+          "owns_landing": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "owns_landing"
+        ],
+        "additionalProperties": false
+      },
+      "parameter_values": {},
+      "consumer_contract": {
+        "capability": "policy.consume.red-main-fix-owns-landing.v1",
+        "status": "proposed_mapping",
+        "parameter_names": [
+          "owns_landing"
+        ]
+      },
+      "absent_behavior": "Record unsupported coverage; do not admit any effect whose mandatory authority/fence/budget/verification capability is missing. Preserve existing owner behavior during read-only integration.",
+      "activation_requirements": [
+        "approved owner policy proposal and scope binding",
+        "all required typed parameters configured",
+        "exact installed consumer contract with local positive/negative evidence",
+        "explicit adoption and existing promotion ladder"
+      ],
+      "source_refs": [
+        "noncelogic/meta-harness@387ca00d37971dac78cce7e6ca7f6449f6926491:policies/red-main-fix-owns-landing.yaml"
+      ]
+    },
+    {
+      "id": "finish-before-start",
+      "version": "1.0.0",
+      "classification": "retained_rule",
+      "decision_point": "operating-transition",
+      "default_mode": "record",
+      "binding_status": "unbound",
+      "parameter_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "parameter_values": {},
+      "consumer_contract": {
+        "capability": "policy.consume.finish-before-start.v1",
+        "status": "proposed_mapping",
+        "parameter_names": []
+      },
+      "absent_behavior": "Record unsupported coverage; do not admit any effect whose mandatory authority/fence/budget/verification capability is missing. Preserve existing owner behavior during read-only integration.",
+      "activation_requirements": [
+        "approved owner policy proposal and scope binding",
+        "all required typed parameters configured",
+        "exact installed consumer contract with local positive/negative evidence",
+        "explicit adoption and existing promotion ladder"
+      ],
+      "source_refs": [
+        "noncelogic/meta-harness@387ca00d37971dac78cce7e6ca7f6449f6926491:policies/finish-before-start.yaml"
+      ]
+    },
+    {
+      "id": "decisions-expire-with-default",
+      "version": "1.0.0",
+      "classification": "retained_rule",
+      "decision_point": "escalation",
+      "default_mode": "record",
+      "binding_status": "unbound",
+      "parameter_schema": {
+        "type": "object",
+        "properties": {
+          "premise_classes": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "spending",
+                "credentials_or_identity",
+                "irreversible_or_public"
+              ]
+            },
+            "minItems": 3,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "premise_classes"
+        ],
+        "additionalProperties": false
+      },
+      "parameter_values": {},
+      "consumer_contract": {
+        "capability": "policy.consume.decisions-expire-with-default.v1",
+        "status": "proposed_mapping",
+        "parameter_names": [
+          "premise_classes"
+        ]
+      },
+      "absent_behavior": "Record unsupported coverage; do not admit any effect whose mandatory authority/fence/budget/verification capability is missing. Preserve existing owner behavior during read-only integration.",
+      "activation_requirements": [
+        "approved owner policy proposal and scope binding",
+        "all required typed parameters configured",
+        "exact installed consumer contract with local positive/negative evidence",
+        "explicit adoption and existing promotion ladder"
+      ],
+      "source_refs": [
+        "noncelogic/meta-harness@387ca00d37971dac78cce7e6ca7f6449f6926491:policies/decisions-expire-with-default.yaml"
+      ]
+    },
+    {
+      "id": "merged-is-not-shipped",
+      "version": "1.0.0",
+      "classification": "retained_rule",
+      "decision_point": "operating-transition",
+      "default_mode": "record",
+      "binding_status": "unbound",
+      "parameter_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "parameter_values": {},
+      "consumer_contract": {
+        "capability": "policy.consume.merged-is-not-shipped.v1",
+        "status": "proposed_mapping",
+        "parameter_names": []
+      },
+      "absent_behavior": "Record unsupported coverage; do not admit any effect whose mandatory authority/fence/budget/verification capability is missing. Preserve existing owner behavior during read-only integration.",
+      "activation_requirements": [
+        "approved owner policy proposal and scope binding",
+        "all required typed parameters configured",
+        "exact installed consumer contract with local positive/negative evidence",
+        "explicit adoption and existing promotion ladder"
+      ],
+      "source_refs": [
+        "noncelogic/meta-harness@387ca00d37971dac78cce7e6ca7f6449f6926491:policies/merged-is-not-shipped.yaml"
+      ]
+    },
+    {
+      "id": "mechanism-not-alerts",
+      "version": "1.0.0",
+      "classification": "retained_rule",
+      "decision_point": "liveness",
+      "default_mode": "record",
+      "binding_status": "unbound",
+      "parameter_schema": {
+        "type": "object",
+        "properties": {
+          "freshness_seconds": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "freshness_seconds"
+        ],
+        "additionalProperties": false
+      },
+      "parameter_values": {},
+      "consumer_contract": {
+        "capability": "policy.consume.mechanism-not-alerts.v1",
+        "status": "proposed_mapping",
+        "parameter_names": [
+          "freshness_seconds"
+        ]
+      },
+      "absent_behavior": "Record unsupported coverage; do not admit any effect whose mandatory authority/fence/budget/verification capability is missing. Preserve existing owner behavior during read-only integration.",
+      "activation_requirements": [
+        "approved owner policy proposal and scope binding",
+        "all required typed parameters configured",
+        "exact installed consumer contract with local positive/negative evidence",
+        "explicit adoption and existing promotion ladder"
+      ],
+      "source_refs": [
+        "noncelogic/meta-harness@387ca00d37971dac78cce7e6ca7f6449f6926491:policies/mechanism-not-alerts.yaml"
+      ]
+    },
+    {
+      "id": "substrate-crashloop-heals",
+      "version": "1.0.0",
+      "classification": "unimplemented_proposal",
+      "decision_point": "operating-transition",
+      "default_mode": "record",
+      "binding_status": "unbound",
+      "parameter_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "parameter_values": {},
+      "consumer_contract": {
+        "capability": "policy.consume.substrate-crashloop-heals.v1",
+        "status": "proposed_mapping",
+        "parameter_names": []
+      },
+      "absent_behavior": "Record unsupported coverage; do not admit any effect whose mandatory authority/fence/budget/verification capability is missing. Preserve existing owner behavior during read-only integration.",
+      "activation_requirements": [
+        "approved owner policy proposal and scope binding",
+        "all required typed parameters configured",
+        "exact installed consumer contract with local positive/negative evidence",
+        "explicit adoption and existing promotion ladder"
+      ],
+      "source_refs": [
+        "noncelogic/meta-harness@387ca00d37971dac78cce7e6ca7f6449f6926491:policies/substrate-crashloop-heals.yaml"
+      ]
+    },
+    {
+      "id": "operating-run-single-owner",
+      "version": "1.0.0",
+      "classification": "proposed_guarantee",
+      "decision_point": "process-claim",
+      "default_mode": "record",
+      "binding_status": "unbound",
+      "parameter_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "parameter_values": {},
+      "consumer_contract": {
+        "capability": "policy.consume.operating-run-single-owner.v1",
+        "status": "proposed_mapping",
+        "parameter_names": []
+      },
+      "absent_behavior": "Record unsupported coverage; do not admit any effect whose mandatory authority/fence/budget/verification capability is missing. Preserve existing owner behavior during read-only integration.",
+      "activation_requirements": [
+        "approved owner policy proposal and scope binding",
+        "all required typed parameters configured",
+        "exact installed consumer contract with local positive/negative evidence",
+        "explicit adoption and existing promotion ladder"
+      ],
+      "source_refs": [
+        "sortyard/sortyard:docs/requirements/operating-processes.md"
+      ]
+    },
+    {
+      "id": "repair-effects-reconcile-before-retry",
+      "version": "1.0.0",
+      "classification": "proposed_guarantee",
+      "decision_point": "repair-admission",
+      "default_mode": "record",
+      "binding_status": "unbound",
+      "parameter_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "parameter_values": {},
+      "consumer_contract": {
+        "capability": "policy.consume.repair-effects-reconcile-before-retry.v1",
+        "status": "proposed_mapping",
+        "parameter_names": []
+      },
+      "absent_behavior": "Record unsupported coverage; do not admit any effect whose mandatory authority/fence/budget/verification capability is missing. Preserve existing owner behavior during read-only integration.",
+      "activation_requirements": [
+        "approved owner policy proposal and scope binding",
+        "all required typed parameters configured",
+        "exact installed consumer contract with local positive/negative evidence",
+        "explicit adoption and existing promotion ladder"
+      ],
+      "source_refs": [
+        "sortyard/sortyard:docs/requirements/operating-processes.md"
+      ]
+    },
+    {
+      "id": "repair-verification-before-recovery",
+      "version": "1.0.0",
+      "classification": "proposed_guarantee",
+      "decision_point": "recovery-verification",
+      "default_mode": "record",
+      "binding_status": "unbound",
+      "parameter_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "parameter_values": {},
+      "consumer_contract": {
+        "capability": "policy.consume.repair-verification-before-recovery.v1",
+        "status": "proposed_mapping",
+        "parameter_names": []
+      },
+      "absent_behavior": "Record unsupported coverage; do not admit any effect whose mandatory authority/fence/budget/verification capability is missing. Preserve existing owner behavior during read-only integration.",
+      "activation_requirements": [
+        "approved owner policy proposal and scope binding",
+        "all required typed parameters configured",
+        "exact installed consumer contract with local positive/negative evidence",
+        "explicit adoption and existing promotion ladder"
+      ],
+      "source_refs": [
+        "sortyard/sortyard:docs/requirements/operating-processes.md"
+      ]
+    },
+    {
+      "id": "actor-capability-expires-with-delegation",
+      "version": "1.0.0",
+      "classification": "proposed_guarantee",
+      "decision_point": "actor-admission",
+      "default_mode": "record",
+      "binding_status": "unbound",
+      "parameter_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "parameter_values": {},
+      "consumer_contract": {
+        "capability": "policy.consume.actor-capability-expires-with-delegation.v1",
+        "status": "proposed_mapping",
+        "parameter_names": []
+      },
+      "absent_behavior": "Record unsupported coverage; do not admit any effect whose mandatory authority/fence/budget/verification capability is missing. Preserve existing owner behavior during read-only integration.",
+      "activation_requirements": [
+        "approved owner policy proposal and scope binding",
+        "all required typed parameters configured",
+        "exact installed consumer contract with local positive/negative evidence",
+        "explicit adoption and existing promotion ladder"
+      ],
+      "source_refs": [
+        "sortyard/sortyard:docs/requirements/operating-processes.md"
+      ]
+    }
+  ],
+  "process_templates": [
+    {
+      "id": "delivery-triage",
+      "version": "1.0.0",
+      "binding_status": "unbound",
+      "trigger_types": [
+        "condition.raised",
+        "condition.revised"
+      ],
+      "correlation_fields": [
+        "source_owner",
+        "installation_id",
+        "subject_id",
+        "condition_kind",
+        "condition_revision",
+        "origin_incident_id"
+      ],
+      "initial_step": "observe",
+      "steps": [
+        {
+          "id": "observe",
+          "role": "detector",
+          "kind": "observe",
+          "on": {
+            "success": [
+              "classify"
+            ],
+            "unknown": [
+              "waiting"
+            ],
+            "exhausted": [
+              "escalated"
+            ],
+            "premise_removed": [
+              "premise_removed"
+            ]
+          }
+        },
+        {
+          "id": "classify",
+          "role": "classifier",
+          "kind": "classify",
+          "on": {
+            "success": [
+              "route"
+            ],
+            "unknown": [
+              "waiting"
+            ],
+            "exhausted": [
+              "escalated"
+            ],
+            "premise_removed": [
+              "premise_removed"
+            ]
+          }
+        },
+        {
+          "id": "route",
+          "role": "coordinator",
+          "kind": "plan",
+          "on": {
+            "success": [
+              "verify"
+            ],
+            "unknown": [
+              "waiting"
+            ],
+            "exhausted": [
+              "escalated"
+            ],
+            "premise_removed": [
+              "premise_removed"
+            ]
+          }
+        },
+        {
+          "id": "verify",
+          "role": "verifier",
+          "kind": "verify",
+          "on": {
+            "success": [
+              "recovered"
+            ],
+            "unknown": [
+              "waiting"
+            ],
+            "exhausted": [
+              "escalated"
+            ],
+            "premise_removed": [
+              "premise_removed"
+            ]
+          }
+        }
+      ],
+      "required_policy_template_ids": [
+        "operating-run-single-owner",
+        "repair-effects-reconcile-before-retry",
+        "repair-verification-before-recovery",
+        "actor-capability-expires-with-delegation"
+      ],
+      "required_bindings": [
+        "registered trigger/owner contract",
+        "actor role bindings and live grants",
+        "verification and escalation owner contracts",
+        "explicit per-stage/case/shared budgets",
+        "source authority/board mapping"
+      ]
+    },
+    {
+      "id": "self-heal-diagnosis",
+      "version": "1.0.0",
+      "binding_status": "unbound",
+      "trigger_types": [
+        "condition.raised",
+        "condition.revised"
+      ],
+      "correlation_fields": [
+        "source_owner",
+        "installation_id",
+        "subject_id",
+        "condition_kind",
+        "condition_revision",
+        "origin_incident_id"
+      ],
+      "initial_step": "observe",
+      "steps": [
+        {
+          "id": "observe",
+          "role": "detector",
+          "kind": "observe",
+          "on": {
+            "success": [
+              "diagnose"
+            ],
+            "unknown": [
+              "waiting"
+            ],
+            "exhausted": [
+              "escalated"
+            ],
+            "premise_removed": [
+              "premise_removed"
+            ]
+          }
+        },
+        {
+          "id": "diagnose",
+          "role": "diagnostician",
+          "kind": "diagnose",
+          "on": {
+            "success": [
+              "plan"
+            ],
+            "unknown": [
+              "waiting"
+            ],
+            "exhausted": [
+              "escalated"
+            ],
+            "premise_removed": [
+              "premise_removed"
+            ]
+          }
+        },
+        {
+          "id": "plan",
+          "role": "coordinator",
+          "kind": "plan",
+          "on": {
+            "success": [
+              "verify"
+            ],
+            "unknown": [
+              "waiting"
+            ],
+            "exhausted": [
+              "escalated"
+            ],
+            "premise_removed": [
+              "premise_removed"
+            ]
+          }
+        },
+        {
+          "id": "verify",
+          "role": "verifier",
+          "kind": "verify",
+          "on": {
+            "success": [
+              "recovered"
+            ],
+            "unknown": [
+              "waiting"
+            ],
+            "exhausted": [
+              "escalated"
+            ],
+            "premise_removed": [
+              "premise_removed"
+            ]
+          }
+        }
+      ],
+      "required_policy_template_ids": [
+        "operating-run-single-owner",
+        "repair-effects-reconcile-before-retry",
+        "repair-verification-before-recovery",
+        "actor-capability-expires-with-delegation"
+      ],
+      "required_bindings": [
+        "registered trigger/owner contract",
+        "actor role bindings and live grants",
+        "verification and escalation owner contracts",
+        "explicit per-stage/case/shared budgets",
+        "source authority/board mapping"
+      ]
+    },
+    {
+      "id": "bounded-repair",
+      "version": "1.0.0",
+      "binding_status": "unbound",
+      "trigger_types": [
+        "condition.raised",
+        "condition.revised"
+      ],
+      "correlation_fields": [
+        "source_owner",
+        "installation_id",
+        "subject_id",
+        "condition_kind",
+        "condition_revision",
+        "origin_incident_id"
+      ],
+      "initial_step": "plan",
+      "steps": [
+        {
+          "id": "plan",
+          "role": "coordinator",
+          "kind": "plan",
+          "on": {
+            "success": [
+              "repair"
+            ],
+            "unknown": [
+              "waiting"
+            ],
+            "exhausted": [
+              "escalated"
+            ],
+            "premise_removed": [
+              "premise_removed"
+            ]
+          }
+        },
+        {
+          "id": "repair",
+          "role": "repair_executor",
+          "kind": "repair",
+          "on": {
+            "success": [
+              "verify"
+            ],
+            "unknown": [
+              "waiting"
+            ],
+            "exhausted": [
+              "escalated"
+            ],
+            "premise_removed": [
+              "premise_removed"
+            ]
+          }
+        },
+        {
+          "id": "verify",
+          "role": "verifier",
+          "kind": "verify",
+          "on": {
+            "success": [
+              "recovered"
+            ],
+            "unknown": [
+              "waiting"
+            ],
+            "exhausted": [
+              "escalated"
+            ],
+            "premise_removed": [
+              "premise_removed"
+            ]
+          }
+        }
+      ],
+      "required_policy_template_ids": [
+        "operating-run-single-owner",
+        "repair-effects-reconcile-before-retry",
+        "repair-verification-before-recovery",
+        "actor-capability-expires-with-delegation"
+      ],
+      "required_bindings": [
+        "registered trigger/owner contract",
+        "actor role bindings and live grants",
+        "verification and escalation owner contracts",
+        "explicit per-stage/case/shared budgets",
+        "source authority/board mapping"
+      ]
+    },
+    {
+      "id": "cause-cleared-return",
+      "version": "1.0.0",
+      "binding_status": "unbound",
+      "trigger_types": [
+        "condition.raised",
+        "condition.revised"
+      ],
+      "correlation_fields": [
+        "source_owner",
+        "installation_id",
+        "subject_id",
+        "condition_kind",
+        "condition_revision",
+        "origin_incident_id"
+      ],
+      "initial_step": "observe",
+      "steps": [
+        {
+          "id": "observe",
+          "role": "detector",
+          "kind": "observe",
+          "on": {
+            "success": [
+              "return"
+            ],
+            "unknown": [
+              "waiting"
+            ],
+            "exhausted": [
+              "escalated"
+            ],
+            "premise_removed": [
+              "premise_removed"
+            ]
+          }
+        },
+        {
+          "id": "return",
+          "role": "coordinator",
+          "kind": "return",
+          "on": {
+            "success": [
+              "verify"
+            ],
+            "unknown": [
+              "waiting"
+            ],
+            "exhausted": [
+              "escalated"
+            ],
+            "premise_removed": [
+              "premise_removed"
+            ]
+          }
+        },
+        {
+          "id": "verify",
+          "role": "verifier",
+          "kind": "verify",
+          "on": {
+            "success": [
+              "recovered"
+            ],
+            "unknown": [
+              "waiting"
+            ],
+            "exhausted": [
+              "escalated"
+            ],
+            "premise_removed": [
+              "premise_removed"
+            ]
+          }
+        }
+      ],
+      "required_policy_template_ids": [
+        "operating-run-single-owner",
+        "repair-effects-reconcile-before-retry",
+        "repair-verification-before-recovery",
+        "actor-capability-expires-with-delegation"
+      ],
+      "required_bindings": [
+        "registered trigger/owner contract",
+        "actor role bindings and live grants",
+        "verification and escalation owner contracts",
+        "explicit per-stage/case/shared budgets",
+        "source authority/board mapping"
+      ]
+    },
+    {
+      "id": "mechanism-liveness",
+      "version": "1.0.0",
+      "binding_status": "unbound",
+      "trigger_types": [
+        "condition.raised",
+        "condition.revised"
+      ],
+      "correlation_fields": [
+        "source_owner",
+        "installation_id",
+        "subject_id",
+        "condition_kind",
+        "condition_revision",
+        "origin_incident_id"
+      ],
+      "initial_step": "observe",
+      "steps": [
+        {
+          "id": "observe",
+          "role": "detector",
+          "kind": "observe",
+          "on": {
+            "success": [
+              "diagnose"
+            ],
+            "unknown": [
+              "waiting"
+            ],
+            "exhausted": [
+              "escalated"
+            ],
+            "premise_removed": [
+              "premise_removed"
+            ]
+          }
+        },
+        {
+          "id": "diagnose",
+          "role": "diagnostician",
+          "kind": "diagnose",
+          "on": {
+            "success": [
+              "repair"
+            ],
+            "unknown": [
+              "waiting"
+            ],
+            "exhausted": [
+              "escalated"
+            ],
+            "premise_removed": [
+              "premise_removed"
+            ]
+          }
+        },
+        {
+          "id": "repair",
+          "role": "repair_executor",
+          "kind": "repair",
+          "on": {
+            "success": [
+              "verify"
+            ],
+            "unknown": [
+              "waiting"
+            ],
+            "exhausted": [
+              "escalated"
+            ],
+            "premise_removed": [
+              "premise_removed"
+            ]
+          }
+        },
+        {
+          "id": "verify",
+          "role": "verifier",
+          "kind": "verify",
+          "on": {
+            "success": [
+              "recovered"
+            ],
+            "unknown": [
+              "waiting"
+            ],
+            "exhausted": [
+              "escalated"
+            ],
+            "premise_removed": [
+              "premise_removed"
+            ]
+          }
+        }
+      ],
+      "required_policy_template_ids": [
+        "operating-run-single-owner",
+        "repair-effects-reconcile-before-retry",
+        "repair-verification-before-recovery",
+        "actor-capability-expires-with-delegation"
+      ],
+      "required_bindings": [
+        "registered trigger/owner contract",
+        "actor role bindings and live grants",
+        "verification and escalation owner contracts",
+        "explicit per-stage/case/shared budgets",
+        "source authority/board mapping"
+      ]
+    }
+  ]
+}

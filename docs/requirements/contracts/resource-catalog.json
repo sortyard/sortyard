@@ -2317,6 +2317,168 @@
       "transitions": {},
       "transition_guard": "State/transition contract delegated to the registered owner; no native writable copy.",
       "data_schema": "#/$defs/DomainMembership"
+    },
+    {
+      "kind": "OperationalActor",
+      "authority": "sortyard-or-registered-process-owner",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "name",
+        "role",
+        "executor_kind",
+        "executor_ref",
+        "responsible_operator_ref",
+        "capability_grant_refs",
+        "project_ref",
+        "configuration_revision"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "draft",
+        "enabled",
+        "paused",
+        "retired"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "Owner operating-process direction; operating-processes.md",
+      "transitions": {
+        "draft": [
+          "enabled",
+          "retired"
+        ],
+        "enabled": [
+          "paused",
+          "retired"
+        ],
+        "paused": [
+          "enabled",
+          "retired"
+        ],
+        "retired": []
+      },
+      "transition_guard": "Registered process owner checks current grants, pinned definition, lease, cumulative budget and typed owner evidence. No generic state PATCH.",
+      "data_schema": "#/$defs/DomainOperationalActor"
+    },
+    {
+      "kind": "OperationalProcessVersion",
+      "authority": "sortyard-or-registered-process-owner",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "version",
+        "content_hash",
+        "purpose",
+        "trigger_types",
+        "correlation_fields",
+        "roles",
+        "steps",
+        "initial_step",
+        "required_policy_template_ids",
+        "verification_contract_ref",
+        "escalation_route_ref",
+        "source_ref"
+      ],
+      "identity": "installation+workspace+kind+domain_id+version",
+      "lifecycle": [
+        "immutable"
+      ],
+      "immutable": true,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "Owner operating-process direction; operating-processes.md",
+      "transitions": {},
+      "transition_guard": "Registered process owner checks current grants, pinned definition, lease, cumulative budget and typed owner evidence. No generic state PATCH.",
+      "data_schema": "#/$defs/DomainOperationalProcessVersion"
+    },
+    {
+      "kind": "OperationalProcessRun",
+      "authority": "sortyard-or-registered-process-owner",
+      "scope": "workspace",
+      "required_domain_fields": [
+        "process_version_ref",
+        "subject_refs",
+        "condition_revision",
+        "correlation_key",
+        "actor_bindings",
+        "lease_owner_ref",
+        "fence_epoch",
+        "current_step",
+        "budget",
+        "case_refs",
+        "attempt_refs",
+        "operation_refs",
+        "policy_decision_refs",
+        "evidence_refs",
+        "outcome",
+        "parent_run_ref",
+        "lease_expires_at"
+      ],
+      "identity": "installation+workspace+kind+domain_id",
+      "lifecycle": [
+        "queued",
+        "running",
+        "waiting",
+        "paused",
+        "verifying",
+        "recovered",
+        "escalated",
+        "cancelled",
+        "failed",
+        "premise_removed"
+      ],
+      "immutable": false,
+      "external_state_contract": false,
+      "schema_version": "1",
+      "implementation": "planned_contract",
+      "source": "Owner operating-process direction; operating-processes.md",
+      "transitions": {
+        "queued": [
+          "running",
+          "paused",
+          "cancelled"
+        ],
+        "running": [
+          "waiting",
+          "paused",
+          "verifying",
+          "escalated",
+          "cancelled",
+          "failed",
+          "premise_removed"
+        ],
+        "waiting": [
+          "running",
+          "paused",
+          "verifying",
+          "escalated",
+          "cancelled",
+          "failed",
+          "premise_removed"
+        ],
+        "paused": [
+          "running",
+          "cancelled",
+          "escalated"
+        ],
+        "verifying": [
+          "recovered",
+          "running",
+          "waiting",
+          "escalated",
+          "failed",
+          "premise_removed"
+        ],
+        "recovered": [],
+        "escalated": [],
+        "cancelled": [],
+        "failed": [],
+        "premise_removed": []
+      },
+      "transition_guard": "Registered process owner checks current grants, pinned definition, lease, cumulative budget and typed owner evidence. No generic state PATCH.",
+      "data_schema": "#/$defs/DomainOperationalProcessRun"
     }
   ],
   "edge_types": [
@@ -2777,6 +2939,66 @@
       ],
       "constraints": [
         "not a prose citation gate; declared dependency only"
+      ]
+    },
+    {
+      "type": "executes",
+      "source_kinds": [
+        "OperationalActor"
+      ],
+      "target_kinds": [
+        "OperationalProcessRun"
+      ],
+      "required": [
+        "owner",
+        "source_ref",
+        "provenance",
+        "observed_at",
+        "access_scope"
+      ],
+      "constraints": [
+        "Authorize both endpoints; no grant follows from an edge."
+      ]
+    },
+    {
+      "type": "instance_of",
+      "source_kinds": [
+        "OperationalProcessRun"
+      ],
+      "target_kinds": [
+        "OperationalProcessVersion"
+      ],
+      "required": [
+        "owner",
+        "source_ref",
+        "provenance",
+        "observed_at",
+        "access_scope"
+      ],
+      "constraints": [
+        "Authorize both endpoints; no grant follows from an edge."
+      ]
+    },
+    {
+      "type": "handles",
+      "source_kinds": [
+        "OperationalProcessRun"
+      ],
+      "target_kinds": [
+        "TriageCase",
+        "RepairAttempt",
+        "GroomingPass",
+        "Mechanism"
+      ],
+      "required": [
+        "owner",
+        "source_ref",
+        "provenance",
+        "observed_at",
+        "access_scope"
+      ],
+      "constraints": [
+        "Authorize both endpoints; no grant follows from an edge."
       ]
     }
   ]

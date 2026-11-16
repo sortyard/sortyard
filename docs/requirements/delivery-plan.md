@@ -63,3 +63,7 @@ completed integration. No write is enabled until its custody/scope/preconditions
 
 Actual implementation, policy migration, identity provisioning and production rollout are
 separate outcomes governed by their existing release and authorization controls.
+
+The [operating-process extension](operating-processes.md) makes triage/self-heal actors,
+process definitions, policy seeds and effective consumer coverage MS2 control-surface work.
+MS5 adds admitted execution and independent recovery verification using the same contracts.

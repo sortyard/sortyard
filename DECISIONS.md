@@ -47,3 +47,24 @@ The current code and deployed release still use the original Postgres backend.
 - **Delivery:** connected project operations precede native execution replacement; reviewed
   CI/GitOps remains the release path. Appwrite qualification is substrate evidence, not
   authorization to migrate production state or retire meta-harness.
+
+## SY-DEC-006 — First-class operating processes (2026-11-16)
+
+- **Owner direction:** Sortyard goes beyond current Kubernetes harness/conductor/runner and
+  meta-harness behavior. Triage/self-heal processes, seeded policies and responsible actors
+  are first-class parts of the operator and delegated-agent control plane.
+- **Decision:** add OperationalActor, OperationalProcessVersion and OperationalProcessRun,
+  linking existing cases, attempts, agent runs, policy decisions and operations. Publish/adopt
+  process versions through the existing definition registry; reuse existing controller/lease/
+  operation execution machinery. A consumer must declare and test exact policy parameters.
+- **Criteria:** visible responsibility and execution history; bounded authority/budgets;
+  reproducible source versions; operator/agent parity; compatibility with existing owners.
+- **Alternatives considered:** retaining current controller-specific loops with only status
+  projections needs less model work but leaves cross-process ownership, configuration and
+  budgets implicit. Extending WorkflowVersion alone reuses delivery stages but obscures
+  event-driven incident correlation and long owner waits across several chains. The selected
+  outer process model keeps delivery workflows and existing runtime components reusable.
+- **Consequence:** reviewed seed templates require explicit owner/consumer/parameter binding
+  before adoption/activation. They introduce no live policy writes, actor grants or direct
+  cluster repair path. Independent review PASS is in the product evidence.
+- **Contract:** [governed operating processes](docs/requirements/operating-processes.md).

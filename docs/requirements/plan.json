@@ -538,7 +538,11 @@
         "OPS-001",
         "OPS-002",
         "OPS-003",
-        "OPS-004"
+        "OPS-004",
+        "OPS-005",
+        "OPS-006",
+        "OPS-007",
+        "OPS-008"
       ],
       "task_decomposition": "next-tranche intake only; not one generated task per requirement"
     },
@@ -1169,6 +1173,15 @@
         "QLT-042"
       ],
       "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS5-ops",
+      "milestone": "MS5",
+      "area": "OPS",
+      "requirement_ids": [
+        "OPS-009",
+        "OPS-010"
+      ]
     }
   ],
   "rules": [
@@ -1180,10 +1193,10 @@
     "Private collaborator pilot does not require every legacy project migration or public release."
   ],
   "technical_review": {
-    "reviewer": "independent appwrite_persistence subagent",
+    "reviewer": "independent appwrite_auth subagent",
     "result": "PASS",
     "date": "2026-11-16",
-    "evidence": "evidence/technical-review.md",
-    "scope": "requirements and planned contracts; not runtime implementation"
+    "evidence": "evidence/operating-process-review.md",
+    "scope": "operating-process extension; prior baseline review preserved in evidence/technical-review.md"
   }
 }
