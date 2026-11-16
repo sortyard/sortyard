@@ -2647,6 +2647,48 @@
       "baseline_ref": null,
       "reason": null,
       "milestone": "MS2"
+    },
+    {
+      "id": "OPS-005",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "OPS-006",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "OPS-007",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "OPS-008",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "OPS-009",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "OPS-010",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS5"
     }
   ]
 }

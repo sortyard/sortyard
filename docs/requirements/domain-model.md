@@ -102,3 +102,10 @@ under a fabricated project; server authorization checks the actual action target
 Grooming queue and lease identity is the server-resolved authority service, installation and
 canonical source board/project ID. Two logical project aliases for the same authoritative board
 share one queue/fence; only independent source boards may run grooming concurrently.
+
+## Operating-process extension
+
+[Governed operating processes](operating-processes.md) adds OperationalActor,
+OperationalProcessVersion and OperationalProcessRun, linking the existing case/attempt/agent/
+operation records. Actor registration is separate from grant issuance. Seed installation,
+consumer coverage, adoption and enforcement are independently visible.

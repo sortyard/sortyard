@@ -10494,6 +10494,150 @@
       "reconciliation": "new",
       "baseline_ref": null,
       "implementation_status": "requirement_only"
+    },
+    {
+      "id": "OPS-005",
+      "title": "First-class operational actors",
+      "area": "OPS",
+      "statement": "Named detector, classifier, diagnostician, repair executor, verifier, groomer and coordinator actors have stable identity, responsible operator, executor binding, scoped grants and enabled/paused/retired lifecycle. Actors may be deterministic services or agents; a persona grants no privileges.",
+      "acceptance": [
+        "AC1: The same actor status/configuration/actions are visible through operator UI and delegated-agent discovery.",
+        "AC2: Actor registration cannot mint grants or inherit cluster/conductor credentials; revocation prevents new effects."
+      ],
+      "source": "Owner operating-process direction, 2026-11-16 UTC; operating-processes.md and pinned legacy source evidence.",
+      "milestone": "MS2",
+      "priority": "MUST",
+      "origin": "NEW",
+      "baseline": null,
+      "better_on": [],
+      "measured": [],
+      "legacy_file": null,
+      "legacy_work_package": null,
+      "file": "catalog.md",
+      "work_package": "MS2-ops",
+      "reconciliation": "new",
+      "baseline_ref": null,
+      "implementation_status": "requirement_only"
+    },
+    {
+      "id": "OPS-006",
+      "title": "Versioned operating processes and runs",
+      "area": "OPS",
+      "statement": "OperationalProcessVersion declares trigger correlation, actor roles, stage graph, owner actions, policy decision points, verification and escalation. OperationalProcessRun pins it and records actual bindings, lease epoch, budgets and evidence while linking existing cases/attempts/operations.",
+      "acceptance": [
+        "AC1: A run displays which actor owns each stage and the policy/definition versions used.",
+        "AC2: Duplicate trigger delivery creates one active owner/run; alias/restart cannot erase history or budget."
+      ],
+      "source": "Owner operating-process direction, 2026-11-16 UTC; operating-processes.md and pinned legacy source evidence.",
+      "milestone": "MS2",
+      "priority": "MUST",
+      "origin": "NEW",
+      "baseline": null,
+      "better_on": [],
+      "measured": [],
+      "legacy_file": null,
+      "legacy_work_package": null,
+      "file": "catalog.md",
+      "work_package": "MS2-ops",
+      "reconciliation": "new",
+      "baseline_ref": null,
+      "implementation_status": "requirement_only"
+    },
+    {
+      "id": "OPS-007",
+      "title": "Seeded policies with consumer coverage",
+      "area": "OPS",
+      "statement": "Install source-neutral versioned triage/self-heal seed templates with provenance, typed parameters, compatible consumer contracts and absent-policy behavior. Installation, proposal, adoption and enforcement activation are distinct. A parameter is effective only when its bound consumer declares and tests that exact parameter.",
+      "acceptance": [
+        "AC1: A copied policy with no compatible installed consumer is visibly unsupported, never an active guard.",
+        "AC2: Upgrades preserve local overrides and approved policy authority; no auto-promotion or overwriting live families."
+      ],
+      "source": "Owner operating-process direction, 2026-11-16 UTC; operating-processes.md and pinned legacy source evidence.",
+      "milestone": "MS2",
+      "priority": "MUST",
+      "origin": "NEW",
+      "baseline": null,
+      "better_on": [],
+      "measured": [],
+      "legacy_file": null,
+      "legacy_work_package": null,
+      "file": "catalog.md",
+      "work_package": "MS2-ops",
+      "reconciliation": "new",
+      "baseline_ref": null,
+      "implementation_status": "requirement_only"
+    },
+    {
+      "id": "OPS-008",
+      "title": "Explicit triage and self-heal process catalog",
+      "area": "OPS",
+      "statement": "Seed delivery triage, diagnosis, bounded repair, cause-cleared return and mechanism-liveness processes. Classify product, infrastructure, transient, missing evidence/access, owner input and obsolete premise separately; preserve project holds and shared fault-domain incidents.",
+      "acceptance": [
+        "AC1: Infrastructure diagnosis cannot silently become infrastructure mutation; effect routes to a separately authorized owner.",
+        "AC2: Shared outages correlate without producing one speculative code fix per project; missing evidence stays unknown."
+      ],
+      "source": "Owner operating-process direction, 2026-11-16 UTC; operating-processes.md and pinned legacy source evidence.",
+      "milestone": "MS2",
+      "priority": "MUST",
+      "origin": "NEW",
+      "baseline": null,
+      "better_on": [],
+      "measured": [],
+      "legacy_file": null,
+      "legacy_work_package": null,
+      "file": "catalog.md",
+      "work_package": "MS2-ops",
+      "reconciliation": "new",
+      "baseline_ref": null,
+      "implementation_status": "requirement_only"
+    },
+    {
+      "id": "OPS-009",
+      "title": "Cumulative budgets and ambiguous-effect recovery",
+      "area": "OPS",
+      "statement": "Execute processes under one fenced owner with stage and cumulative attempt/time/token/external-effect budgets; owner command receipts retain committed/not_committed/unknown. Reconciliation precedes replay. Pauses, new leases, process versions and child runs cannot reset the originating case budget.",
+      "acceptance": [
+        "AC1: Restart/lease takeover/child run cannot exceed the same original case budget or duplicate an unknown effect.",
+        "AC2: Exhaustion parks/escalates to a named owner under existing authority without a hidden infinite repair loop."
+      ],
+      "source": "Owner operating-process direction, 2026-11-16 UTC; operating-processes.md and pinned legacy source evidence.",
+      "milestone": "MS5",
+      "priority": "MUST",
+      "origin": "NEW",
+      "baseline": null,
+      "better_on": [],
+      "measured": [],
+      "legacy_file": null,
+      "legacy_work_package": null,
+      "file": "catalog.md",
+      "work_package": "MS5-ops",
+      "reconciliation": "new",
+      "baseline_ref": null,
+      "implementation_status": "requirement_only"
+    },
+    {
+      "id": "OPS-010",
+      "title": "Evidence-based recovery and process improvement",
+      "area": "OPS",
+      "statement": "A registered verifier must observe fresh positive evidence for the exact condition/revision before recovery. Agent exit, merged code, acknowledgement, cancelled workflow and healthy API do not prove recovered product delivery. Failed processes emit owned conditions and improvement proposals through the normal version/publication/adoption loop.",
+      "acceptance": [
+        "AC1: Obsolete premise closes as premise_removed rather than recovered; verification cannot consume the actor self-attestation alone.",
+        "AC2: Changed policy/procedure requires normal publication/adoption; repair actors cannot weaken their own guards."
+      ],
+      "source": "Owner operating-process direction, 2026-11-16 UTC; operating-processes.md and pinned legacy source evidence.",
+      "milestone": "MS5",
+      "priority": "MUST",
+      "origin": "NEW",
+      "baseline": null,
+      "better_on": [],
+      "measured": [],
+      "legacy_file": null,
+      "legacy_work_package": null,
+      "file": "catalog.md",
+      "work_package": "MS5-ops",
+      "reconciliation": "new",
+      "baseline_ref": null,
+      "implementation_status": "requirement_only"
     }
   ],
   "qualification_evidence": {
@@ -10532,10 +10676,10 @@
     }
   },
   "technical_review": {
-    "reviewer": "independent appwrite_persistence subagent",
+    "reviewer": "independent appwrite_auth subagent",
     "result": "PASS",
     "date": "2026-11-16",
-    "evidence": "evidence/technical-review.md",
-    "scope": "requirements and planned contracts; not runtime implementation"
+    "evidence": "evidence/operating-process-review.md",
+    "scope": "operating-process extension; prior baseline review preserved in evidence/technical-review.md"
   }
 }

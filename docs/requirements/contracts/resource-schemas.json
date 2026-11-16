@@ -4411,7 +4411,10 @@
             "Need",
             "ExtensionRegistration",
             "Operator",
-            "Membership"
+            "Membership",
+            "OperationalActor",
+            "OperationalProcessVersion",
+            "OperationalProcessRun"
           ]
         },
         "id": {
@@ -4481,7 +4484,10 @@
                   "Need",
                   "ExtensionRegistration",
                   "Operator",
-                  "Membership"
+                  "Membership",
+                  "OperationalActor",
+                  "OperationalProcessVersion",
+                  "OperationalProcessRun"
                 ]
               }
             },
@@ -4549,7 +4555,8 @@
                   "QualityBarVersion",
                   "PolicyVersion",
                   "ContractVersion",
-                  "ProcedureVersion"
+                  "ProcedureVersion",
+                  "OperationalProcessVersion"
                 ]
               }
             },
@@ -4640,6 +4647,662 @@
       ],
       "additionalProperties": false,
       "description": "Server-resolved authoritative board/project identity; logical project aliases do not create separate queue keys."
+    },
+    "DomainOperationalActor": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "enum": [
+            "detector",
+            "classifier",
+            "diagnostician",
+            "repair_executor",
+            "verifier",
+            "groomer",
+            "coordinator"
+          ]
+        },
+        "executor_kind": {
+          "enum": [
+            "controller",
+            "agent",
+            "service"
+          ]
+        },
+        "executor_ref": {
+          "$ref": "#/$defs/ResourceRef"
+        },
+        "responsible_operator_ref": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "Operator"
+                }
+              }
+            }
+          ]
+        },
+        "capability_grant_refs": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ResourceRef"
+              },
+              {
+                "properties": {
+                  "kind": {
+                    "const": "CapabilityGrant"
+                  }
+                }
+              }
+            ]
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "project_ref": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/ResourceRef"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "Project"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "configuration_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state": {
+          "enum": [
+            "draft",
+            "enabled",
+            "paused",
+            "retired"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "role",
+        "executor_kind",
+        "executor_ref",
+        "responsible_operator_ref",
+        "capability_grant_refs",
+        "project_ref",
+        "configuration_revision",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned operating-process resource; identity/scope/revision are in ResourceEnvelope. Semantic guards are specified in operating-processes.md."
+    },
+    "DomainOperationalProcessVersion": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trigger_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "correlation_fields": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "detector",
+              "classifier",
+              "diagnostician",
+              "repair_executor",
+              "verifier",
+              "groomer",
+              "coordinator"
+            ]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "role": {
+                "enum": [
+                  "detector",
+                  "classifier",
+                  "diagnostician",
+                  "repair_executor",
+                  "verifier",
+                  "groomer",
+                  "coordinator"
+                ]
+              },
+              "kind": {
+                "enum": [
+                  "observe",
+                  "classify",
+                  "diagnose",
+                  "plan",
+                  "repair",
+                  "verify",
+                  "return",
+                  "escalate",
+                  "prevent_recurrence"
+                ]
+              },
+              "allowed_actions": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 0,
+                "uniqueItems": true
+              },
+              "policy_template_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 0,
+                "uniqueItems": true
+              },
+              "on": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true
+                }
+              }
+            },
+            "required": [
+              "id",
+              "role",
+              "kind",
+              "allowed_actions",
+              "policy_template_ids",
+              "on"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "initial_step": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required_policy_template_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "verification_contract_ref": {
+          "$ref": "#/$defs/ResourceRef"
+        },
+        "escalation_route_ref": {
+          "$ref": "#/$defs/ResourceRef"
+        },
+        "source_ref": {
+          "$ref": "#/$defs/ResourceRef"
+        }
+      },
+      "required": [
+        "version",
+        "content_hash",
+        "purpose",
+        "trigger_types",
+        "correlation_fields",
+        "roles",
+        "steps",
+        "initial_step",
+        "required_policy_template_ids",
+        "verification_contract_ref",
+        "escalation_route_ref",
+        "source_ref"
+      ],
+      "additionalProperties": false,
+      "description": "Planned operating-process resource; identity/scope/revision are in ResourceEnvelope. Semantic guards are specified in operating-processes.md."
+    },
+    "DomainOperationalProcessRun": {
+      "type": "object",
+      "properties": {
+        "process_version_ref": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "OperationalProcessVersion"
+                }
+              }
+            }
+          ]
+        },
+        "subject_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "condition_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "correlation_key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actor_bindings": {
+          "type": "object",
+          "propertyNames": {
+            "enum": [
+              "detector",
+              "classifier",
+              "diagnostician",
+              "repair_executor",
+              "verifier",
+              "groomer",
+              "coordinator"
+            ]
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "actor_ref": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/ResourceRef"
+                  },
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "OperationalActor"
+                      }
+                    }
+                  }
+                ]
+              },
+              "configuration_revision": {
+                "type": "string",
+                "minLength": 1
+              },
+              "executor_ref": {
+                "$ref": "#/$defs/ResourceRef"
+              },
+              "executor_revision": {
+                "type": "string",
+                "minLength": 1
+              },
+              "grant_refs": {
+                "type": "array",
+                "items": {
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/ResourceRef"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "CapabilityGrant"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "actor_ref",
+              "configuration_revision",
+              "executor_ref",
+              "executor_revision",
+              "grant_refs"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "lease_owner_ref": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/ResourceRef"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "OperationalActor"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fence_epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "current_step": {
+          "type": "string",
+          "minLength": 1
+        },
+        "budget": {
+          "type": "object",
+          "properties": {
+            "attempt_limit": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "attempts_spent": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "elapsed_limit_seconds": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "elapsed_spent_seconds": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "agent_token_limit": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "agent_tokens_spent": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "external_effect_limit": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "external_effects_spent": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "attempt_limit",
+            "attempts_spent",
+            "elapsed_limit_seconds",
+            "elapsed_spent_seconds",
+            "agent_token_limit",
+            "agent_tokens_spent",
+            "external_effect_limit",
+            "external_effects_spent"
+          ],
+          "additionalProperties": false
+        },
+        "case_refs": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ResourceRef"
+              },
+              {
+                "properties": {
+                  "kind": {
+                    "const": "TriageCase"
+                  }
+                }
+              }
+            ]
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "attempt_refs": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ResourceRef"
+              },
+              {
+                "properties": {
+                  "kind": {
+                    "const": "RepairAttempt"
+                  }
+                }
+              }
+            ]
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "operation_refs": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ResourceRef"
+              },
+              {
+                "properties": {
+                  "kind": {
+                    "const": "Operation"
+                  }
+                }
+              }
+            ]
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "policy_decision_refs": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ResourceRef"
+              },
+              {
+                "properties": {
+                  "kind": {
+                    "const": "PolicyDecision"
+                  }
+                }
+              }
+            ]
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "outcome": {
+          "enum": [
+            "pending",
+            "recovered",
+            "premise_removed",
+            "escalated",
+            "cancelled",
+            "failed"
+          ]
+        },
+        "parent_run_ref": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/ResourceRef"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "OperationalProcessRun"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "queued",
+            "running",
+            "waiting",
+            "paused",
+            "verifying",
+            "recovered",
+            "escalated",
+            "cancelled",
+            "failed",
+            "premise_removed"
+          ]
+        },
+        "lease_expires_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "process_version_ref",
+        "subject_refs",
+        "condition_revision",
+        "correlation_key",
+        "actor_bindings",
+        "lease_owner_ref",
+        "fence_epoch",
+        "current_step",
+        "budget",
+        "case_refs",
+        "attempt_refs",
+        "operation_refs",
+        "policy_decision_refs",
+        "evidence_refs",
+        "outcome",
+        "parent_run_ref",
+        "state",
+        "lease_expires_at"
+      ],
+      "additionalProperties": false,
+      "description": "Planned operating-process resource; identity/scope/revision are in ResourceEnvelope. Semantic guards are specified in operating-processes.md.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "running",
+                  "waiting",
+                  "verifying"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "lease_owner_ref": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/ResourceRef"
+                  },
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "OperationalActor"
+                      }
+                    }
+                  }
+                ]
+              },
+              "lease_expires_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }
