@@ -5,6 +5,13 @@ agent or a new contributor to make a first change without anyone briefing them. 
 here is wrong or missing, that is a bug: fix it in the same change, or file it (see
 [Known gaps](#known-gaps)).
 
+## Current requirements authority
+
+Read the [ecosystem baseline](docs/requirements/README.md) before new feature planning.
+It supersedes the historical draft and corpus where they conflict. Planned contracts under
+`docs/requirements/contracts/` are distinct from the implemented `spec/` contract.
+The baseline preserves single service ownership and equal operator/agent public actions.
+
 ## Substrate planning amendment
 
 [SY-DEC-004](docs/decisions/appwrite-substrate.md) selects Appwrite as the preferred future

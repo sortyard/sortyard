@@ -1,0 +1,1962 @@
+{
+  "status": "requirements_traceability_not_runtime_parity",
+  "rows": [
+    {
+      "id": "LP-001",
+      "legacy_behavior": "A task is a board item with a spec block; the board's own fields win",
+      "legacy_source": "TR \"The task item\"",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "TRK-002"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-002",
+      "legacy_behavior": "Kinds: feature, fix, deployment, decision, parent",
+      "legacy_source": "TR \"Kinds\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "TRK-003"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-003",
+      "legacy_behavior": "File many tasks from YAML or markdown; dependencies first; ids on the board skipped",
+      "legacy_source": "TR; CR \"Plane tasks\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "TRK-012",
+        "API-015"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-004",
+      "legacy_behavior": "Ready rules 1\u20136",
+      "legacy_source": "TR \"Ready rules\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "RDY-001"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-005",
+      "legacy_behavior": "Sizing checks as warnings",
+      "legacy_source": "TR \"One PR's worth\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "RDY-002"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-006",
+      "legacy_behavior": "Release once; removing the label sticks",
+      "legacy_source": "TP \u00a72",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "RDY-003"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-007",
+      "legacy_behavior": "Release only with blockers Done, parent not in Backlog, repo matching",
+      "legacy_source": "TP \u00a72",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "RDY-004"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-008",
+      "legacy_behavior": "A failed board read releases and closes nothing that sync",
+      "legacy_source": "TP \u00a72",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "SCH-015",
+        "RDY-004"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-009",
+      "legacy_behavior": "A parent closes when its children are Done; nested parents close",
+      "legacy_source": "DRV \u00a73; release note 2026-11-01",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "TRK-005"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-010",
+      "legacy_behavior": "Decision default applies at its date; only an explicit value is an answer",
+      "legacy_source": "CR \"Plane tasks\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "RDY-015",
+        "TRK-011"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-011",
+      "legacy_behavior": "Premise-class decisions never take a default; they escalate once",
+      "legacy_source": "CR \"Plane tasks\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "RDY-015"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-012",
+      "legacy_behavior": "Needs routed to devops, owner or agent",
+      "legacy_source": "K3D \"Discharging needs\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "RDY-007"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-013",
+      "legacy_behavior": "`outcome_met` closes a deployment whose needs delivered its outcome",
+      "legacy_source": "K3D; HARNESS-272",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "RDY-008"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-014",
+      "legacy_behavior": "Preflight checks 1\u20139; unverifiable holds like a failure",
+      "legacy_source": "CR \"Preflight\"; TR",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "RDY-005",
+        "RDY-006"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-015",
+      "legacy_behavior": "Filing verdicts; 30-minute sweep; one `FILING-INVISIBLE` item",
+      "legacy_source": "CR \"Filing visibility\"; TP \u00a79",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "TRK-013",
+        "REC-023"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-016",
+      "legacy_behavior": "Directly filed items bypass the ready rules",
+      "legacy_source": "TR (HARNESS-504)",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "RDY-010"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-017",
+      "legacy_behavior": "Retroactive queue audit",
+      "legacy_source": "CR \"Retroactive audit\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "RDY-011"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-018",
+      "legacy_behavior": "Intended-use, reference-clone and access-citation rules",
+      "legacy_source": "CR \"Plane tasks\"",
+      "historical_disposition": "PACK",
+      "requirement_ids": [
+        "RDY-009"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-019",
+      "legacy_behavior": "Production flips held until estate preconditions are discharged",
+      "legacy_source": "CR `cutover_readiness`; drive note 173",
+      "historical_disposition": "PACK",
+      "requirement_ids": [
+        "RDY-014",
+        "SCH-017"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-020",
+      "legacy_behavior": "One invalid project entry no longer stops every board",
+      "legacy_source": "CR \"Product configuration failsafe\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "RDY-013"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-021",
+      "legacy_behavior": "`build`, `tasks`, `lanes` switches per project; `lanes: 0` pauses",
+      "legacy_source": "DRV \u00a71",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "RDY-004",
+        "SCH-004",
+        "SCH-012"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-022",
+      "legacy_behavior": "A hand-back owes a new preflight check or a gap filing",
+      "legacy_source": "TR \"De-risking\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "RDY-012"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-030",
+      "legacy_behavior": "Eligible = labelled, Todo, driven project, no live record",
+      "legacy_source": "TP \u00a74",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "SCH-001",
+        "TRK-004"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-031",
+      "legacy_behavior": "Order: urgent, milestone rank, priority, sequence",
+      "legacy_source": "TP \u00a74",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "SCH-002"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-032",
+      "legacy_behavior": "Milestone rank also matches by id prefix",
+      "legacy_source": "TP \u00a74",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "SCH-003"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-033",
+      "legacy_behavior": "Lanes per project; a slot is held until done or blocked; urgent holds none",
+      "legacy_source": "TP \u00a74\u2013\u00a75",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "SCH-004",
+        "SCH-005"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-034",
+      "legacy_behavior": "A freed slot is reused at the next three-minute pass",
+      "legacy_source": "TP \u00a73",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "SCH-006"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-035",
+      "legacy_behavior": "An exception in one claim aborts the pass",
+      "legacy_source": "TP conformance row 2",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "SCH-014"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-036",
+      "legacy_behavior": "A failed clone makes the pass order by priority alone",
+      "legacy_source": "TP conformance row 3",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "SCH-015"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-037",
+      "legacy_behavior": "A Todo item with a stale live record is skipped for ever",
+      "legacy_source": "TP conformance row 4",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "SCH-016",
+        "TRK-004"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-038",
+      "legacy_behavior": "Heavy caps: cluster, train, per project; one slot kept for rush",
+      "legacy_source": "MH `caps_allow`; DRV \u00a75",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "SCH-007"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-039",
+      "legacy_behavior": "Rush first, then creation order",
+      "legacy_source": "MH `_drive_order`; TP \u00a76",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "SCH-007",
+        "SCH-018"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-040",
+      "legacy_behavior": "`--dry-run` for drive and sync",
+      "legacy_source": "DRV \u00a74 \"Tools\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "SCH-013",
+        "CLI-004"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-041",
+      "legacy_behavior": "Phase and slot use visible only in `state.json`",
+      "legacy_source": "TP conformance row 7",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "SCH-008",
+        "REC-011"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-042",
+      "legacy_behavior": "Caps hardcoded in three files; a release needed to change one",
+      "legacy_source": "DRV \u00a71; HARNESS-246",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "SCH-011",
+        "DEF-005"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-043",
+      "legacy_behavior": "A stale release must not pass cutover gating",
+      "legacy_source": "drive note 890",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "SCH-017"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-044",
+      "legacy_behavior": "Ship items run after planned work; capped per product",
+      "legacy_source": "CR `unlanded_builds`",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "SCH-019"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-050",
+      "legacy_behavior": "One Job per stage, no Kubernetes retries, deadline, TTL",
+      "legacy_source": "MH Job render",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "EXE-002"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-051",
+      "legacy_behavior": "Stage resources and deadlines; 3-hour builds",
+      "legacy_source": "MH; DRV \u00a74",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "EXE-003"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-052",
+      "legacy_behavior": "Fresh clone and run directory per stage",
+      "legacy_source": "MH WORKER_TEMPLATE",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "EXE-004"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-053",
+      "legacy_behavior": "Workers never push; optional read-only token with a leak scan",
+      "legacy_source": "DRV \u00a75; MH",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "EXE-005"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-054",
+      "legacy_behavior": "Result document; `execution_ok` versus `pass`; checks run by the wrapper",
+      "legacy_source": "MH result builder",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "EXE-006",
+        "EXE-007"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-055",
+      "legacy_behavior": "Mirror freshness recorded; base ensured and seeded before dispatch",
+      "legacy_source": "CR `seed_mirror`, `ensure_base`",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "EXE-008"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-056",
+      "legacy_behavior": "Mirrors and run output on one shared volume",
+      "legacy_source": "MH volumes",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "EXE-009"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-057",
+      "legacy_behavior": "Only the new commits are fetched; commit trailers",
+      "legacy_source": "drive notes 373\u2013375; MH",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "EXE-010"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-058",
+      "legacy_behavior": "External inputs vendored only when marked; unverifiable is never dispatched",
+      "legacy_source": "CR `vendor_inputs`",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "EXE-011"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-059",
+      "legacy_behavior": "File attachments by repo, commit and path",
+      "legacy_source": "MH attachments",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "EXE-011"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-060",
+      "legacy_behavior": "Harnesses: claude, codex, none",
+      "legacy_source": "MH `validate_request`",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "EXE-012"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-061",
+      "legacy_behavior": "Routing by stage; fallback chain stamped in facts",
+      "legacy_source": "CR \"Harness routing\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "EXE-013"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-062",
+      "legacy_behavior": "CLI soak window of six hours",
+      "legacy_source": "DRV \"Worker CLIs\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "EXE-014"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-063",
+      "legacy_behavior": "Packet templates; 200,000-character cap",
+      "legacy_source": "drive.py packets; MH",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "EXE-015"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-064",
+      "legacy_behavior": "Privileged container sidecar for build, verify and proof",
+      "legacy_source": "MH dind",
+      "historical_disposition": "PACK",
+      "requirement_ids": [
+        "EXE-016"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-065",
+      "legacy_behavior": "Proof receipts bound to base and candidate",
+      "legacy_source": "MH proof",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "EXE-017"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-066",
+      "legacy_behavior": "Per-project proof provisioning (browsers, a systemd executor image)",
+      "legacy_source": "MH proof worker",
+      "historical_disposition": "OUT",
+      "requirement_ids": [
+        "EXE-012",
+        "EXT-002"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-067",
+      "legacy_behavior": "Usage recorded per stage",
+      "legacy_source": "MH ledger row",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "EXE-018"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-068",
+      "legacy_behavior": "Trajectory capture with `missing`/`error` states",
+      "legacy_source": "MH `mh_trajectories`",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "EXE-019"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-069",
+      "legacy_behavior": "Interrupted tasks recovered after a restart",
+      "legacy_source": "MH `recover_interrupted`",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "EXE-021"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-070",
+      "legacy_behavior": "Only queued tasks can be cancelled",
+      "legacy_source": "DRV \u00a75",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "EXE-022"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-071",
+      "legacy_behavior": "Run-directory retention, faster under disk pressure",
+      "legacy_source": "DRV \u00a75",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "REC-022"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-072",
+      "legacy_behavior": "The control plane is not protected from worker load",
+      "legacy_source": "DESIGN \u00a73.7b",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "EXE-020"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-080",
+      "legacy_behavior": "Pool selection, cooling, three limit requeues",
+      "legacy_source": "MH pool",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "CRD-003"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-081",
+      "legacy_behavior": "Auth quarantine and probes tied to credential generation",
+      "legacy_source": "MH pool probes",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "CRD-004"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-082",
+      "legacy_behavior": "Sign-in flows for pool accounts",
+      "legacy_source": "DRV \u00a75; HC J4",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "CRD-005",
+        "UI-012"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-083",
+      "legacy_behavior": "Credential sync never overwrites a newer copy; one keeper refreshes Codex",
+      "legacy_source": "DRV \u00a75",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "CRD-006"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-084",
+      "legacy_behavior": "Workers use subscription credentials only (API keys unset)",
+      "legacy_source": "MH WORKER_TEMPLATE",
+      "historical_disposition": "PACK",
+      "requirement_ids": [
+        "CRD-002",
+        "CRD-003"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-085",
+      "legacy_behavior": "The owner's personal token in a cluster Secret",
+      "legacy_source": "DRV \u00a74",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "CRD-007"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-086",
+      "legacy_behavior": "Account priority as data; task-level `Select:` override",
+      "legacy_source": "CR \"Harness routing\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "CRD-009"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-087",
+      "legacy_behavior": "Quota readings and `QUOTA` items",
+      "legacy_source": "MECH",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "CRD-008"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-100",
+      "legacy_behavior": "Item phases; one step per pass; observed facts only",
+      "legacy_source": "TP \u00a72a",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "FLW-002",
+        "FLW-004"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-101",
+      "legacy_behavior": "Ad-hoc jobs: one stage, report posted once",
+      "legacy_source": "DRV \u00a74",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "FLW-003"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-102",
+      "legacy_behavior": "Review verdict protocol, blocking classes, follow-ups, post-merge lines",
+      "legacy_source": "drive.py `REVIEW_PACKET`; CR \"Drive loop\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "FLW-005",
+        "DLV-004"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-103",
+      "legacy_behavior": "Review scope rules",
+      "legacy_source": "DRV \u00a74; CR",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "FLW-006"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-104",
+      "legacy_behavior": "Test-determinism review",
+      "legacy_source": "TRV",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "FLW-007"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-105",
+      "legacy_behavior": "Design review of UI changes",
+      "legacy_source": "DRVW",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "FLW-008"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-106",
+      "legacy_behavior": "Auto-merge armed only with every verdict on the exact head",
+      "legacy_source": "TRV; drive note 933",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "FLW-009"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-107",
+      "legacy_behavior": "Fix rounds while the failure changes; backstop 10",
+      "legacy_source": "DRV \u00a74",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "FLW-010"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-108",
+      "legacy_behavior": "Conflict rounds counted apart (5); markers never pushed",
+      "legacy_source": "DRV \u00a74",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "FLW-011"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-109",
+      "legacy_behavior": "Review tripwire at five",
+      "legacy_source": "CR \"Review tripwire\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "FLW-012"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-110",
+      "legacy_behavior": "A parked item resumes on its open PR",
+      "legacy_source": "CR `resume_parked`",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "FLW-013"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-111",
+      "legacy_behavior": "Outside PRs get one review per head",
+      "legacy_source": "release note 2026-11-03",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "FLW-014"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-112",
+      "legacy_behavior": "Landing sweep",
+      "legacy_source": "DRV \u00a74",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "FLW-015"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-113",
+      "legacy_behavior": "Stranded builds: ship retry or cancel",
+      "legacy_source": "CR `unlanded_builds`",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "FLW-016"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-114",
+      "legacy_behavior": "Follow-ups land in Backlog at low priority",
+      "legacy_source": "DRV \u00a74",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "TRK-018"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-115",
+      "legacy_behavior": "Design chains with dual review and self-repair of the dispatcher",
+      "legacy_source": "MH chains",
+      "historical_disposition": "DROP",
+      "requirement_ids": [
+        "FLW-017"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-116",
+      "legacy_behavior": "Scorecard battery",
+      "legacy_source": "MH `_chain_battery_score`",
+      "historical_disposition": "OUT",
+      "requirement_ids": [
+        "MIG-013"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-117",
+      "legacy_behavior": "A rejected verify records a blocked follow-up request that is never dispatched",
+      "legacy_source": "DRV \u00a74 \"Harness\"",
+      "historical_disposition": "DROP",
+      "requirement_ids": [
+        "TRK-018"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-120",
+      "legacy_behavior": "Branch per item; PR body is the item's text with a link note",
+      "legacy_source": "DRV \u00a74; CR `pr_body`",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "MRG-002",
+        "TRK-017"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-121",
+      "legacy_behavior": "A pushed head resumes at PR creation",
+      "legacy_source": "DRV \"Recovery\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "MRG-002",
+        "REC-012"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-122",
+      "legacy_behavior": "Auto-merge on the matched head; never a direct merge",
+      "legacy_source": "DRV \u00a74 \"Hard rules\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "MRG-003"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-123",
+      "legacy_behavior": "Admin merge past a quarantined job, once per head",
+      "legacy_source": "JQ",
+      "historical_disposition": "PACK",
+      "requirement_ids": [
+        "MRG-004"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-124",
+      "legacy_behavior": "Behind or conflicting: merge main in; review before re-arming",
+      "legacy_source": "DRV \u00a74; drive notes 196\u2013197",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "MRG-005"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-125",
+      "legacy_behavior": "Only required checks drive rounds; policy never guessed; missing check after 30 min",
+      "legacy_source": "CR `ci_round`, `missing_checks`",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "MRG-006"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-126",
+      "legacy_behavior": "Auto-merge for the earlier head is dropped before a fix head",
+      "legacy_source": "DRV \u00a74",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "MRG-007"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-127",
+      "legacy_behavior": "Merged and closed observed; a landed squash is proved by tree",
+      "legacy_source": "TP \u00a75; drive note 122",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "MRG-008"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-128",
+      "legacy_behavior": "A stalled merge is re-triggered once, then parked",
+      "legacy_source": "TP \u00a75; HARNESS-242",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "MRG-009"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-129",
+      "legacy_behavior": "A merged PR's own runs are cancelled",
+      "legacy_source": "release note 2026-11-04",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "MRG-010"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-130",
+      "legacy_behavior": "The shipping fence: receipt for the pair, approval of the head, tree identity",
+      "legacy_source": "DESIGN \u00a73.7a",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "MRG-011"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-131",
+      "legacy_behavior": "Internal pushes bypass repository hooks",
+      "legacy_source": "DRV \"Recovery\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "MRG-012"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-132",
+      "legacy_behavior": "Branch names are shell-quoted",
+      "legacy_source": "drive note 376",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "MRG-013"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-140",
+      "legacy_behavior": "Red main, red scheduled runs and `workflow_run` deploys sensed; hand runs count",
+      "legacy_source": "DRV \u00a73; HARNESS-241",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "CIH-001"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-141",
+      "legacy_behavior": "One item per incident; three triage attempts; re-run attempts told apart",
+      "legacy_source": "CR `queue_triage`",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "CIH-002"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-142",
+      "legacy_behavior": "Infrastructure, estate-access, zero-job and unrunnable failures are not sent to a build",
+      "legacy_source": "CR `infra_cause`, `estate_access`, `zero_jobs`, `queue_unrunnable`",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "CIH-003"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-143",
+      "legacy_behavior": "Only live workflows and runs after onboarding",
+      "legacy_source": "CR `live_workflows`, `first_sync`",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "CIH-001"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-144",
+      "legacy_behavior": "Red-main items close when main goes green",
+      "legacy_source": "CR `close_green`",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "CIH-004"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-145",
+      "legacy_behavior": "Causal proof; confirming on main; verdict events; no-verdict runs; 24-hour limit",
+      "legacy_source": "DRV \u00a74 \"Red main\"; CR incident notes",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "CIH-005"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-146",
+      "legacy_behavior": "Lock-in regression item",
+      "legacy_source": "DRV \u00a74",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "CIH-006"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-147",
+      "legacy_behavior": "Inherited main red is held, not fixed",
+      "legacy_source": "CR `inherited`",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "CIH-007"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-148",
+      "legacy_behavior": "CI log excerpts in the packet; \"could not read the log\" refused once",
+      "legacy_source": "CR `ci_round`",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "CIH-008",
+        "REC-007"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-149",
+      "legacy_behavior": "A runner- or estate-stopped job is re-run once, then goes to self-heal",
+      "legacy_source": "CR `ci_round`",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "CIH-009"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-150",
+      "legacy_behavior": "Flaky-job quarantine; per-test flake ledger",
+      "legacy_source": "JQ; CI-FLAKES",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "CIH-010"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-151",
+      "legacy_behavior": "Flake re-run when failing tests are outside the change",
+      "legacy_source": "CR `flake_rerun`",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "CIH-011"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-152",
+      "legacy_behavior": "Triage may not move jobs to hosted runners or change labels",
+      "legacy_source": "release note 2026-11-03",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "CIH-012"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-153",
+      "legacy_behavior": "Issues and PRs projected onto the board as items",
+      "legacy_source": "CR \"Plane sync\"",
+      "historical_disposition": "DROP",
+      "requirement_ids": [
+        "TRK-017",
+        "FLW-014"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-154",
+      "legacy_behavior": "Health summary and delivery-cost items on the board",
+      "legacy_source": "CR `cost_item`",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "OBS-006",
+        "UI-009"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-155",
+      "legacy_behavior": "Daily reconciliation flags",
+      "legacy_source": "CR `queue_reconciliation`",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "GRM-007"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-156",
+      "legacy_behavior": "Drift consolidation across plan, board, STATUS.md and registers",
+      "legacy_source": "CR \"Drift consolidation\"",
+      "historical_disposition": "DROP",
+      "requirement_ids": [
+        "GRM-007"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-160",
+      "legacy_behavior": "Running-system changes are Done only when deployed and run",
+      "legacy_source": "K3D \"Running-system delivery\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "DLV-001",
+        "DLV-002"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-161",
+      "legacy_behavior": "Release verification with shield, revert, re-groom and lift",
+      "legacy_source": "CR \"Release verification\"",
+      "historical_disposition": "PACK",
+      "requirement_ids": [
+        "DLV-003"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-162",
+      "legacy_behavior": "Post-merge deployment items close when a release carries them out",
+      "legacy_source": "CR \"Self-heal drain\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "DLV-004"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-170",
+      "legacy_behavior": "Infrastructure retries: 3, then 30 minutes \u00d7 2; repeated reason shortcut",
+      "legacy_source": "DRV \u00a74",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "REC-002"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-171",
+      "legacy_behavior": "Failed checks are not infrastructure; a build rebuilds at most twice",
+      "legacy_source": "DRV \u00a74",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "REC-003"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-172",
+      "legacy_behavior": "A missing mirror base is deterministic",
+      "legacy_source": "DRV \u00a74",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "REC-004"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-173",
+      "legacy_behavior": "Five consecutive errors park an item; six cluster-API retries",
+      "legacy_source": "DRV \"Recovery\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "REC-005"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-174",
+      "legacy_behavior": "API rollouts are waited out; nothing is recorded as failed",
+      "legacy_source": "CR \"API rollouts\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "REC-016"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-175",
+      "legacy_behavior": "Version skew skips the pass without writing",
+      "legacy_source": "CR `api_skew`",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "REC-015"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-176",
+      "legacy_behavior": "Parking: Backlog, label dropped, comment; requeue resumes",
+      "legacy_source": "DRV \u00a74",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "REC-006"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-177",
+      "legacy_behavior": "No change \u2192 self-heal with the worker's account",
+      "legacy_source": "DRV \"Recovery\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "REC-007"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-178",
+      "legacy_behavior": "Blocking causes; automatic return",
+      "legacy_source": "CR \"Blocking causes\"",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "REC-008"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-179",
+      "legacy_behavior": "Self-heal outcomes and restrictions",
+      "legacy_source": "SH",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "REC-009"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-180",
+      "legacy_behavior": "`SELF-HEAL-STALLED` after 24 hours",
+      "legacy_source": "CR \"Self-heal drain\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "REC-010"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-181",
+      "legacy_behavior": "One stall comment at four hours; in-flight items logged each pass",
+      "legacy_source": "DRV \u00a74 \"Visibility\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "REC-011"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-182",
+      "legacy_behavior": "Writes recorded once accepted; toggles persisted first",
+      "legacy_source": "drive notes 242, 416, 422",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "REC-012"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-183",
+      "legacy_behavior": "Idempotent submit; a 409 moves to a fresh key",
+      "legacy_source": "DRV \u00a75, \"Recovery\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "REC-013"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-184",
+      "legacy_behavior": "Single writer by CronJob `Forbid` and `Recreate`",
+      "legacy_source": "TP \u00a73; `k8s/deployment.yaml`",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "REC-014"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-185",
+      "legacy_behavior": "Mechanism registry; `SILENT` and `UNREGISTERED` items",
+      "legacy_source": "MECH",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "REC-017",
+        "REC-018"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-186",
+      "legacy_behavior": "Four sensor states",
+      "legacy_source": "MECH",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "REC-019"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-187",
+      "legacy_behavior": "No stop in flight; steering is a prose procedure",
+      "legacy_source": "DRV \u00a77; in-flight-steering",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "REC-020",
+        "REC-021"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-188",
+      "legacy_behavior": "Alarm items updated in place and closed by the system",
+      "legacy_source": "CR (several)",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "REC-023"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-189",
+      "legacy_behavior": "The owner is never a step; Slack only for owner-only or factory-down",
+      "legacy_source": "DRV \u00a76",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "REC-024",
+        "OBS-013"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-200",
+      "legacy_behavior": "An exhausted queue triggers grooming of known work",
+      "legacy_source": "CR (grooming)",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "GRM-001"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-201",
+      "legacy_behavior": "Frontier model only, except a stamped fallback",
+      "legacy_source": "CR (grooming)",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "GRM-002"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-202",
+      "legacy_behavior": "Output validation, in-place repair, no duplicates",
+      "legacy_source": "CR (grooming)",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "GRM-003"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-203",
+      "legacy_behavior": "Inputs by hash; packets filled newest-first; deferrals",
+      "legacy_source": "CR (grooming)",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "GRM-004"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-204",
+      "legacy_behavior": "`GROOMING-STALLED`",
+      "legacy_source": "CR (grooming)",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "GRM-005"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-205",
+      "legacy_behavior": "Shaping: one pass, no reviews",
+      "legacy_source": "TR",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "GRM-006"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-206",
+      "legacy_behavior": "Premises reconciled against observed product state",
+      "legacy_source": "CR (grooming)",
+      "historical_disposition": "PACK",
+      "requirement_ids": [
+        "EXT-004",
+        "GRM-008"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-220",
+      "legacy_behavior": "Operator tools: `add_item`, `requeue`, `pickup_status`, `plane_tasks file`, `queue_audit`, `repos_check`",
+      "legacy_source": "DRV \u00a74; CR",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "CLI-005"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-221",
+      "legacy_behavior": "Read-only MCP server with a curated tool set",
+      "legacy_source": "API.md \"MCP server\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "MCP-002"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-222",
+      "legacy_behavior": "Operator tokens and logins for mutations; audit rows",
+      "legacy_source": "DRV \u00a75; HC J5",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "IAM-004",
+        "IAM-011"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-223",
+      "legacy_behavior": "Identity from a proxy header that in-cluster pods can forge",
+      "legacy_source": "HC decided D2, D16",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "IAM-002"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-224",
+      "legacy_behavior": "Console journeys J1\u2013J5 and J8",
+      "legacy_source": "HC journeys",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "UI-009",
+        "UI-014",
+        "OBS-014"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-225",
+      "legacy_behavior": "Concierge (J6, J7)",
+      "legacy_source": "HC journeys",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "UI-026",
+        "IAM-012"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-226",
+      "legacy_behavior": "Bundle budget, accessibility, keyboard and viewport tests",
+      "legacy_source": "console `check_budget.py`, e2e specs",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "UI-018",
+        "UI-019",
+        "UI-020"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-227",
+      "legacy_behavior": "Live updates over SSE",
+      "legacy_source": "HC decided D5",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "API-008",
+        "UI-021"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-228",
+      "legacy_behavior": "Bounded, redacted read model with `as_of` and coverage",
+      "legacy_source": "FD",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "API-011",
+        "API-012",
+        "OBS-003"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-229",
+      "legacy_behavior": "Needs-attention insights with dismiss and restore",
+      "legacy_source": "API.md HC-14",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "OBS-014"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-230",
+      "legacy_behavior": "Request landing and sentence-to-tasks decomposition",
+      "legacy_source": "API.md \"Write side\"",
+      "historical_disposition": "DROP",
+      "requirement_ids": [
+        "TRK-012"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-240",
+      "legacy_behavior": "Metric definitions with cohorts, clocks and missingness",
+      "legacy_source": "measurement contract",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "OBS-004"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-241",
+      "legacy_behavior": "Delivery cost: agent-minutes per merged change",
+      "legacy_source": "DRV \u00a73",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "OBS-006"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-242",
+      "legacy_behavior": "OTLP export through an outbox with counted drops",
+      "legacy_source": "MH trace outbox",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "OBS-012"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-243",
+      "legacy_behavior": "Daily pipeline record",
+      "legacy_source": "JQ \"Record\"",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "OBS-009"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-244",
+      "legacy_behavior": "Queue census",
+      "legacy_source": "DRV \u00a75",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "OBS-008"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-260",
+      "legacy_behavior": "Pull-based release controller; digest compare-and-swap; no cluster credential in CI",
+      "legacy_source": "RC",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "QLT-024",
+        "DEP-020",
+        "QLT-023"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-261",
+      "legacy_behavior": "Releases keep the suspend state",
+      "legacy_source": "DRV \u00a74",
+      "historical_disposition": "KEEP",
+      "requirement_ids": [
+        "SCH-012"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-262",
+      "legacy_behavior": "Merged is not released; releases were manual",
+      "legacy_source": "TP conformance row 8",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "QLT-024",
+        "DLV-002"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-263",
+      "legacy_behavior": "A hand-applied Role blocked every release",
+      "legacy_source": "release note 2026-11-12",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "DEP-002"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-264",
+      "legacy_behavior": "A bundle size cap pushed comments out of the code",
+      "legacy_source": "CR; MECH \"Release bundle\"",
+      "historical_disposition": "DROP",
+      "requirement_ids": [
+        "DEP-020"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-265",
+      "legacy_behavior": "`Recreate` leaves 30\u201340 seconds with nothing listening",
+      "legacy_source": "CR \"API rollouts\"",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "DEP-009",
+        "DEP-010"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-266",
+      "legacy_behavior": "The running revision is visible only as a cluster annotation",
+      "legacy_source": "TP conformance row 7",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "API-014"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-280",
+      "legacy_behavior": "Estate mechanisms beyond the pipeline are watched (runners, certificates, backups)",
+      "legacy_source": "`mechanisms.yaml`",
+      "historical_disposition": "OUT",
+      "requirement_ids": [
+        "REC-018",
+        "MIG-012"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-281",
+      "legacy_behavior": "An agent writes throughput reports and Slack cards",
+      "legacy_source": "DRV \u00a76",
+      "historical_disposition": "FIX",
+      "requirement_ids": [
+        "OBS-009",
+        "OBS-013"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-282",
+      "legacy_behavior": "Experiment rig sharing the control plane",
+      "legacy_source": "DESIGN \u00a70",
+      "historical_disposition": "OUT",
+      "requirement_ids": [
+        "MIG-013"
+      ],
+      "current_disposition": "covered_by_current_requirements",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-283",
+      "legacy_behavior": "Template workflows, roles, skills, `dispatch`/`validate`/`emit`",
+      "legacy_source": "meta-harness templates, scripts",
+      "historical_disposition": "OUT",
+      "requirement_ids": [],
+      "current_disposition": "retained_need_requires_explicit_owner_disposition",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    },
+    {
+      "id": "LP-284",
+      "legacy_behavior": "Task registers and STATUS.md",
+      "legacy_source": "meta-harness",
+      "historical_disposition": "OUT",
+      "requirement_ids": [],
+      "current_disposition": "retained_need_requires_explicit_owner_disposition",
+      "source": "history/2026-11-12/16-legacy-parity.md"
+    }
+  ],
+  "rule": "A historical DROP/replaced/unobserved label is not approval to cut current owner scope; verify affected consumer before migration."
+}

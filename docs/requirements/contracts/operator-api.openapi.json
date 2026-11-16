@@ -1,0 +1,3744 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Sortyard ecosystem operator control plane \u2014 planned contract",
+    "version": "requirements-2.0",
+    "description": "Future additive interface; does not replace served runtime OpenAPI or advertise existing implementation."
+  },
+  "x-sortyard-contract-status": "planned",
+  "paths": {
+    "/v1/capabilities": {
+      "get": {
+        "operationId": "listCallableCapabilities",
+        "description": "Planned operator-control contract; runtime discovery exposes only installed handlers.",
+        "responses": {
+          "200": {
+            "description": "Authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid contract/arguments",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid authenticated principal",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current authority does not permit operation",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No accessible resource",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Domain state, capacity, owner epoch or idempotency conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Retained cursor/plan unavailable; resync required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale expected revision",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Schema/domain validation refused",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "Required expected revision absent",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Scoped rate/resource limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Required owner/substrate capability unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appwriteBackedSession": []
+          },
+          {
+            "delegatedAgentBearer": []
+          }
+        ],
+        "x-sortyard-control-surface": [
+          "ui",
+          "agent"
+        ],
+        "x-sortyard-implementation": "planned"
+      }
+    },
+    "/v1/resource-types": {
+      "get": {
+        "operationId": "listResourceTypes",
+        "description": "Planned operator-control contract; runtime discovery exposes only installed handlers.",
+        "responses": {
+          "200": {
+            "description": "Authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourceTypePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid contract/arguments",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid authenticated principal",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current authority does not permit operation",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No accessible resource",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Domain state, capacity, owner epoch or idempotency conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Retained cursor/plan unavailable; resync required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale expected revision",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Schema/domain validation refused",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "Required expected revision absent",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Scoped rate/resource limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Required owner/substrate capability unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appwriteBackedSession": []
+          },
+          {
+            "delegatedAgentBearer": []
+          }
+        ],
+        "x-sortyard-control-surface": [
+          "ui",
+          "agent"
+        ],
+        "x-sortyard-implementation": "planned"
+      }
+    },
+    "/v1/workspaces/{workspace_id}/resource-lookups": {
+      "post": {
+        "operationId": "resolveResources",
+        "description": "Planned operator-control contract; runtime discovery exposes only installed handlers.",
+        "responses": {
+          "200": {
+            "description": "Authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid contract/arguments",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid authenticated principal",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current authority does not permit operation",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No accessible resource",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Domain state, capacity, owner epoch or idempotency conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Retained cursor/plan unavailable; resync required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale expected revision",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Schema/domain validation refused",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "Required expected revision absent",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Scoped rate/resource limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Required owner/substrate capability unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appwriteBackedSession": []
+          },
+          {
+            "delegatedAgentBearer": []
+          }
+        ],
+        "x-sortyard-control-surface": [
+          "ui",
+          "agent"
+        ],
+        "x-sortyard-implementation": "planned",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LookupArguments"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/resources": {
+      "get": {
+        "operationId": "listScopedResources",
+        "description": "Planned operator-control contract; runtime discovery exposes only installed handlers.",
+        "responses": {
+          "200": {
+            "description": "Authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid contract/arguments",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid authenticated principal",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current authority does not permit operation",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No accessible resource",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Domain state, capacity, owner epoch or idempotency conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Retained cursor/plan unavailable; resync required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale expected revision",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Schema/domain validation refused",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "Required expected revision absent",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Scoped rate/resource limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Required owner/substrate capability unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appwriteBackedSession": []
+          },
+          {
+            "delegatedAgentBearer": []
+          }
+        ],
+        "x-sortyard-control-surface": [
+          "ui",
+          "agent"
+        ],
+        "x-sortyard-implementation": "planned",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/workspaces/{workspace_id}/action-plans": {
+      "post": {
+        "operationId": "prepareActionPlan",
+        "description": "Planned operator-control contract; runtime discovery exposes only installed handlers.",
+        "responses": {
+          "200": {
+            "description": "Authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid contract/arguments",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid authenticated principal",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current authority does not permit operation",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No accessible resource",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Domain state, capacity, owner epoch or idempotency conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Retained cursor/plan unavailable; resync required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale expected revision",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Schema/domain validation refused",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "Required expected revision absent",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Scoped rate/resource limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Required owner/substrate capability unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appwriteBackedSession": []
+          },
+          {
+            "delegatedAgentBearer": []
+          }
+        ],
+        "x-sortyard-control-surface": [
+          "ui",
+          "agent"
+        ],
+        "x-sortyard-implementation": "planned",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Command"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/actions": {
+      "post": {
+        "operationId": "executeOperatorAction",
+        "description": "Planned operator-control contract; runtime discovery exposes only installed handlers.",
+        "responses": {
+          "202": {
+            "description": "Authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid contract/arguments",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid authenticated principal",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current authority does not permit operation",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No accessible resource",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Domain state, capacity, owner epoch or idempotency conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Retained cursor/plan unavailable; resync required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale expected revision",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Schema/domain validation refused",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "Required expected revision absent",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Scoped rate/resource limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Required owner/substrate capability unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appwriteBackedSession": []
+          },
+          {
+            "delegatedAgentBearer": []
+          }
+        ],
+        "x-sortyard-control-surface": [
+          "ui",
+          "agent"
+        ],
+        "x-sortyard-implementation": "planned",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Command"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/operations/{operation_id}": {
+      "get": {
+        "operationId": "getOperation",
+        "description": "Planned operator-control contract; runtime discovery exposes only installed handlers.",
+        "responses": {
+          "200": {
+            "description": "Authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid contract/arguments",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid authenticated principal",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current authority does not permit operation",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No accessible resource",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Domain state, capacity, owner epoch or idempotency conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Retained cursor/plan unavailable; resync required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale expected revision",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Schema/domain validation refused",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "Required expected revision absent",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Scoped rate/resource limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Required owner/substrate capability unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appwriteBackedSession": []
+          },
+          {
+            "delegatedAgentBearer": []
+          }
+        ],
+        "x-sortyard-control-surface": [
+          "ui",
+          "agent"
+        ],
+        "x-sortyard-implementation": "planned",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/workspaces/{workspace_id}/events": {
+      "get": {
+        "operationId": "listAuthorizedEvents",
+        "description": "Planned operator-control contract; runtime discovery exposes only installed handlers.",
+        "responses": {
+          "200": {
+            "description": "Authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid contract/arguments",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid authenticated principal",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current authority does not permit operation",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No accessible resource",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Domain state, capacity, owner epoch or idempotency conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Retained cursor/plan unavailable; resync required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale expected revision",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Schema/domain validation refused",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "Required expected revision absent",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Scoped rate/resource limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Required owner/substrate capability unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appwriteBackedSession": []
+          },
+          {
+            "delegatedAgentBearer": []
+          }
+        ],
+        "x-sortyard-control-surface": [
+          "ui",
+          "agent"
+        ],
+        "x-sortyard-implementation": "planned",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/workspaces/{workspace_id}/policy-evaluations": {
+      "post": {
+        "operationId": "evaluatePolicySnapshot",
+        "description": "Planned operator-control contract; runtime discovery exposes only installed handlers.",
+        "responses": {
+          "200": {
+            "description": "Authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourceEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid contract/arguments",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid authenticated principal",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current authority does not permit operation",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No accessible resource",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Domain state, capacity, owner epoch or idempotency conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Retained cursor/plan unavailable; resync required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale expected revision",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Schema/domain validation refused",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "Required expected revision absent",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Scoped rate/resource limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Required owner/substrate capability unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appwriteBackedSession": []
+          },
+          {
+            "delegatedAgentBearer": []
+          }
+        ],
+        "x-sortyard-control-surface": [
+          "ui",
+          "agent"
+        ],
+        "x-sortyard-implementation": "planned",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluatePolicyArguments"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/graph-queries": {
+      "post": {
+        "operationId": "queryAuthorizedGraph",
+        "description": "Planned operator-control contract; runtime discovery exposes only installed handlers.",
+        "responses": {
+          "200": {
+            "description": "Authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid contract/arguments",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid authenticated principal",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current authority does not permit operation",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No accessible resource",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Domain state, capacity, owner epoch or idempotency conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Retained cursor/plan unavailable; resync required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale expected revision",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Schema/domain validation refused",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "Required expected revision absent",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Scoped rate/resource limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Required owner/substrate capability unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appwriteBackedSession": []
+          },
+          {
+            "delegatedAgentBearer": []
+          }
+        ],
+        "x-sortyard-control-surface": [
+          "ui",
+          "agent"
+        ],
+        "x-sortyard-implementation": "planned",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphQuery"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/events/stream": {
+      "get": {
+        "operationId": "streamAuthorizedEvents",
+        "description": "Planned operator-control contract; runtime discovery exposes only installed handlers.",
+        "responses": {
+          "200": {
+            "description": "At-least-once authorized Event envelopes; id is the durable opaque owner/workspace cursor, never arrival order. Close/re-authorize on revocation. Retention gap is410.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid contract/arguments",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid authenticated principal",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current authority does not permit operation",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No accessible resource",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Domain state, capacity, owner epoch or idempotency conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Retained cursor/plan unavailable; resync required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale expected revision",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Schema/domain validation refused",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "Required expected revision absent",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Scoped rate/resource limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Required owner/substrate capability unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appwriteBackedSession": []
+          },
+          {
+            "delegatedAgentBearer": []
+          }
+        ],
+        "x-sortyard-control-surface": [
+          "ui",
+          "agent"
+        ],
+        "x-sortyard-implementation": "planned",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Last-Event-ID",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/schemas/{schema_id}": {
+      "get": {
+        "operationId": "getRegisteredSchema",
+        "description": "Planned operator-control contract; runtime discovery exposes only installed handlers.",
+        "responses": {
+          "200": {
+            "description": "Authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchemaDocument"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid contract/arguments",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid authenticated principal",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current authority does not permit operation",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No accessible resource",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Domain state, capacity, owner epoch or idempotency conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Retained cursor/plan unavailable; resync required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale expected revision",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Schema/domain validation refused",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "Required expected revision absent",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Scoped rate/resource limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Required owner/substrate capability unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appwriteBackedSession": []
+          },
+          {
+            "delegatedAgentBearer": []
+          }
+        ],
+        "x-sortyard-control-surface": [
+          "ui",
+          "agent"
+        ],
+        "x-sortyard-implementation": "planned",
+        "parameters": [
+          {
+            "name": "schema_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/workspaces/{workspace_id}/resources/{kind}/{resource_id}": {
+      "get": {
+        "operationId": "getScopedResource",
+        "description": "Planned operator-control contract; runtime discovery exposes only installed handlers.",
+        "responses": {
+          "200": {
+            "description": "Authorized result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourceEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid contract/arguments",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid authenticated principal",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current authority does not permit operation",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No accessible resource",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Domain state, capacity, owner epoch or idempotency conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Retained cursor/plan unavailable; resync required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale expected revision",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Schema/domain validation refused",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "Required expected revision absent",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Scoped rate/resource limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Required owner/substrate capability unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appwriteBackedSession": []
+          },
+          {
+            "delegatedAgentBearer": []
+          }
+        ],
+        "x-sortyard-control-surface": [
+          "ui",
+          "agent"
+        ],
+        "x-sortyard-implementation": "planned",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resource_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ResourceRef": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string"
+          },
+          "installation_id": {
+            "type": "string"
+          },
+          "workspace_id": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "Installation",
+              "Workspace",
+              "Project",
+              "Repository",
+              "Milestone",
+              "Task",
+              "Decision",
+              "ArchetypeVersion",
+              "WorkflowVersion",
+              "RoleDefinitionVersion",
+              "SkillVersion",
+              "ContextRecipeVersion",
+              "QualityBarVersion",
+              "DefinitionProposal",
+              "DefinitionAssignment",
+              "Policy",
+              "PolicyVersion",
+              "PolicyDecision",
+              "ContextPacket",
+              "AgentDefinition",
+              "AgentRun",
+              "Lane",
+              "ExecutionBinding",
+              "Chain",
+              "StageRun",
+              "GroomingPass",
+              "TriageCase",
+              "RepairAttempt",
+              "Mechanism",
+              "DeliveryObservation",
+              "CapabilityGrant",
+              "Operation",
+              "ActionPlan",
+              "ServiceConnection",
+              "ExternalReference",
+              "Discovery",
+              "ImprovementProposal",
+              "Adoption",
+              "OutcomeObservation",
+              "DocumentArtifact",
+              "Intent",
+              "Goal",
+              "KeyResult",
+              "MemoryObservation",
+              "KnowledgeFact",
+              "Corpus",
+              "RankedCandidate",
+              "Loop",
+              "Experiment",
+              "NotificationCondition",
+              "BrowserOperation",
+              "Requirement",
+              "DesignRecord",
+              "ContractVersion",
+              "ProcedureVersion",
+              "IntendedUseRecord",
+              "Need",
+              "ExtensionRegistration",
+              "Operator",
+              "Membership"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "service",
+          "installation_id",
+          "kind",
+          "id"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "Workspace",
+                    "Project",
+                    "Repository",
+                    "Milestone",
+                    "Task",
+                    "Decision",
+                    "ArchetypeVersion",
+                    "WorkflowVersion",
+                    "RoleDefinitionVersion",
+                    "SkillVersion",
+                    "ContextRecipeVersion",
+                    "QualityBarVersion",
+                    "DefinitionProposal",
+                    "DefinitionAssignment",
+                    "Policy",
+                    "PolicyVersion",
+                    "PolicyDecision",
+                    "ContextPacket",
+                    "AgentDefinition",
+                    "AgentRun",
+                    "Lane",
+                    "ExecutionBinding",
+                    "Chain",
+                    "StageRun",
+                    "GroomingPass",
+                    "TriageCase",
+                    "RepairAttempt",
+                    "Mechanism",
+                    "DeliveryObservation",
+                    "CapabilityGrant",
+                    "Operation",
+                    "ActionPlan",
+                    "ServiceConnection",
+                    "ExternalReference",
+                    "Discovery",
+                    "ImprovementProposal",
+                    "Adoption",
+                    "OutcomeObservation",
+                    "DocumentArtifact",
+                    "Requirement",
+                    "DesignRecord",
+                    "ContractVersion",
+                    "ProcedureVersion",
+                    "IntendedUseRecord",
+                    "Need",
+                    "ExtensionRegistration",
+                    "Operator",
+                    "Membership"
+                  ]
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "required": [
+                "workspace_id"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "Project",
+                    "Repository",
+                    "Milestone",
+                    "Task",
+                    "DefinitionAssignment",
+                    "PolicyDecision",
+                    "ContextPacket",
+                    "AgentRun",
+                    "ExecutionBinding",
+                    "Chain",
+                    "StageRun",
+                    "GroomingPass",
+                    "TriageCase",
+                    "RepairAttempt",
+                    "DeliveryObservation",
+                    "Discovery",
+                    "ImprovementProposal",
+                    "Adoption",
+                    "OutcomeObservation",
+                    "Requirement",
+                    "DesignRecord",
+                    "IntendedUseRecord",
+                    "Need"
+                  ]
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "required": [
+                "project_id"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "ArchetypeVersion",
+                    "WorkflowVersion",
+                    "RoleDefinitionVersion",
+                    "SkillVersion",
+                    "ContextRecipeVersion",
+                    "QualityBarVersion",
+                    "PolicyVersion",
+                    "ContractVersion",
+                    "ProcedureVersion"
+                  ]
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "required": [
+                "version"
+              ]
+            }
+          }
+        ]
+      },
+      "Problem": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "reason_code": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "operation_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "resync_link": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "reason_code",
+          "request_id"
+        ],
+        "additionalProperties": false
+      },
+      "ResourceEnvelope": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "revision": {
+            "type": "string",
+            "description": "Opaque mutation precondition; distinct from immutable content version."
+          },
+          "authority": {
+            "type": "object",
+            "properties": {
+              "service": {
+                "type": "string"
+              },
+              "epoch": {
+                "type": "string"
+              },
+              "mode": {
+                "enum": [
+                  "authoritative",
+                  "projection",
+                  "reference"
+                ]
+              }
+            },
+            "required": [
+              "service",
+              "epoch",
+              "mode"
+            ],
+            "additionalProperties": false
+          },
+          "schema_version": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "description": "Validated against the installed kind schema; excludes secret values and forbidden fields."
+          },
+          "observation": {
+            "type": "object",
+            "properties": {
+              "observed_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "coverage": {
+                "enum": [
+                  "complete",
+                  "partial",
+                  "unknown"
+                ]
+              },
+              "source_revision": {
+                "type": "string"
+              },
+              "reason_code": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "coverage"
+            ],
+            "additionalProperties": false
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Installed and authorized named action IDs, never a grant."
+            }
+          },
+          "_links": {
+            "type": "object",
+            "properties": {
+              "ui": {
+                "type": "string"
+              },
+              "api": {
+                "type": "string"
+              },
+              "history": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "ui",
+              "api"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "ref",
+          "revision",
+          "authority",
+          "schema_version",
+          "data",
+          "observation",
+          "actions",
+          "_links"
+        ],
+        "additionalProperties": false
+      },
+      "Page": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceEnvelope"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "coverage": {
+            "enum": [
+              "complete",
+              "partial",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "as_of",
+          "coverage"
+        ],
+        "additionalProperties": false
+      },
+      "Capability": {
+        "type": "object",
+        "properties": {
+          "action_id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "handler_version": {
+            "type": "string"
+          },
+          "implemented": {
+            "type": "boolean"
+          },
+          "installed": {
+            "type": "boolean"
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "operational": {
+            "type": "boolean"
+          },
+          "authorized": {
+            "type": "boolean"
+          },
+          "valid_in_state": {
+            "type": "boolean"
+          },
+          "reason_code": {
+            "type": "string"
+          },
+          "request_schema_ref": {
+            "type": "string"
+          },
+          "result_schema_ref": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "action_id",
+          "kind",
+          "handler_version",
+          "implemented",
+          "installed",
+          "configured",
+          "operational",
+          "authorized",
+          "valid_in_state",
+          "request_schema_ref",
+          "result_schema_ref"
+        ],
+        "additionalProperties": false
+      },
+      "Command": {
+        "type": "object",
+        "properties": {
+          "action_id": {
+            "type": "string"
+          },
+          "target": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "arguments": {
+            "type": "object",
+            "description": "Validated against the closed installed action schema. Task user-field patches are then checked against the registered Task field schema; arbitrary state/role/source properties are refused."
+          },
+          "expected_revision": {
+            "type": "string"
+          },
+          "delegation_id": {
+            "type": "string",
+            "description": "Selector only; server resolves current authority."
+          },
+          "reason": {
+            "type": "string"
+          },
+          "plan_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          }
+        },
+        "required": [
+          "action_id",
+          "target",
+          "arguments",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "Operation": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "action_id": {
+            "type": "string"
+          },
+          "target_refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceRef"
+            }
+          },
+          "state": {
+            "enum": [
+              "accepted",
+              "running",
+              "waiting_external",
+              "waiting_verification",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "commit_state": {
+            "enum": [
+              "not_committed",
+              "committed",
+              "unknown"
+            ]
+          },
+          "authority_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "executor_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "result_refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceRef"
+            }
+          },
+          "receipt_refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceRef"
+            }
+          },
+          "problem": {
+            "$ref": "#/components/schemas/Problem"
+          },
+          "_links": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "ref",
+          "action_id",
+          "target_refs",
+          "state",
+          "commit_state",
+          "authority_ref",
+          "executor_ref",
+          "result_refs",
+          "receipt_refs",
+          "_links"
+        ],
+        "additionalProperties": false
+      },
+      "ActionPlan": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "command": {
+            "$ref": "#/components/schemas/Command"
+          },
+          "plan_hash": {
+            "type": "string"
+          },
+          "expected_revisions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "policy_refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceRef"
+            }
+          },
+          "impact_refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceRef"
+            }
+          },
+          "coverage": {
+            "enum": [
+              "complete",
+              "partial",
+              "unknown"
+            ]
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approval_required": {
+            "type": "boolean"
+          },
+          "approval_ref": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ResourceRef"
+              },
+              {
+                "properties": {
+                  "kind": {
+                    "const": "Decision"
+                  }
+                }
+              }
+            ]
+          },
+          "_links": {
+            "type": "object"
+          },
+          "state": {
+            "enum": [
+              "proposed",
+              "ready",
+              "approval_required",
+              "approved",
+              "expired",
+              "superseded",
+              "executed",
+              "rejected"
+            ]
+          }
+        },
+        "required": [
+          "ref",
+          "command",
+          "plan_hash",
+          "expected_revisions",
+          "policy_refs",
+          "impact_refs",
+          "coverage",
+          "expires_at",
+          "approval_required",
+          "_links",
+          "state"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "approval_required": {
+                  "const": true
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "approval_ref"
+              ]
+            }
+          }
+        ]
+      },
+      "Event": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "workspace_id": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "owner_cursor": {
+            "type": "string"
+          },
+          "subject_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "caused_by": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceRef"
+            }
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "type": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "description": "Redacted, schema-validated authorized event data."
+          }
+        },
+        "required": [
+          "id",
+          "owner",
+          "workspace_id",
+          "owner_cursor",
+          "subject_ref",
+          "caused_by",
+          "observed_at",
+          "type",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "EventPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "as_of"
+        ],
+        "additionalProperties": false
+      },
+      "GrantArguments": {
+        "type": "object",
+        "properties": {
+          "executor_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "scope_refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceRef"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "audience": {
+            "type": "string"
+          },
+          "parent_grant_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/GrantLimits"
+          }
+        },
+        "required": [
+          "executor_ref",
+          "scope_refs",
+          "actions",
+          "expires_at",
+          "audience"
+        ],
+        "additionalProperties": false
+      },
+      "PolicyArguments": {
+        "type": "object",
+        "properties": {
+          "owner_contract_version": {
+            "type": "string"
+          },
+          "policy_document": {
+            "type": "object",
+            "description": "Validated against the registered policy-owner schema including variant/lifecycle; not interpreted by arbitrary client code."
+          },
+          "why": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "owner_contract_version",
+          "policy_document",
+          "why"
+        ],
+        "additionalProperties": false
+      },
+      "DefinitionArguments": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "source_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "content_hash": {
+            "type": "string"
+          },
+          "document": {
+            "type": "object",
+            "description": "Validated against the registered definition-kind schema."
+          }
+        },
+        "required": [
+          "kind",
+          "content_hash",
+          "document"
+        ],
+        "additionalProperties": false
+      },
+      "AdoptArguments": {
+        "type": "object",
+        "properties": {
+          "version_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "prior_assignment_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "impact_plan_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          }
+        },
+        "required": [
+          "version_ref",
+          "impact_plan_ref"
+        ],
+        "additionalProperties": false
+      },
+      "TaskArguments": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "spec": {
+            "type": "object"
+          },
+          "parent_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "depends_on": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceRef"
+            }
+          },
+          "workflow_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "priority": {
+            "enum": [
+              "urgent",
+              "high",
+              "medium",
+              "low",
+              "none"
+            ],
+            "default": "none"
+          }
+        },
+        "required": [
+          "title",
+          "outcome",
+          "spec",
+          "depends_on"
+        ],
+        "additionalProperties": false
+      },
+      "ReasonArguments": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "GroomArguments": {
+        "type": "object",
+        "properties": {
+          "input_refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceRef"
+            }
+          },
+          "mode": {
+            "enum": [
+              "evaluate",
+              "apply"
+            ]
+          },
+          "expected_project_revision": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "input_refs",
+          "mode",
+          "expected_project_revision"
+        ],
+        "additionalProperties": false
+      },
+      "PursueArguments": {
+        "type": "object",
+        "properties": {
+          "proposal_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "goal_or_key_result_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "expected_outcome": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "proposal_ref",
+          "expected_outcome"
+        ],
+        "additionalProperties": false
+      },
+      "EvaluatePolicyArguments": {
+        "type": "object",
+        "properties": {
+          "decision_point": {
+            "type": "string"
+          },
+          "context_refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceRef"
+            }
+          },
+          "input_snapshot_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "candidate_version_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          }
+        },
+        "required": [
+          "decision_point",
+          "context_refs",
+          "input_snapshot_ref"
+        ],
+        "additionalProperties": false
+      },
+      "ReleaseArguments": {
+        "type": "object",
+        "properties": {
+          "source_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "native_release_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "target_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          }
+        },
+        "required": [
+          "source_ref",
+          "native_release_ref",
+          "target_ref"
+        ],
+        "additionalProperties": false
+      },
+      "LookupArguments": {
+        "type": "object",
+        "properties": {
+          "refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceRef"
+            }
+          }
+        },
+        "required": [
+          "refs"
+        ],
+        "additionalProperties": false
+      },
+      "CapabilityPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Capability"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "running_revision": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "running_revision"
+        ],
+        "additionalProperties": false
+      },
+      "ResourceTypePage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "kind",
+                "schema_version",
+                "owner",
+                "actions"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string"
+                },
+                "schema_version": {
+                  "type": "string"
+                },
+                "owner": {
+                  "type": "string"
+                },
+                "actions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "LaneArguments": {
+        "type": "object",
+        "properties": {
+          "capacity": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "project_refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceRef"
+            }
+          },
+          "resource_envelope_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "capacity",
+          "project_refs",
+          "resource_envelope_ref",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "AgentArguments": {
+        "type": "object",
+        "properties": {
+          "definition_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "definition_ref",
+          "enabled",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "MechanismArguments": {
+        "type": "object",
+        "properties": {
+          "definition_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "schedule": {
+            "type": "string"
+          },
+          "owner_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "definition_ref",
+          "enabled",
+          "schedule",
+          "owner_ref",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "TriageArguments": {
+        "type": "object",
+        "properties": {
+          "classification": {
+            "type": "string"
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceRef"
+            }
+          },
+          "owner_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "classification",
+          "evidence_refs",
+          "owner_ref",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "MembershipArguments": {
+        "type": "object",
+        "properties": {
+          "user_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "role": {
+            "enum": [
+              "viewer",
+              "operator",
+              "admin"
+            ]
+          },
+          "project_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_ref",
+          "role",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "ConnectionArguments": {
+        "type": "object",
+        "properties": {
+          "registered_connector_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "custody_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "scope_refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceRef"
+            }
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "registered_connector_ref",
+          "custody_ref",
+          "scope_refs",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "GraphQuery": {
+        "type": "object",
+        "properties": {
+          "start_refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceRef"
+            }
+          },
+          "edge_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "direction": {
+            "enum": [
+              "outbound",
+              "inbound",
+              "both"
+            ]
+          },
+          "max_depth": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "start_refs",
+          "edge_types",
+          "direction",
+          "max_depth",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "GraphPage": {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceEnvelope"
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "source": {
+                  "$ref": "#/components/schemas/ResourceRef"
+                },
+                "target": {
+                  "$ref": "#/components/schemas/ResourceRef"
+                },
+                "provenance_ref": {
+                  "$ref": "#/components/schemas/ResourceRef"
+                },
+                "observed_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "type",
+                "source",
+                "target",
+                "provenance_ref"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "coverage": {
+            "enum": [
+              "complete",
+              "partial",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "nodes",
+          "edges",
+          "next_cursor",
+          "coverage"
+        ],
+        "additionalProperties": false
+      },
+      "PolicyDecision": {
+        "$ref": "#/components/schemas/ResourceEnvelope"
+      },
+      "TaskPatchArguments": {
+        "type": "object",
+        "properties": {
+          "patch": {
+            "$ref": "#/components/schemas/EditableTaskFields"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "patch",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "SequenceArguments": {
+        "type": "object",
+        "properties": {
+          "ordered_refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceRef"
+            }
+          },
+          "milestone_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ordered_refs",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "LinkArguments": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": [
+              "depends_on",
+              "parent",
+              "relates_to"
+            ]
+          },
+          "target_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "target_ref",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "NoteArguments": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceRef"
+            }
+          }
+        },
+        "required": [
+          "body",
+          "evidence_refs"
+        ],
+        "additionalProperties": false
+      },
+      "DecisionArguments": {
+        "type": "object",
+        "properties": {
+          "option": {
+            "type": "string"
+          },
+          "why": {
+            "type": "string"
+          },
+          "approval": {
+            "type": "object",
+            "properties": {
+              "plan_ref": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/ResourceRef"
+                  },
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "ActionPlan"
+                      }
+                    }
+                  }
+                ]
+              },
+              "plan_hash": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "plan_revision": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "plan_ref",
+              "plan_hash",
+              "plan_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "option",
+          "why"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "approval"
+              ]
+            },
+            "then": {
+              "properties": {
+                "option": {
+                  "enum": [
+                    "approve",
+                    "reject"
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      },
+      "ProjectArguments": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "archetype_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "owner_ref": {
+            "$ref": "#/components/schemas/ResourceRef"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "archetype_ref",
+          "owner_ref"
+        ],
+        "additionalProperties": false
+      },
+      "EditableTaskFields": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "spec": {
+            "type": "object"
+          },
+          "priority": {
+            "enum": [
+              "urgent",
+              "high",
+              "medium",
+              "low",
+              "none"
+            ]
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false,
+        "minProperties": 1
+      },
+      "SchemaDocument": {
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "schema"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "schema": {
+            "type": "object"
+          }
+        },
+        "additionalProperties": false
+      },
+      "GrantLimits": {
+        "type": "object",
+        "properties": {
+          "max_concurrent_operations": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "max_operations": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "JobArguments": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "instructions": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "title",
+          "instructions"
+        ],
+        "additionalProperties": false
+      },
+      "NeedArguments": {
+        "type": "object",
+        "properties": {
+          "evidence_refs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/ResourceRef"
+            }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "evidence_refs",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "securitySchemes": {
+      "appwriteBackedSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "sortyard_session",
+        "description": "Server-validated Appwrite-backed session. Cookie mutations require CSRF protection."
+      },
+      "delegatedAgentBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Narrow Sortyard grant, never a project administrative key."
+      }
+    }
+  }
+}

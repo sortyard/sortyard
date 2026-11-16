@@ -1,0 +1,1189 @@
+{
+  "schema_version": "2.0",
+  "status": "approved",
+  "milestones": [
+    {
+      "id": "MS0",
+      "name": "Coherent contract and substrate qualification",
+      "depends_on": [],
+      "exit_criteria": [
+        "Current requirements retain every legacy ID with explicit amendments and owned integration gaps.",
+        "Pinned local Appwrite primitives and their limits are recorded; remaining adapter/domain proof is named.",
+        "Next-tranche tasks have source contracts and native dependency relations; historical cuts/estimates do not release work."
+      ]
+    },
+    {
+      "id": "MS1",
+      "name": "Scoped resource, identity and action kernel",
+      "depends_on": [
+        "MS0"
+      ],
+      "exit_criteria": [
+        "Appwrite-native boundaries and indexed scope/ID mapping pass domain/provider contracts.",
+        "Individual identity/membership and narrow standing delegation enforce the same scope through UI/API discovery.",
+        "Resources, capabilities, action plans, operations and authorized event/read contracts are usable in the replica."
+      ]
+    },
+    {
+      "id": "MS2",
+      "name": "One project control surface over current owners",
+      "depends_on": [
+        "MS1"
+      ],
+      "exit_criteria": [
+        "A colleague and delegated agent inspect a task, policy, run and delivery evidence through canonical links.",
+        "Policy reads and supported writes route to the owner with lifecycle and attribution; unsupported writer scope stays explicit.",
+        "Archetype/role/skill/context/version adoption, graph, grooming queue and triage are manageable without competing source writers."
+      ]
+    },
+    {
+      "id": "MS3",
+      "name": "Bound native execution",
+      "depends_on": [
+        "MS1",
+        "MS2"
+      ],
+      "exit_criteria": [
+        "Bindings pin required context/skills/workflows and resource/credential envelope.",
+        "Concurrent claims, recovery, stage isolation and lease fencing work against the qualified persistence boundary.",
+        "A scripted complete chain executes through the native engine in the local replica."
+      ]
+    },
+    {
+      "id": "MS4",
+      "name": "Governed native delivery",
+      "depends_on": [
+        "MS3"
+      ],
+      "exit_criteria": [
+        "Required review/checks, conflict handling and landing use the source host native gate with no inferred admin bypass.",
+        "Delivery observations distinguish merge, publication, desired/reconciled revision and health with freshness.",
+        "Release requests follow existing reviewed CI/GitOps; no product-shell deployment or custom restore controller."
+      ]
+    },
+    {
+      "id": "MS5",
+      "name": "Owned unattended operation",
+      "depends_on": [
+        "MS2",
+        "MS4"
+      ],
+      "exit_criteria": [
+        "Each stall/triage class has bounded attempts, owner, observed repair and declared exit.",
+        "Grooming is serialized per project and independently observed mechanisms report stale/unknown honestly.",
+        "Notifications/acknowledgement escalate through the actual owner/goal chain under standing authority."
+      ]
+    },
+    {
+      "id": "MS6",
+      "name": "Measured improvement and portfolio operation",
+      "depends_on": [
+        "MS2"
+      ],
+      "exit_criteria": [
+        "One ranked candidate is pursued once, linked to Closer work, landed and explicitly adopted.",
+        "A binding/run proves usage and outcome evidence retains coverage/confounders; merge alone is not effectiveness.",
+        "Portfolio/concierge/knowledge/experiment views use the same authorized objects and partner capability status."
+      ]
+    },
+    {
+      "id": "MS7",
+      "name": "Qualified project and resource-family handovers",
+      "depends_on": [
+        "MS4",
+        "MS5"
+      ],
+      "exit_criteria": [
+        "Each selected project/family has complete snapshot/provenance, matched behavior and one fenced writer.",
+        "Full policy-history/variant/import snapshot is required only if that policy family actually migrates.",
+        "Rollback/retirement is scoped to accepted owners/consumers; unmigrated meta-harness/Plane and external products remain authoritative."
+      ]
+    },
+    {
+      "id": "MS8",
+      "name": "Independent installation and distribution",
+      "depends_on": [
+        "MS2",
+        "MS4",
+        "MS5",
+        "MS6"
+      ],
+      "exit_criteria": [
+        "A documented private self-hosted installation connects to a supported Appwrite substrate without estate-only assumptions.",
+        "Upgrade, recovery, supply-chain and access boundaries are exercised in the local replica.",
+        "Public naming/licensing/publication or independent-tenant activation retains its explicit authority and isolation acceptance; none is implied by a colleague invitation."
+      ]
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "MS0-dep",
+      "milestone": "MS0",
+      "area": "DEP",
+      "requirement_ids": [
+        "DEP-004",
+        "DEP-018"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS0-dom",
+      "milestone": "MS0",
+      "area": "DOM",
+      "requirement_ids": [
+        "DOM-006"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS0-mig",
+      "milestone": "MS0",
+      "area": "MIG",
+      "requirement_ids": [
+        "MIG-001",
+        "MIG-002",
+        "MIG-006",
+        "MIG-015",
+        "MIG-016",
+        "MIG-017"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS0-qlt",
+      "milestone": "MS0",
+      "area": "QLT",
+      "requirement_ids": [
+        "QLT-002",
+        "QLT-003",
+        "QLT-005",
+        "QLT-010",
+        "QLT-012",
+        "QLT-025",
+        "QLT-050",
+        "QLT-051"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS0-sub",
+      "milestone": "MS0",
+      "area": "SUB",
+      "requirement_ids": [
+        "SUB-001",
+        "SUB-002"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS1-agt",
+      "milestone": "MS1",
+      "area": "AGT",
+      "requirement_ids": [
+        "AGT-001",
+        "AGT-002",
+        "AGT-003",
+        "AGT-004",
+        "AGT-005",
+        "AGT-006",
+        "AGT-007",
+        "AGT-008"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS1-api",
+      "milestone": "MS1",
+      "area": "API",
+      "requirement_ids": [
+        "API-001",
+        "API-002",
+        "API-003",
+        "API-004",
+        "API-005",
+        "API-006",
+        "API-007",
+        "API-008",
+        "API-011",
+        "API-014",
+        "API-015",
+        "API-017",
+        "API-018"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS1-cli",
+      "milestone": "MS1",
+      "area": "CLI",
+      "requirement_ids": [
+        "CLI-001",
+        "CLI-002",
+        "CLI-003"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS1-def",
+      "milestone": "MS1",
+      "area": "DEF",
+      "requirement_ids": [
+        "DEF-002"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS1-dep",
+      "milestone": "MS1",
+      "area": "DEP",
+      "requirement_ids": [
+        "DEP-001",
+        "DEP-002",
+        "DEP-003",
+        "DEP-005",
+        "DEP-006",
+        "DEP-007",
+        "DEP-012",
+        "DEP-013",
+        "DEP-014",
+        "DEP-020"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS1-dom",
+      "milestone": "MS1",
+      "area": "DOM",
+      "requirement_ids": [
+        "DOM-001",
+        "DOM-003"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS1-eco",
+      "milestone": "MS1",
+      "area": "ECO",
+      "requirement_ids": [
+        "ECO-001",
+        "ECO-002"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS1-iam",
+      "milestone": "MS1",
+      "area": "IAM",
+      "requirement_ids": [
+        "IAM-001",
+        "IAM-002",
+        "IAM-003",
+        "IAM-004",
+        "IAM-005",
+        "IAM-006",
+        "IAM-008",
+        "IAM-009",
+        "IAM-010",
+        "IAM-011",
+        "IAM-012"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS1-int",
+      "milestone": "MS1",
+      "area": "INT",
+      "requirement_ids": [
+        "INT-001"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS1-mcp",
+      "milestone": "MS1",
+      "area": "MCP",
+      "requirement_ids": [
+        "MCP-001",
+        "MCP-002",
+        "MCP-003",
+        "MCP-004"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS1-obs",
+      "milestone": "MS1",
+      "area": "OBS",
+      "requirement_ids": [
+        "OBS-001",
+        "OBS-002",
+        "OBS-011",
+        "OBS-015"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS1-qlt",
+      "milestone": "MS1",
+      "area": "QLT",
+      "requirement_ids": [
+        "QLT-004",
+        "QLT-011",
+        "QLT-014",
+        "QLT-022",
+        "QLT-024",
+        "QLT-030",
+        "QLT-031"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS1-rec",
+      "milestone": "MS1",
+      "area": "REC",
+      "requirement_ids": [
+        "REC-013"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS1-sub",
+      "milestone": "MS1",
+      "area": "SUB",
+      "requirement_ids": [
+        "SUB-003",
+        "SUB-004"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS1-trk",
+      "milestone": "MS1",
+      "area": "TRK",
+      "requirement_ids": [
+        "TRK-001",
+        "TRK-002",
+        "TRK-003",
+        "TRK-004",
+        "TRK-005",
+        "TRK-006",
+        "TRK-007",
+        "TRK-008",
+        "TRK-009",
+        "TRK-010",
+        "TRK-012",
+        "TRK-014"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS1-ui",
+      "milestone": "MS1",
+      "area": "UI",
+      "requirement_ids": [
+        "UI-003",
+        "UI-005",
+        "UI-018",
+        "UI-019",
+        "UI-020",
+        "UI-023",
+        "UI-024",
+        "UI-025"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS2-api",
+      "milestone": "MS2",
+      "area": "API",
+      "requirement_ids": [
+        "API-012"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS2-cli",
+      "milestone": "MS2",
+      "area": "CLI",
+      "requirement_ids": [
+        "CLI-004",
+        "CLI-005"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS2-def",
+      "milestone": "MS2",
+      "area": "DEF",
+      "requirement_ids": [
+        "DEF-001",
+        "DEF-003",
+        "DEF-004",
+        "DEF-005",
+        "DEF-007"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS2-dlv",
+      "milestone": "MS2",
+      "area": "DLV",
+      "requirement_ids": [
+        "DLV-001",
+        "DLV-002",
+        "DLV-004"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS2-dom",
+      "milestone": "MS2",
+      "area": "DOM",
+      "requirement_ids": [
+        "DOM-002",
+        "DOM-004",
+        "DOM-005"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS2-eco",
+      "milestone": "MS2",
+      "area": "ECO",
+      "requirement_ids": [
+        "ECO-003",
+        "ECO-004"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS2-ext",
+      "milestone": "MS2",
+      "area": "EXT",
+      "requirement_ids": [
+        "EXT-001",
+        "EXT-006"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS2-grf",
+      "milestone": "MS2",
+      "area": "GRF",
+      "requirement_ids": [
+        "GRF-001",
+        "GRF-002",
+        "GRF-003"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS2-grm",
+      "milestone": "MS2",
+      "area": "GRM",
+      "requirement_ids": [
+        "GRM-003"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS2-imp",
+      "milestone": "MS2",
+      "area": "IMP",
+      "requirement_ids": [
+        "IMP-003",
+        "IMP-005"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS2-int",
+      "milestone": "MS2",
+      "area": "INT",
+      "requirement_ids": [
+        "INT-002",
+        "INT-003",
+        "INT-005",
+        "INT-006",
+        "INT-008",
+        "INT-011"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS2-mig",
+      "milestone": "MS2",
+      "area": "MIG",
+      "requirement_ids": [
+        "MIG-003",
+        "MIG-004",
+        "MIG-005"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS2-obs",
+      "milestone": "MS2",
+      "area": "OBS",
+      "requirement_ids": [
+        "OBS-003"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS2-ops",
+      "milestone": "MS2",
+      "area": "OPS",
+      "requirement_ids": [
+        "OPS-001",
+        "OPS-002",
+        "OPS-003",
+        "OPS-004"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS2-rdy",
+      "milestone": "MS2",
+      "area": "RDY",
+      "requirement_ids": [
+        "RDY-001",
+        "RDY-002",
+        "RDY-003",
+        "RDY-004",
+        "RDY-005",
+        "RDY-006",
+        "RDY-007",
+        "RDY-008",
+        "RDY-010",
+        "RDY-011",
+        "RDY-013",
+        "RDY-015"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS2-sch",
+      "milestone": "MS2",
+      "area": "SCH",
+      "requirement_ids": [
+        "SCH-001",
+        "SCH-002",
+        "SCH-003",
+        "SCH-004",
+        "SCH-005",
+        "SCH-008",
+        "SCH-009",
+        "SCH-010",
+        "SCH-011",
+        "SCH-012",
+        "SCH-013",
+        "SCH-014",
+        "SCH-015",
+        "SCH-017",
+        "SCH-019"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS2-trk",
+      "milestone": "MS2",
+      "area": "TRK",
+      "requirement_ids": [
+        "TRK-011",
+        "TRK-013"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS2-ui",
+      "milestone": "MS2",
+      "area": "UI",
+      "requirement_ids": [
+        "UI-001",
+        "UI-002",
+        "UI-004",
+        "UI-006",
+        "UI-007",
+        "UI-008",
+        "UI-009",
+        "UI-010",
+        "UI-011",
+        "UI-013",
+        "UI-014",
+        "UI-015",
+        "UI-016",
+        "UI-017",
+        "UI-021",
+        "UI-022",
+        "UI-026"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS3-crd",
+      "milestone": "MS3",
+      "area": "CRD",
+      "requirement_ids": [
+        "CRD-010"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS3-def",
+      "milestone": "MS3",
+      "area": "DEF",
+      "requirement_ids": [
+        "DEF-006",
+        "DEF-008"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS3-dep",
+      "milestone": "MS3",
+      "area": "DEP",
+      "requirement_ids": [
+        "DEP-009",
+        "DEP-010",
+        "DEP-016"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS3-exe",
+      "milestone": "MS3",
+      "area": "EXE",
+      "requirement_ids": [
+        "EXE-001",
+        "EXE-002",
+        "EXE-003",
+        "EXE-004",
+        "EXE-005",
+        "EXE-006",
+        "EXE-007",
+        "EXE-008",
+        "EXE-009",
+        "EXE-010",
+        "EXE-012",
+        "EXE-015",
+        "EXE-017",
+        "EXE-018",
+        "EXE-020",
+        "EXE-021",
+        "EXE-022"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS3-ext",
+      "milestone": "MS3",
+      "area": "EXT",
+      "requirement_ids": [
+        "EXT-003"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS3-flw",
+      "milestone": "MS3",
+      "area": "FLW",
+      "requirement_ids": [
+        "FLW-001",
+        "FLW-002",
+        "FLW-003",
+        "FLW-004",
+        "FLW-018"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS3-iam",
+      "milestone": "MS3",
+      "area": "IAM",
+      "requirement_ids": [
+        "IAM-007"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS3-mcp",
+      "milestone": "MS3",
+      "area": "MCP",
+      "requirement_ids": [
+        "MCP-005"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS3-mrg",
+      "milestone": "MS3",
+      "area": "MRG",
+      "requirement_ids": [
+        "MRG-001",
+        "MRG-011"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS3-obs",
+      "milestone": "MS3",
+      "area": "OBS",
+      "requirement_ids": [
+        "OBS-008",
+        "OBS-010"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS3-qlt",
+      "milestone": "MS3",
+      "area": "QLT",
+      "requirement_ids": [
+        "QLT-015",
+        "QLT-043"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS3-rec",
+      "milestone": "MS3",
+      "area": "REC",
+      "requirement_ids": [
+        "REC-001",
+        "REC-006",
+        "REC-011",
+        "REC-012",
+        "REC-014",
+        "REC-015",
+        "REC-020",
+        "REC-021",
+        "REC-022"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS3-sch",
+      "milestone": "MS3",
+      "area": "SCH",
+      "requirement_ids": [
+        "SCH-006",
+        "SCH-007",
+        "SCH-016",
+        "SCH-018"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS4-api",
+      "milestone": "MS4",
+      "area": "API",
+      "requirement_ids": [
+        "API-016"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS4-cih",
+      "milestone": "MS4",
+      "area": "CIH",
+      "requirement_ids": [
+        "CIH-008",
+        "CIH-013"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS4-crd",
+      "milestone": "MS4",
+      "area": "CRD",
+      "requirement_ids": [
+        "CRD-001",
+        "CRD-002",
+        "CRD-003",
+        "CRD-004",
+        "CRD-005",
+        "CRD-006",
+        "CRD-007",
+        "CRD-009"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS4-def",
+      "milestone": "MS4",
+      "area": "DEF",
+      "requirement_ids": [
+        "DEF-009"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS4-dlv",
+      "milestone": "MS4",
+      "area": "DLV",
+      "requirement_ids": [
+        "DLV-003"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS4-exe",
+      "milestone": "MS4",
+      "area": "EXE",
+      "requirement_ids": [
+        "EXE-011",
+        "EXE-013",
+        "EXE-014",
+        "EXE-016"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS4-flw",
+      "milestone": "MS4",
+      "area": "FLW",
+      "requirement_ids": [
+        "FLW-005",
+        "FLW-006",
+        "FLW-007",
+        "FLW-009",
+        "FLW-010",
+        "FLW-011",
+        "FLW-013",
+        "FLW-014",
+        "FLW-015",
+        "FLW-019"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS4-mrg",
+      "milestone": "MS4",
+      "area": "MRG",
+      "requirement_ids": [
+        "MRG-002",
+        "MRG-003",
+        "MRG-004",
+        "MRG-005",
+        "MRG-006",
+        "MRG-007",
+        "MRG-008",
+        "MRG-009",
+        "MRG-010",
+        "MRG-012",
+        "MRG-013"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS4-trk",
+      "milestone": "MS4",
+      "area": "TRK",
+      "requirement_ids": [
+        "TRK-017",
+        "TRK-018"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS4-ui",
+      "milestone": "MS4",
+      "area": "UI",
+      "requirement_ids": [
+        "UI-012"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS5-api",
+      "milestone": "MS5",
+      "area": "API",
+      "requirement_ids": [
+        "API-009"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS5-cih",
+      "milestone": "MS5",
+      "area": "CIH",
+      "requirement_ids": [
+        "CIH-001",
+        "CIH-002",
+        "CIH-003",
+        "CIH-004",
+        "CIH-005",
+        "CIH-006",
+        "CIH-007",
+        "CIH-009",
+        "CIH-010",
+        "CIH-011",
+        "CIH-012"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS5-crd",
+      "milestone": "MS5",
+      "area": "CRD",
+      "requirement_ids": [
+        "CRD-008"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS5-ext",
+      "milestone": "MS5",
+      "area": "EXT",
+      "requirement_ids": [
+        "EXT-004"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS5-flw",
+      "milestone": "MS5",
+      "area": "FLW",
+      "requirement_ids": [
+        "FLW-008",
+        "FLW-012",
+        "FLW-016"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS5-grm",
+      "milestone": "MS5",
+      "area": "GRM",
+      "requirement_ids": [
+        "GRM-001",
+        "GRM-002",
+        "GRM-004",
+        "GRM-005",
+        "GRM-006",
+        "GRM-007"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS5-int",
+      "milestone": "MS5",
+      "area": "INT",
+      "requirement_ids": [
+        "INT-007",
+        "INT-009"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS5-obs",
+      "milestone": "MS5",
+      "area": "OBS",
+      "requirement_ids": [
+        "OBS-013",
+        "OBS-014",
+        "OBS-017"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS5-rdy",
+      "milestone": "MS5",
+      "area": "RDY",
+      "requirement_ids": [
+        "RDY-009",
+        "RDY-012",
+        "RDY-014"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS5-rec",
+      "milestone": "MS5",
+      "area": "REC",
+      "requirement_ids": [
+        "REC-002",
+        "REC-003",
+        "REC-004",
+        "REC-005",
+        "REC-007",
+        "REC-008",
+        "REC-009",
+        "REC-010",
+        "REC-016",
+        "REC-017",
+        "REC-018",
+        "REC-019",
+        "REC-023",
+        "REC-024",
+        "REC-025",
+        "REC-026"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS6-dep",
+      "milestone": "MS6",
+      "area": "DEP",
+      "requirement_ids": [
+        "DEP-011"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS6-exe",
+      "milestone": "MS6",
+      "area": "EXE",
+      "requirement_ids": [
+        "EXE-019"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS6-imp",
+      "milestone": "MS6",
+      "area": "IMP",
+      "requirement_ids": [
+        "IMP-001",
+        "IMP-002",
+        "IMP-004"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS6-int",
+      "milestone": "MS6",
+      "area": "INT",
+      "requirement_ids": [
+        "INT-010"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS6-obs",
+      "milestone": "MS6",
+      "area": "OBS",
+      "requirement_ids": [
+        "OBS-004",
+        "OBS-005",
+        "OBS-006",
+        "OBS-007",
+        "OBS-009",
+        "OBS-012",
+        "OBS-016"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS6-qlt",
+      "milestone": "MS6",
+      "area": "QLT",
+      "requirement_ids": [
+        "QLT-016"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS6-trk",
+      "milestone": "MS6",
+      "area": "TRK",
+      "requirement_ids": [
+        "TRK-015",
+        "TRK-016"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS7-int",
+      "milestone": "MS7",
+      "area": "INT",
+      "requirement_ids": [
+        "INT-004"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS7-mig",
+      "milestone": "MS7",
+      "area": "MIG",
+      "requirement_ids": [
+        "MIG-007",
+        "MIG-008",
+        "MIG-009",
+        "MIG-010",
+        "MIG-011",
+        "MIG-012",
+        "MIG-013",
+        "MIG-014"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS8-api",
+      "milestone": "MS8",
+      "area": "API",
+      "requirement_ids": [
+        "API-010",
+        "API-013"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS8-dep",
+      "milestone": "MS8",
+      "area": "DEP",
+      "requirement_ids": [
+        "DEP-008",
+        "DEP-015",
+        "DEP-017",
+        "DEP-019",
+        "DEP-021"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS8-ext",
+      "milestone": "MS8",
+      "area": "EXT",
+      "requirement_ids": [
+        "EXT-002",
+        "EXT-005",
+        "EXT-007"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    },
+    {
+      "id": "MS8-qlt",
+      "milestone": "MS8",
+      "area": "QLT",
+      "requirement_ids": [
+        "QLT-001",
+        "QLT-013",
+        "QLT-020",
+        "QLT-021",
+        "QLT-023",
+        "QLT-032",
+        "QLT-040",
+        "QLT-041",
+        "QLT-042"
+      ],
+      "task_decomposition": "next-tranche intake only; not one generated task per requirement"
+    }
+  ],
+  "rules": [
+    "Board state is authoritative; no calendar/lane-time/task-count estimates.",
+    "Packages are requirement groupings, not single-PR tasks.",
+    "Decompose only next tranche; <=3 named acceptance tests per feature slice.",
+    "Cross-project capability needs are explicit source contracts and owner work, never prose gates.",
+    "MS6 can start after MS2 through the current execution adapter; it need not wait for full engine replacement.",
+    "Private collaborator pilot does not require every legacy project migration or public release."
+  ],
+  "technical_review": {
+    "reviewer": "independent appwrite_persistence subagent",
+    "result": "PASS",
+    "date": "2026-11-16",
+    "evidence": "evidence/technical-review.md",
+    "scope": "requirements and planned contracts; not runtime implementation"
+  }
+}

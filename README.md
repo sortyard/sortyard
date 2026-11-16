@@ -10,10 +10,15 @@ This repository is at **Phase 1**: the six services exist as entry points, the A
 serves the Phase 1 REST surface of the OpenAPI spec behind service-account tokens and the §7
 permission matrix (below), the chart installs the API plus Postgres with the §3 domain schema
 and the event ledger migrated in, and the conductor can run in shadow mode (below) — observing
-the production conductor's input path and logging what it would claim. See [`MILESTONES.md`](MILESTONES.md) for what lands next.
+the production conductor's input path and logging what it would claim. See the [ecosystem requirements baseline](docs/requirements/README.md) for the current delivery sequence.
 
 Contributors and agents: start with [`AGENTS.md`](AGENTS.md), the repo brief (architecture
 map, build loop, conventions, known gaps).
+
+The current planning authority is the [ecosystem requirements baseline](docs/requirements/README.md). It formalizes meta-harness
+resources, policy and partner API ownership, and equal operator UI/agent API actions.
+Its contracts describe planned capabilities; the code and runbooks below describe the
+existing Postgres implementation.
 
 ## Quickstart — a running, empty Sortyard on a local cluster
 
@@ -201,52 +206,18 @@ request and every push to `main`, plus `helm lint`/`helm template` and a contain
 
 ## Project charter
 
-Sortyard is the open-source harness reboot: the delivery harness (conductor, k3s control
-plane, task manager) rethought from first principles as an open-source package anyone can
-deploy (Helm chart), with a UI for everything for the operator and APIs for everything for
-agents — without losing the control, tunability and flexibility of the current system.
-Joe named it Sortyard on 2026-11-06 ("harness" rejected) and registered sortyard.ai the
-same day; the GitHub org is github.com/sortyard.
-
-The design record is the Sortyard design draft v5, held locally at
-~/workspace/harness-reboot/HARNESS-REBOOT-DRAFT-v5.md (Juno's workspace) until the code
-repo exists; the draft's domain model (§3), architecture (§4) and migration plan (§8) are
-the Phase 0 source of truth.
-
-### Phase 0 scope (freeze the model — no code moves yet)
-
-1. Verify the conductor's fix-round/review semantics from the product-factory source and
-   amend the design draft to match (the design's one unverified fact).
-2. Freeze the domain model: JSON Schemas for every §3 domain object, authored into
-   projects/sortyard/spec/ (definitions in git).
-3. Write the OpenAPI spec for the Sortyard API, including the MCP permission matrix.
-4. Create the code repo github.com/sortyard/sortyard (private) and seed it from
-   projects/sortyard (README, AGENTS.md, LICENSE, spec/, branding/).
-5. Nothing ships and no existing project migrates in Phase 0; later phases are filed
-   separately when Phase 0 lands.
+Sortyard is the human and agent control plane for the ecosystem around the delivery harness.
+It brings project work, governed definitions, policy, execution, triage and improvement into
+one authorized resource graph. Both the operator console and agents use its public domain API.
+[The requirements baseline](docs/requirements/README.md) defines scope, service ownership,
+contracts and the dependency-ordered delivery plan. [Decision records](DECISIONS.md) explain
+the stack and Appwrite substrate direction. Existing implementation and local runbooks above
+remain Postgres-backed until the migration is implemented and accepted.
 
 ### Tracking
 
-Sortyard has its own Plane project — **Sortyard** (identifier `SORTYARD`), at
-https://plane.ts.noncelogic.com/noncelogic/projects/10d493fb-4cef-4ef1-ab70-a0aefca87d59/issues/
-— migrated off the HARNESS board on 2026-11-09 (the 2026-11-08 MH→Plane migration moved
-ROVE/LOOP/CPV2 but left Sortyard behind). Like HARNESS, the SORTYARD product has `tasks: off`
-and no plan file: work enters only as board items created directly (conductor/add_item.py), and
-the board item IS the filing. The project is registered with the conductor in the
-`conductor-config` ConfigMap `products.json` (ns exp-phase0): one lane, `tasks: false`,
-`repo: noncelogic/meta-harness`.
-
-The former HARNESS board items were recreated on the SORTYARD board and the HARNESS originals
-retired (Cancelled, each pointing at its replacement). Old → new: HARNESS-286→SORTYARD-1,
-287→SORTYARD-2 (Done, delivered via PR #259), 288→SORTYARD-3, 289→SORTYARD-4, 310→SORTYARD-5,
-311→SORTYARD-6, 312→SORTYARD-7, 313→SORTYARD-8, 314→SORTYARD-9, 315→SORTYARD-10, 316→SORTYARD-11,
-317→SORTYARD-12, 318→SORTYARD-13, 319→SORTYARD-14, 320→SORTYARD-15, 321→SORTYARD-16. (HARNESS-290,
-the PR #244 review tracker, is a HARNESS item and stays on the HARNESS board.) Do not add a
-plan/tasks file for this project, and do not add a repos.yaml entry yet: the code repo
-github.com/sortyard/sortyard is created by SORTYARD-4 ("Sortyard Phase 0: create
-github.com/sortyard/sortyard (private) and seed it from projects/sortyard").
-
-### Branding
-
-The commissioned Sortyard brand kit (2026-11-06) will live at projects/sortyard/branding/
-when the package lands; see projects/sortyard/branding/README.md.
+Execution state, ordering, parent scopes and blocked-by relations live on the
+[Sortyard Plane board](https://plane.ts.noncelogic.com/noncelogic/projects/10d493fb-4cef-4ef1-ab70-a0aefca87d59/issues/).
+Product changes target `sortyard/sortyard`. Meta-harness stays commit-forward for unmigrated
+governance and definitions; it is not a second task-status store. The historical design and
+corpus remain provenance, with the active baseline taking precedence where they conflict.

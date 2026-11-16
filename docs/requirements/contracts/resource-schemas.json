@@ -1,0 +1,4645 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/requirements/resource-schemas-v2.json",
+  "x-status": "planned_contract",
+  "$defs": {
+    "DomainInstallation": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "substrate_connection_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "operator_base_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "authority_registry_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "configured",
+            "ready",
+            "degraded",
+            "disabled"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "substrate_connection_ref",
+        "operator_base_url",
+        "authority_registry_ref",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard"
+    },
+    "DomainWorkspace": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "membership_team_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "owner_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "active",
+            "suspended",
+            "archived"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "membership_team_ref",
+        "owner_ref",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard"
+    },
+    "DomainProject": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "repo_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "archetype_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "owner_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source_authority_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "discovery",
+            "active",
+            "maintain",
+            "archived"
+          ]
+        }
+      },
+      "required": [
+        "key",
+        "name",
+        "repo_refs",
+        "archetype_ref",
+        "owner_ref",
+        "source_authority_ref",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard"
+    },
+    "DomainRepository": {
+      "type": "object",
+      "properties": {
+        "url_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "default_branch": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observed_head": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "connection_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "unconfigured",
+            "ready",
+            "degraded",
+            "disabled",
+            "archived"
+          ]
+        }
+      },
+      "required": [
+        "url_ref",
+        "default_branch",
+        "role",
+        "observed_head",
+        "connection_ref",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard"
+    },
+    "DomainMilestone": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sequence": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "outcome_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "task_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "state": {
+          "enum": [
+            "planned",
+            "active",
+            "completed",
+            "cancelled"
+          ]
+        }
+      },
+      "required": [
+        "title",
+        "sequence",
+        "outcome_ref",
+        "task_refs",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard"
+    },
+    "DomainTask": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "outcome": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "spec_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "depends_on": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "parent_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "milestone_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "priority": {
+          "enum": [
+            "urgent",
+            "high",
+            "medium",
+            "low",
+            "none"
+          ]
+        },
+        "sequence": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "workflow_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "backlog",
+            "todo",
+            "in_progress",
+            "in_review",
+            "done",
+            "cancelled"
+          ]
+        },
+        "queue_status": {
+          "enum": [
+            "unreleased",
+            "released",
+            "claimed",
+            "parked",
+            "handed_back",
+            "needs_human"
+          ]
+        },
+        "queue_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "queue_evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "queue_route_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        }
+      },
+      "required": [
+        "title",
+        "outcome",
+        "spec_ref",
+        "depends_on",
+        "parent_ref",
+        "milestone_ref",
+        "priority",
+        "sequence",
+        "workflow_ref",
+        "state",
+        "queue_status",
+        "queue_reason",
+        "queue_evidence_refs",
+        "queue_route_refs"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-registered-tracker",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "queue_status": {
+                "enum": [
+                  "parked",
+                  "handed_back",
+                  "needs_human"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "queue_reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "queue_status": {
+                "const": "handed_back"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "queue_evidence_refs": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "queue_status": {
+                "const": "needs_human"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "queue_route_refs": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "queue_status": {
+                "const": "claimed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "in_progress",
+                  "in_review"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "done",
+                  "cancelled",
+                  "backlog"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "queue_status": {
+                "const": "unreleased"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "DomainDecision": {
+      "type": "object",
+      "properties": {
+        "question": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "default_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "decide_by": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "premise_class": {
+          "type": "boolean"
+        },
+        "authority_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "application_operation_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "proposed",
+            "pending",
+            "decided",
+            "applied",
+            "rejected",
+            "expired"
+          ]
+        },
+        "decision_kind": {
+          "enum": [
+            "ordinary",
+            "action_plan_approval"
+          ]
+        },
+        "approval_binding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PlanApprovalBinding"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "question",
+        "default_ref",
+        "decide_by",
+        "premise_class",
+        "authority_ref",
+        "application_operation_ref",
+        "state",
+        "decision_kind",
+        "approval_binding"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "decision_kind": {
+                "const": "action_plan_approval"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "approval_binding": {
+                "$ref": "#/$defs/PlanApprovalBinding"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "decision_kind": {
+                "const": "ordinary"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "approval_binding": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "DomainArchetypeVersion": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content_hash": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "workflow_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "role_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "skill_slots": {
+          "type": "array",
+          "items": {}
+        },
+        "context_recipe_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "quality_bar_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "substrate_profile_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "version",
+        "content_hash",
+        "workflow_refs",
+        "role_refs",
+        "skill_slots",
+        "context_recipe_refs",
+        "quality_bar_refs",
+        "substrate_profile_ref"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-git"
+    },
+    "DomainWorkflowVersion": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content_hash": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "stages": {
+          "type": "array",
+          "items": {}
+        },
+        "transitions": {
+          "type": "array",
+          "items": {}
+        },
+        "role_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "policy_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        }
+      },
+      "required": [
+        "version",
+        "content_hash",
+        "stages",
+        "transitions",
+        "role_refs",
+        "policy_refs"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-git"
+    },
+    "DomainRoleDefinitionVersion": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content_hash": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "persona_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "context_recipe_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tool_requirements": {
+          "type": "array",
+          "items": {}
+        },
+        "model_policy_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "version",
+        "content_hash",
+        "persona_ref",
+        "context_recipe_ref",
+        "tool_requirements",
+        "model_policy_ref"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-git"
+    },
+    "DomainSkillVersion": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content_hash": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "artifact_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "required_capabilities": {
+          "type": "array",
+          "items": {}
+        },
+        "compatibility": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "provenance_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "verification_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        }
+      },
+      "required": [
+        "version",
+        "content_hash",
+        "artifact_ref",
+        "required_capabilities",
+        "compatibility",
+        "provenance_refs",
+        "verification_refs"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-git"
+    },
+    "DomainContextRecipeVersion": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content_hash": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "allowlist": {
+          "type": "array",
+          "items": {}
+        },
+        "token_budget": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "provenance_rules": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "sensitivity_rules": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "version",
+        "content_hash",
+        "allowlist",
+        "token_budget",
+        "provenance_rules",
+        "sensitivity_rules"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-git"
+    },
+    "DomainQualityBarVersion": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content_hash": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "contract_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "eval_pack_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "absent_state_rules": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "version",
+        "content_hash",
+        "contract_refs",
+        "eval_pack_refs",
+        "absent_state_rules"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-git"
+    },
+    "DomainDefinitionProposal": {
+      "type": "object",
+      "properties": {
+        "target_kind": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "proposed_content_hash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "review_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "published_version_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "draft",
+            "validated",
+            "in_review",
+            "accepted",
+            "published",
+            "rejected",
+            "withdrawn"
+          ]
+        }
+      },
+      "required": [
+        "target_kind",
+        "proposed_content_hash",
+        "source_ref",
+        "review_ref",
+        "published_version_ref",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard"
+    },
+    "DomainDefinitionAssignment": {
+      "type": "object",
+      "properties": {
+        "definition_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "project_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "overrides": {
+          "type": "array",
+          "items": {}
+        },
+        "activation_epoch": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "effective_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "source_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "proposed",
+            "validated",
+            "active",
+            "superseded",
+            "revoked"
+          ]
+        }
+      },
+      "required": [
+        "definition_ref",
+        "project_ref",
+        "overrides",
+        "activation_epoch",
+        "effective_at",
+        "source_ref",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "registered-definition-owner"
+    },
+    "DomainPolicy": {
+      "type": "object",
+      "properties": {
+        "family": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scope": {
+          "enum": [
+            "global",
+            "project",
+            "workflow",
+            "stage",
+            "corpus",
+            "loop"
+          ]
+        },
+        "scope_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "current_version_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "active_variant_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "consumer_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "state": {
+          "enum": [
+            "candidate",
+            "pending_owner",
+            "active",
+            "retired"
+          ]
+        }
+      },
+      "required": [
+        "family",
+        "scope",
+        "scope_ref",
+        "current_version_ref",
+        "active_variant_refs",
+        "consumer_refs",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "registered-policy-owner"
+    },
+    "DomainPolicyVersion": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content_hash": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "scope": {
+          "enum": [
+            "global",
+            "project",
+            "workflow",
+            "stage",
+            "corpus",
+            "loop"
+          ]
+        },
+        "scope_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parameters": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "enforcement": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "absent_state": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "history_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "import_provenance_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        }
+      },
+      "required": [
+        "version",
+        "content_hash",
+        "scope",
+        "scope_ref",
+        "parameters",
+        "enforcement",
+        "absent_state",
+        "history_refs",
+        "import_provenance_refs"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "registered-policy-owner"
+    },
+    "DomainPolicyDecision": {
+      "type": "object",
+      "properties": {
+        "decision_point": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "consumer_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "policy_version_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "input_snapshot_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "verdict": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason_codes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "fallback": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "conflict_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        }
+      },
+      "required": [
+        "decision_point",
+        "consumer_ref",
+        "policy_version_refs",
+        "input_snapshot_ref",
+        "verdict",
+        "reason_codes",
+        "fallback",
+        "conflict_refs"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-decision-owner"
+    },
+    "DomainContextPacket": {
+      "type": "object",
+      "properties": {
+        "content_hash": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "artifact_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recipe_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "definition_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "policy_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "provenance_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "redaction_receipt": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "content_hash",
+        "artifact_ref",
+        "recipe_ref",
+        "definition_refs",
+        "policy_refs",
+        "provenance_refs",
+        "redaction_receipt"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard"
+    },
+    "DomainAgentDefinition": {
+      "type": "object",
+      "properties": {
+        "harness": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model_policy_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tool_requirements": {
+          "type": "array",
+          "items": {}
+        },
+        "credential_pool_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "capability_requirements": {
+          "type": "array",
+          "items": {}
+        },
+        "state": {
+          "enum": [
+            "draft",
+            "enabled",
+            "disabled",
+            "retired"
+          ]
+        }
+      },
+      "required": [
+        "harness",
+        "model_policy_ref",
+        "tool_requirements",
+        "credential_pool_ref",
+        "capability_requirements",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard"
+    },
+    "DomainAgentRun": {
+      "type": "object",
+      "properties": {
+        "definition_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "executor_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "authority_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "delegation_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "binding_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stage_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attempt": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "started_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "finished_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "outcome_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "queued",
+            "running",
+            "waiting",
+            "succeeded",
+            "failed",
+            "cancelled"
+          ]
+        }
+      },
+      "required": [
+        "definition_ref",
+        "executor_ref",
+        "authority_ref",
+        "delegation_ref",
+        "binding_ref",
+        "stage_ref",
+        "attempt",
+        "started_at",
+        "finished_at",
+        "outcome_ref",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-execution-owner"
+    },
+    "DomainLane": {
+      "type": "object",
+      "properties": {
+        "capacity": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "project_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "resource_envelope_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "occupancy_revision": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "source_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "enabled",
+            "paused",
+            "draining",
+            "disabled"
+          ]
+        }
+      },
+      "required": [
+        "capacity",
+        "project_refs",
+        "resource_envelope_ref",
+        "occupancy_revision",
+        "source_ref",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-execution-owner"
+    },
+    "DomainExecutionBinding": {
+      "type": "object",
+      "properties": {
+        "task_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stage": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "workflow_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "role_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "skill_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "context_packet_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "policy_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "lane_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "place": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "resource_envelope": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "unbound_reasons": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "enum": [
+            "unbound",
+            "bound",
+            "revoked",
+            "expired"
+          ]
+        }
+      },
+      "required": [
+        "task_ref",
+        "stage",
+        "workflow_ref",
+        "role_ref",
+        "skill_refs",
+        "context_packet_ref",
+        "policy_refs",
+        "lane_ref",
+        "place",
+        "resource_envelope",
+        "unbound_reasons",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-execution-owner"
+    },
+    "DomainChain": {
+      "type": "object",
+      "properties": {
+        "task_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "workflow_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stage_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "epoch": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "owner_lease_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "outcome_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "queued",
+            "running",
+            "stalled",
+            "succeeded",
+            "failed",
+            "cancelled"
+          ]
+        }
+      },
+      "required": [
+        "task_ref",
+        "workflow_ref",
+        "stage_refs",
+        "epoch",
+        "owner_lease_ref",
+        "outcome_ref",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-execution-owner"
+    },
+    "DomainStageRun": {
+      "type": "object",
+      "properties": {
+        "chain_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "binding_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attempt": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "epoch": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "agent_run_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "result_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "verification_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "state": {
+          "enum": [
+            "queued",
+            "running",
+            "waiting",
+            "succeeded",
+            "failed",
+            "cancelled"
+          ]
+        }
+      },
+      "required": [
+        "chain_ref",
+        "binding_ref",
+        "attempt",
+        "epoch",
+        "agent_run_ref",
+        "result_ref",
+        "verification_refs",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-execution-owner"
+    },
+    "DomainGroomingPass": {
+      "type": "object",
+      "properties": {
+        "input_snapshot_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "model_policy_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lease_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "proposal_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "applied_operation_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "enum": [
+            "queued",
+            "leased",
+            "evaluating",
+            "proposed",
+            "applying",
+            "succeeded",
+            "failed",
+            "handed_back",
+            "cancelled"
+          ]
+        },
+        "queue_key": {
+          "$ref": "#/$defs/GroomingQueueKey"
+        }
+      },
+      "required": [
+        "input_snapshot_ref",
+        "model_policy_ref",
+        "lease_ref",
+        "proposal_refs",
+        "applied_operation_refs",
+        "reason",
+        "state",
+        "queue_key"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-execution-owner"
+    },
+    "DomainTriageCase": {
+      "type": "object",
+      "properties": {
+        "condition_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "classification": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "owner_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "repair_budget": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "attempt_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "resolution_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "open",
+            "classified",
+            "repairing",
+            "waiting",
+            "verified",
+            "closed",
+            "dismissed"
+          ]
+        }
+      },
+      "required": [
+        "condition_ref",
+        "evidence_refs",
+        "classification",
+        "owner_ref",
+        "repair_budget",
+        "attempt_refs",
+        "resolution_ref",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-execution-owner"
+    },
+    "DomainRepairAttempt": {
+      "type": "object",
+      "properties": {
+        "case_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "action_plan_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "operation_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observed_result_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "remaining_budget": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "state": {
+          "enum": [
+            "planned",
+            "running",
+            "waiting",
+            "succeeded",
+            "failed",
+            "cancelled"
+          ]
+        }
+      },
+      "required": [
+        "case_ref",
+        "action_plan_ref",
+        "operation_ref",
+        "observed_result_ref",
+        "remaining_budget",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-execution-owner"
+    },
+    "DomainMechanism": {
+      "type": "object",
+      "properties": {
+        "owner_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "schedule": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "expected_freshness": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observer_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "last_observation_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "absence_policy_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "configured",
+            "active",
+            "stale",
+            "unknown",
+            "failed",
+            "disabled"
+          ]
+        }
+      },
+      "required": [
+        "owner_ref",
+        "schedule",
+        "expected_freshness",
+        "observer_ref",
+        "last_observation_ref",
+        "absence_policy_ref",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "registered-mechanism-owner"
+    },
+    "DomainDeliveryObservation": {
+      "type": "object",
+      "properties": {
+        "task_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "artifact_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "desired_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reconciled_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "health": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "coverage": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        }
+      },
+      "required": [
+        "task_ref",
+        "source_ref",
+        "artifact_ref",
+        "desired_revision",
+        "reconciled_revision",
+        "health",
+        "observed_at",
+        "coverage",
+        "evidence_refs"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-projection"
+    },
+    "DomainCapabilityGrant": {
+      "type": "object",
+      "properties": {
+        "authority_ref": {
+          "$ref": "#/$defs/ResourceRef"
+        },
+        "executor_ref": {
+          "$ref": "#/$defs/ResourceRef"
+        },
+        "scope": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "audience": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parent_grant_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "issued_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "revoked_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "limits": {
+          "$ref": "#/$defs/GrantLimits"
+        },
+        "state": {
+          "enum": [
+            "issued",
+            "active",
+            "expired",
+            "revoked"
+          ]
+        }
+      },
+      "required": [
+        "authority_ref",
+        "executor_ref",
+        "scope",
+        "actions",
+        "audience",
+        "parent_grant_ref",
+        "issued_at",
+        "expires_at",
+        "revoked_at",
+        "limits",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard"
+    },
+    "DomainOperation": {
+      "type": "object",
+      "properties": {
+        "action_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "authority_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "executor_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "idempotency_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "commit_state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_receipt_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "result_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "accepted",
+            "running",
+            "waiting_external",
+            "waiting_verification",
+            "succeeded",
+            "failed",
+            "cancelled"
+          ]
+        }
+      },
+      "required": [
+        "action_id",
+        "target_refs",
+        "authority_ref",
+        "executor_ref",
+        "idempotency_ref",
+        "commit_state",
+        "source_receipt_refs",
+        "result_ref",
+        "error_ref",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard"
+    },
+    "DomainActionPlan": {
+      "type": "object",
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "normalized_arguments": {
+          "type": "object"
+        },
+        "expected_revisions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "policy_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "impact_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "plan_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "approval_ref": {
+          "anyOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/ResourceRef"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "Decision"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "proposed",
+            "ready",
+            "approval_required",
+            "approved",
+            "expired",
+            "superseded",
+            "executed",
+            "rejected"
+          ]
+        },
+        "approval_required": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "action_id",
+        "target_refs",
+        "normalized_arguments",
+        "expected_revisions",
+        "policy_refs",
+        "impact_refs",
+        "plan_hash",
+        "expires_at",
+        "approval_ref",
+        "state",
+        "approval_required"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "approval_required": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "approval_ref": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/ResourceRef"
+                  },
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "Decision"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "DomainServiceConnection": {
+      "type": "object",
+      "properties": {
+        "service": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "installation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "endpoint_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "contract_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "custody_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scope_mapping": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "capability_manifest": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "observed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "state": {
+          "enum": [
+            "unconfigured",
+            "configured",
+            "healthy",
+            "degraded",
+            "unavailable",
+            "disabled"
+          ]
+        }
+      },
+      "required": [
+        "service",
+        "installation",
+        "endpoint_ref",
+        "contract_version",
+        "custody_ref",
+        "scope_mapping",
+        "capability_manifest",
+        "observed_at",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard"
+    },
+    "DomainExternalReference": {
+      "type": "object",
+      "properties": {
+        "owner_service": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "owner_installation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "external_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "external_scope": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "external_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_link": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "state": {
+          "enum": [
+            "observed",
+            "stale",
+            "unknown",
+            "unavailable"
+          ]
+        }
+      },
+      "required": [
+        "owner_service",
+        "owner_installation",
+        "external_id",
+        "external_scope",
+        "external_version",
+        "source_link",
+        "observed_at",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-projection"
+    },
+    "DomainDiscovery": {
+      "type": "object",
+      "properties": {
+        "source_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "content_hash": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "classification": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "provenance_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "ranked_candidate_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "captured",
+            "classified",
+            "ranked",
+            "superseded",
+            "rejected"
+          ]
+        }
+      },
+      "required": [
+        "source_ref",
+        "content_hash",
+        "classification",
+        "provenance_refs",
+        "ranked_candidate_ref",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-ranker"
+    },
+    "DomainImprovementProposal": {
+      "type": "object",
+      "properties": {
+        "discovery_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "applicability": {
+          "type": "array",
+          "items": {}
+        },
+        "expected_outcome_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "ranked_candidate_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "loop_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "task_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "state": {
+          "enum": [
+            "proposed",
+            "evaluated",
+            "accepted",
+            "rejected",
+            "superseded",
+            "withdrawn"
+          ]
+        }
+      },
+      "required": [
+        "discovery_ref",
+        "applicability",
+        "expected_outcome_ref",
+        "evidence_refs",
+        "ranked_candidate_ref",
+        "loop_ref",
+        "task_refs",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard"
+    },
+    "DomainAdoption": {
+      "type": "object",
+      "properties": {
+        "proposal_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "version_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "project_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "prior_assignment_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "operation_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "usage_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "outcome_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "state": {
+          "enum": [
+            "proposed",
+            "validated",
+            "applying",
+            "applied",
+            "observing",
+            "verified",
+            "reverted",
+            "failed"
+          ]
+        }
+      },
+      "required": [
+        "proposal_ref",
+        "version_ref",
+        "project_ref",
+        "prior_assignment_ref",
+        "operation_ref",
+        "usage_refs",
+        "outcome_refs",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard"
+    },
+    "DomainOutcomeObservation": {
+      "type": "object",
+      "properties": {
+        "adoption_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "metric_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "measurement_window": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "input_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "result": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "coverage": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "confounders": {
+          "type": "array",
+          "items": {}
+        },
+        "evidence_strength": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "adoption_ref",
+        "metric_ref",
+        "measurement_window",
+        "input_refs",
+        "result",
+        "coverage",
+        "confounders",
+        "evidence_strength"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-projection"
+    },
+    "DomainDocumentArtifact": {
+      "type": "object",
+      "properties": {
+        "source_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "content_hash": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "media_type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sensitivity": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provenance_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        }
+      },
+      "required": [
+        "source_ref",
+        "source_version",
+        "content_hash",
+        "media_type",
+        "sensitivity",
+        "provenance_refs"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "registered-source-owner"
+    },
+    "DomainIntent": {
+      "type": "object",
+      "properties": {
+        "owner_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "external_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provider_state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "owner_ref",
+        "external_ref",
+        "provider_state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "cortexplane"
+    },
+    "DomainGoal": {
+      "type": "object",
+      "properties": {
+        "owner_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "external_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parent_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "key_result_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "provider_state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "owner_ref",
+        "external_ref",
+        "parent_ref",
+        "key_result_refs",
+        "provider_state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "cortexplane"
+    },
+    "DomainKeyResult": {
+      "type": "object",
+      "properties": {
+        "owner_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "external_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "goal_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observation_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "provider_state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "owner_ref",
+        "external_ref",
+        "goal_ref",
+        "observation_refs",
+        "provider_state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "cortexplane"
+    },
+    "DomainMemoryObservation": {
+      "type": "object",
+      "properties": {
+        "external_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provenance_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "observed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "provider_state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "external_ref",
+        "provenance_refs",
+        "observed_at",
+        "provider_state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "walwarden"
+    },
+    "DomainKnowledgeFact": {
+      "type": "object",
+      "properties": {
+        "external_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "valid_time": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "supersedes_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provenance_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "provider_state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "external_ref",
+        "valid_time",
+        "supersedes_ref",
+        "provenance_refs",
+        "provider_state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "walwarden"
+    },
+    "DomainCorpus": {
+      "type": "object",
+      "properties": {
+        "external_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "owner_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provider_state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "external_ref",
+        "owner_ref",
+        "provider_state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "corpus-ranker"
+    },
+    "DomainRankedCandidate": {
+      "type": "object",
+      "properties": {
+        "external_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "corpus_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scoring_policy_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "score_evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "applicability": {
+          "type": "array",
+          "items": {}
+        },
+        "provider_state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "external_ref",
+        "corpus_ref",
+        "scoring_policy_ref",
+        "score_evidence_refs",
+        "applicability",
+        "provider_state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "corpus-ranker"
+    },
+    "DomainLoop": {
+      "type": "object",
+      "properties": {
+        "external_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "owner_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "goal_or_key_result_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "who_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "what_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "when_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "provider_state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "external_ref",
+        "owner_ref",
+        "goal_or_key_result_ref",
+        "who_refs",
+        "what_refs",
+        "when_refs",
+        "provider_state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "loop-closer"
+    },
+    "DomainExperiment": {
+      "type": "object",
+      "properties": {
+        "external_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hypothesis_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "treatment_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "baseline_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "result_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "provider_state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "external_ref",
+        "hypothesis_ref",
+        "treatment_refs",
+        "baseline_refs",
+        "result_refs",
+        "provider_state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "product-lab"
+    },
+    "DomainNotificationCondition": {
+      "type": "object",
+      "properties": {
+        "external_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "owner_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source_condition_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "acknowledgement_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "escalation_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provider_state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "external_ref",
+        "owner_ref",
+        "source_condition_ref",
+        "acknowledgement_ref",
+        "escalation_ref",
+        "provider_state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "notification-service"
+    },
+    "DomainBrowserOperation": {
+      "type": "object",
+      "properties": {
+        "external_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "authority_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "approval_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source_receipt_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provider_state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "external_ref",
+        "authority_ref",
+        "approval_ref",
+        "source_receipt_ref",
+        "provider_state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "rove"
+    },
+    "DomainRequirement": {
+      "type": "object",
+      "properties": {
+        "statement": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "acceptance": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "design_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "coverage_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "state": {
+          "enum": [
+            "proposed",
+            "active",
+            "superseded",
+            "retired"
+          ]
+        }
+      },
+      "required": [
+        "statement",
+        "acceptance",
+        "source_refs",
+        "version",
+        "design_refs",
+        "coverage_refs",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-registered-source-owner"
+    },
+    "DomainDesignRecord": {
+      "type": "object",
+      "properties": {
+        "document_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "approved_source_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "review_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "decision_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "requirement_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "state": {
+          "enum": [
+            "proposed",
+            "in_review",
+            "approved",
+            "superseded",
+            "rejected"
+          ]
+        }
+      },
+      "required": [
+        "document_ref",
+        "approved_source_revision",
+        "review_refs",
+        "decision_refs",
+        "requirement_refs",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-registered-source-owner"
+    },
+    "DomainContractVersion": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content_hash": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "schema_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "boundary": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "compatibility": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "owner_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "version",
+        "content_hash",
+        "schema_ref",
+        "boundary",
+        "compatibility",
+        "owner_ref"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-registered-source-owner"
+    },
+    "DomainProcedureVersion": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content_hash": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "steps_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "required_capabilities": {
+          "type": "array",
+          "items": {}
+        },
+        "authority_policy_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "version",
+        "content_hash",
+        "steps_ref",
+        "required_capabilities",
+        "authority_policy_ref"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-registered-source-owner"
+    },
+    "DomainIntendedUseRecord": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content_hash": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "project_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "intent_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceRef"
+          }
+        },
+        "scope_constraints": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "non_goals": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "version",
+        "content_hash",
+        "project_ref",
+        "intent_refs",
+        "scope_constraints",
+        "non_goals"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-registered-source-owner"
+    },
+    "DomainNeed": {
+      "type": "object",
+      "properties": {
+        "capability_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "owner_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "satisfaction_evidence_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "state": {
+          "enum": [
+            "open",
+            "awaiting_owner",
+            "satisfiable",
+            "satisfied",
+            "revoked",
+            "superseded"
+          ]
+        }
+      },
+      "required": [
+        "capability_ref",
+        "owner_ref",
+        "source_ref",
+        "satisfaction_evidence_ref",
+        "observed_at",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-registered-source-owner"
+    },
+    "DomainExtensionRegistration": {
+      "type": "object",
+      "properties": {
+        "version_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "compatibility": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "capability_requirements": {
+          "type": "array",
+          "items": {}
+        },
+        "owner_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "health_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "registered",
+            "validated",
+            "enabled",
+            "disabled",
+            "retired"
+          ]
+        }
+      },
+      "required": [
+        "version_ref",
+        "compatibility",
+        "capability_requirements",
+        "owner_ref",
+        "health_ref",
+        "state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "sortyard-or-registered-source-owner"
+    },
+    "DomainOperator": {
+      "type": "object",
+      "properties": {
+        "external_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "issuer": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "appwrite_project_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "appwrite_user_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "display_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider_state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "external_ref",
+        "issuer",
+        "appwrite_project_id",
+        "appwrite_user_id",
+        "display_name",
+        "provider_state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "appwrite"
+    },
+    "DomainMembership": {
+      "type": "object",
+      "properties": {
+        "external_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "operator_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "team_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "workspace_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "project_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "role": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider_state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "external_ref",
+        "operator_ref",
+        "team_ref",
+        "workspace_ref",
+        "project_ref",
+        "role",
+        "provider_state"
+      ],
+      "additionalProperties": false,
+      "description": "Planned resource data; scope/identity in ResourceEnvelope. Nullable references/times represent state-dependent absence. Commands validate kind-specific invariants beyond structural shape.",
+      "x-owner": "appwrite"
+    },
+    "ResourceRef": {
+      "type": "object",
+      "properties": {
+        "service": {
+          "type": "string"
+        },
+        "installation_id": {
+          "type": "string"
+        },
+        "workspace_id": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "Installation",
+            "Workspace",
+            "Project",
+            "Repository",
+            "Milestone",
+            "Task",
+            "Decision",
+            "ArchetypeVersion",
+            "WorkflowVersion",
+            "RoleDefinitionVersion",
+            "SkillVersion",
+            "ContextRecipeVersion",
+            "QualityBarVersion",
+            "DefinitionProposal",
+            "DefinitionAssignment",
+            "Policy",
+            "PolicyVersion",
+            "PolicyDecision",
+            "ContextPacket",
+            "AgentDefinition",
+            "AgentRun",
+            "Lane",
+            "ExecutionBinding",
+            "Chain",
+            "StageRun",
+            "GroomingPass",
+            "TriageCase",
+            "RepairAttempt",
+            "Mechanism",
+            "DeliveryObservation",
+            "CapabilityGrant",
+            "Operation",
+            "ActionPlan",
+            "ServiceConnection",
+            "ExternalReference",
+            "Discovery",
+            "ImprovementProposal",
+            "Adoption",
+            "OutcomeObservation",
+            "DocumentArtifact",
+            "Intent",
+            "Goal",
+            "KeyResult",
+            "MemoryObservation",
+            "KnowledgeFact",
+            "Corpus",
+            "RankedCandidate",
+            "Loop",
+            "Experiment",
+            "NotificationCondition",
+            "BrowserOperation",
+            "Requirement",
+            "DesignRecord",
+            "ContractVersion",
+            "ProcedureVersion",
+            "IntendedUseRecord",
+            "Need",
+            "ExtensionRegistration",
+            "Operator",
+            "Membership"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "service",
+        "installation_id",
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "Workspace",
+                  "Project",
+                  "Repository",
+                  "Milestone",
+                  "Task",
+                  "Decision",
+                  "ArchetypeVersion",
+                  "WorkflowVersion",
+                  "RoleDefinitionVersion",
+                  "SkillVersion",
+                  "ContextRecipeVersion",
+                  "QualityBarVersion",
+                  "DefinitionProposal",
+                  "DefinitionAssignment",
+                  "Policy",
+                  "PolicyVersion",
+                  "PolicyDecision",
+                  "ContextPacket",
+                  "AgentDefinition",
+                  "AgentRun",
+                  "Lane",
+                  "ExecutionBinding",
+                  "Chain",
+                  "StageRun",
+                  "GroomingPass",
+                  "TriageCase",
+                  "RepairAttempt",
+                  "Mechanism",
+                  "DeliveryObservation",
+                  "CapabilityGrant",
+                  "Operation",
+                  "ActionPlan",
+                  "ServiceConnection",
+                  "ExternalReference",
+                  "Discovery",
+                  "ImprovementProposal",
+                  "Adoption",
+                  "OutcomeObservation",
+                  "DocumentArtifact",
+                  "Requirement",
+                  "DesignRecord",
+                  "ContractVersion",
+                  "ProcedureVersion",
+                  "IntendedUseRecord",
+                  "Need",
+                  "ExtensionRegistration",
+                  "Operator",
+                  "Membership"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "workspace_id"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "Project",
+                  "Repository",
+                  "Milestone",
+                  "Task",
+                  "DefinitionAssignment",
+                  "PolicyDecision",
+                  "ContextPacket",
+                  "AgentRun",
+                  "ExecutionBinding",
+                  "Chain",
+                  "StageRun",
+                  "GroomingPass",
+                  "TriageCase",
+                  "RepairAttempt",
+                  "DeliveryObservation",
+                  "Discovery",
+                  "ImprovementProposal",
+                  "Adoption",
+                  "OutcomeObservation",
+                  "Requirement",
+                  "DesignRecord",
+                  "IntendedUseRecord",
+                  "Need"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "project_id"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "ArchetypeVersion",
+                  "WorkflowVersion",
+                  "RoleDefinitionVersion",
+                  "SkillVersion",
+                  "ContextRecipeVersion",
+                  "QualityBarVersion",
+                  "PolicyVersion",
+                  "ContractVersion",
+                  "ProcedureVersion"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "version"
+            ]
+          }
+        }
+      ]
+    },
+    "GrantLimits": {
+      "type": "object",
+      "properties": {
+        "max_concurrent_operations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_operations": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "PlanApprovalBinding": {
+      "type": "object",
+      "properties": {
+        "plan_ref": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "ActionPlan"
+                }
+              }
+            }
+          ]
+        },
+        "plan_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "plan_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "plan_ref",
+        "plan_hash",
+        "plan_revision",
+        "expires_at"
+      ],
+      "additionalProperties": false
+    },
+    "GroomingQueueKey": {
+      "type": "object",
+      "properties": {
+        "authority_service": {
+          "type": "string",
+          "minLength": 1
+        },
+        "installation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_board_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "authority_service",
+        "installation_id",
+        "source_board_id"
+      ],
+      "additionalProperties": false,
+      "description": "Server-resolved authoritative board/project identity; logical project aliases do not create separate queue keys."
+    }
+  }
+}
