@@ -40,49 +40,6 @@ jobs:
       PGUSER: postgres
       PGPASSWORD: postgres
     steps:
-      # DEVOPS-184: temporary non-gating diagnostics before checkout.
-      # Cost: four read-only requests/job; one-minute outer bound; no credential/body logging.
-      # Remove after the next main-event comparison establishes REST vs Git access.
-      - &checkout_access_diagnostic
-        name: Diagnose native checkout access
-        timeout-minutes: 1
-        continue-on-error: true
-        env:
-          DIAGNOSTIC_TOKEN: ${{ github.token }}
-        run: |
-          python3 - <<'PY'
-          import base64
-          import json
-          import os
-          import urllib.error
-          import urllib.request
-
-          class NoRedirect(urllib.request.HTTPRedirectHandler):
-              def redirect_request(self, req, fp, code, msg, headers, newurl):
-                  return None
-
-          token = os.environ.pop("DIAGNOSTIC_TOKEN")
-          repo = os.environ["GITHUB_REPOSITORY"]
-          sha = os.environ["GITHUB_SHA"]
-          opener = urllib.request.build_opener(NoRedirect)
-          basic = base64.b64encode(("x-access-token:" + token).encode()).decode()
-          for endpoint, url, authorization in (
-              ("rest_repository", "https://api.github.com/repos/" + repo, "Bearer " + token),
-              ("rest_commit", "https://api.github.com/repos/" + repo + "/commits/" + sha, "Bearer " + token),
-              ("git_exact_remote", "https://github.com/" + repo + "/info/refs?service=git-upload-pack", "Basic " + basic),
-              ("git_advertisement", "https://github.com/" + repo + ".git/info/refs?service=git-upload-pack", "Basic " + basic),
-          ):
-              record = {"endpoint": endpoint, "job": os.environ["GITHUB_JOB"], "event": os.environ["GITHUB_EVENT_NAME"]}
-              request = urllib.request.Request(url, headers={"Authorization": authorization, "User-Agent": "sortyard-checkout-diagnostic", "Cache-Control": "no-cache", "Git-Protocol": "version=2"})
-              try:
-                  with opener.open(request, timeout=10) as response:
-                      record.update(status=response.status, request_id=response.headers.get("X-GitHub-Request-Id"))
-              except urllib.error.HTTPError as error:
-                  record.update(status=error.code, request_id=error.headers.get("X-GitHub-Request-Id"))
-              except (urllib.error.URLError, TimeoutError) as error:
-                  record.update(status="network_error", error_class=type(error).__name__)
-              print(json.dumps(record, sort_keys=True))
-          PY
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
@@ -110,7 +67,6 @@ jobs:
     name: spec (Phase 0 schemas + OpenAPI)
     runs-on: ubuntu-latest
     steps:
-      - *checkout_access_diagnostic
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
@@ -124,7 +80,6 @@ jobs:
     name: helm chart
     runs-on: ubuntu-latest
     steps:
-      - *checkout_access_diagnostic
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
         with:
@@ -138,7 +93,6 @@ jobs:
     name: container image
     runs-on: ubuntu-latest
     steps:
-      - *checkout_access_diagnostic
       - uses: actions/checkout@v4
       - name: Build
         run: docker build -t ghcr.io/sortyard/sortyard:ci .
@@ -154,7 +108,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - *checkout_access_diagnostic
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
         with:
