@@ -89,7 +89,10 @@ PGHOST=localhost PGUSER=postgres PGPASSWORD=pw pytest tests/test_migrations.py  
 The [native execution design](docs/design/native-execution.md) includes an offline checkout
 incident replay. Run it with `python -m sortyard.checkout tests/fixtures/checkout-incident.json
 --policy wait-and-retry`. Swap to `--policy owner-first` to compare decisions and repository
-progress using the same recorded observations. The replay prints its trace as JSON.
+progress using the same recorded observations. Add `--lifecycle` to include the shared event
+format in the JSON output. Use `python -m sortyard.lifecycle --help` to score observed
+lifecycle facts. See the [contract and pre-cutover baseline](docs/design/lifecycle-scorecard.md)
+for evidence requirements and runnable examples.
 
 ## API service (Phase 1)
 
@@ -202,6 +205,7 @@ build, in one job, `test`: the one required status check on `main` (strict, up t
 | `src/sortyard/services/` | The six services (§4), one console script each: `sortyard-api`, `sortyard-conductor`, `sortyard-context-assembler`, `sortyard-eval-runner`, `sortyard-sensor-runner`, `sortyard-integrator`. Besides the API (REST surface in `src/sortyard/api/`), only the conductor's shadow mode (`--shadow`) does work yet; the rest are stubs that start, log and idle. |
 | `src/sortyard/api/` | The API's REST surface: the §7 permission matrix (`permissions.py`), tokens (`auth.py`), routing, handlers and the Postgres store with its audit/ledger writes. |
 | `src/sortyard/shadow/` | The shadow conductor: read-only input adapters, the claim decision (a pure function), and the DecisionLog writer. |
+| `src/sortyard/lifecycle/` | Versioned delivery observations and the shared cutover scorecard. |
 | `src/sortyard/models/` | The §3 data models, generated from `spec/` (`codegen.py` is the generator). |
 | `charts/sortyard/` | The Helm chart: API Deployment + Service, Postgres StatefulSet + Service + Secret, the migration Job, and (opt-in) the shadow conductor Deployment. |
 | `charts/sortyard/migrations/` | The SQL migrations (§3 tables + event ledger; 0002: the API token store) and `migrate.sh`, the Job's runner. |

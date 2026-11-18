@@ -157,6 +157,9 @@ keeps the current system available while each native owner earns authority with 
 
 ## 5. Cutover evidence
 
+The [lifecycle contract and scorecard](lifecycle-scorecard.md) implement the replay and baseline
+intake described here.
+
 Use one scorecard for the incumbent and Sortyard. The current conductor continues delivery and
 produces the baseline through its lifecycle instrumentation. The first Sortyard comparison uses a
 versioned mapping from both event streams to the same facts. A mapping must cite its source
