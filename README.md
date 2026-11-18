@@ -86,6 +86,11 @@ docker run -d --name sortyard-pg -e POSTGRES_PASSWORD=pw -p 5432:5432 postgres:1
 PGHOST=localhost PGUSER=postgres PGPASSWORD=pw pytest tests/test_migrations.py   # needs psql
 ```
 
+The [native execution design](docs/design/native-execution.md) includes an offline checkout
+incident replay. Run it with `python -m sortyard.checkout tests/fixtures/checkout-incident.json
+--policy wait-and-retry`. Swap to `--policy owner-first` to compare decisions and repository
+progress using the same recorded observations. The replay prints its trace as JSON.
+
 ## API service (Phase 1)
 
 `sortyard-api` is the only door (design §4). Under `/v1/workspaces/{workspace_id}/` it serves

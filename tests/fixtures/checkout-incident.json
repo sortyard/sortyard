@@ -1,0 +1,80 @@
+{
+  "incident": "DEVOPS-184",
+  "evidence": {
+    "audit": "https://github.com/noncelogic/meta-harness/blob/main/operations/audits/2026-11-16-sortyard-checkout-access.md",
+    "failed_run": "https://github.com/sortyard/sortyard/actions/runs/43799510804",
+    "recovery_run": "https://github.com/sortyard/sortyard/actions/runs/43961502003",
+    "failed_chart_fetch_times_utc": [
+      "03:42:50",
+      "03:43:10",
+      "03:43:27"
+    ],
+    "successful_spec_checkout_utc": "03:39:47",
+    "failed_commit": "b199404032d226d9a822f6cafbb9a17079291ad3",
+    "recovery_commit": "0cca5384280ab9cebcbdd032592cc2d912aa9b32",
+    "backend_cause": "unknown"
+  },
+  "required_checks": [
+    "container image",
+    "helm chart",
+    "lint, typecheck, test",
+    "local replica (kind)",
+    "spec (Phase 0 schemas + OpenAPI)"
+  ],
+  "start": [
+    {
+      "tick": 0,
+      "repo": "sortyard/sortyard",
+      "tree": "bfddb12532e13f76d2b5af77c7ef4e59fa21e161",
+      "run": "43799510804/1",
+      "step": "checkout",
+      "git_exit": 128,
+      "log": "remote: Repository not found."
+    },
+    {
+      "tick": 1,
+      "repo": "fixture/unrelated",
+      "tree": "fixture-tree",
+      "run": "fixture/run",
+      "step": "checkout",
+      "git_exit": 0,
+      "log": ""
+    }
+  ],
+  "retry": {
+    "repo": "sortyard/sortyard",
+    "tree": "bfddb12532e13f76d2b5af77c7ef4e59fa21e161",
+    "run": "43799510804/2",
+    "step": "checkout",
+    "git_exit": 128,
+    "log": "remote: Repository not found."
+  },
+  "verification": [
+    {
+      "tick": 1,
+      "repo": "fixture/unrelated",
+      "tree": "fixture-tree",
+      "run": "fixture/run",
+      "checks": [
+        "container image",
+        "helm chart",
+        "lint, typecheck, test",
+        "local replica (kind)",
+        "spec (Phase 0 schemas + OpenAPI)"
+      ]
+    },
+    {
+      "tick": 20,
+      "repo": "sortyard/sortyard",
+      "tree": "bfddb12532e13f76d2b5af77c7ef4e59fa21e161",
+      "run": "43961502003",
+      "checks": [
+        "container image",
+        "helm chart",
+        "lint, typecheck, test",
+        "local replica (kind)",
+        "spec (Phase 0 schemas + OpenAPI)"
+      ]
+    }
+  ]
+}
