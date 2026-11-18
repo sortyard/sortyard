@@ -7,7 +7,7 @@ WHERE timestamp >= toUnixTimestamp64Nano(toDateTime64({window_start:String}, 9, 
   AND resources_string['k8s.cluster.name'] = 'k3s-azure-01'
   AND resources_string['k8s.namespace.name'] = 'exp-phase0'
   AND resources_string['k8s.cronjob.name'] IN (
-      'conductor-drive', 'conductor-plane-sync', 'conductor-maintenance')
+      'conductor-drive', 'conductor-plane-sync', 'conductor-maintenance', 'conductor-red-main')
   AND JSONExtractString(body, 'record_type') IN ('harness.lifecycle.v1', 'harness.lifecycle_error.v1')
 ORDER BY timestamp, id
 FORMAT JSONEachRow
