@@ -40,3 +40,24 @@ deployed producer revision.
 The five values remain unknown. The initial readiness and refusal cohort covers native Todo
 eligibility on declared build repositories. Drive-only refusals and fleet red-main comparisons
 need additional coverage. Cutover remains pending.
+
+## First live readback
+
+The successor [passed push checks](https://github.com/noncelogic/k3s-harness/actions/runs/44311647216).
+The [release run](https://github.com/noncelogic/k3s-harness/actions/runs/44313104167) published
+`13e82d27f17847296ff597e55919285f1781e921` to the production branch. By 13:36:59 UTC, Argo
+reported Synced and Healthy, and drive, plane-sync and maintenance advertised source
+`2c96a4c72df58bebd073341dbbef0f478574d936`. The running bundle digest was
+`4d770b68860bddc8bd87a5eb99ff36a5ddeabb5521a702fa52e15c122873d4cc`.
+
+The first SigNoz extract, collected for 13:24–13:35 UTC, had 32 unique matching record IDs
+across ten boards. The seven lifecycle facts and 25 coverage records parsed with zero invalid
+records. The facts were three readiness holds, three decisions with inspected refusal
+projections, and one HARNESS green-main sample at 13:32:02 UTC. Two reasons were on the task
+projection. One CRANK reason was absent.
+
+For the 13:25–13:30 UTC slot, the shared scorer verified **one silent refusal out of one
+decision** in the CRANK native Todo eligibility cohort for `noncelogic/corpus-ranker`.
+The same scoped HARNESS check recorded **zero silent refusals and zero decisions**. These
+sampled intervals verify the metric path. They leave the full comparison-window refusal
+counts and the other missing delivery measures unknown.
