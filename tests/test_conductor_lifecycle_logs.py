@@ -70,3 +70,19 @@ def test_coverage_requires_each_scoped_reconciliation_slot() -> None:
         _covered_cadence([*records, replace(records[0], complete=False)], "readiness", WINDOW)
         is None
     )
+
+
+def test_unresolved_read_is_not_a_known_final_main_state() -> None:
+    record = conductor_log(
+        log_row(
+            kind="coverage",
+            coverage_kind="red_main",
+            cadence_seconds=300,
+            complete=True,
+            reason="required_checks_unresolved",
+        )
+    )
+    assert isinstance(record, Coverage)
+    window = replace(WINDOW, end=START + timedelta(minutes=5))
+    assert _covered_cadence([record], "red_main", window) is None
+    assert _covered_cadence([replace(record, reason="sample_observed")], "red_main", window) == 300

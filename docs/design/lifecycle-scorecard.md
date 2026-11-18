@@ -100,7 +100,8 @@ Only add `--complete` for a measured cohort whose authoritative source
 coverage is established. Readiness, refusal and red-main claims additionally
 require complete markers in every expected UTC cadence slot for the selected
 board and repository. Poll timing can miss transitions inside an interval.
-Red-main hours require a complete seven-day window and known recovery
-boundaries. Handback and release-to-merge claims need their own transition
+Red-main hours require a complete seven-day window, initial and final state
+evidence, and known recovery boundaries. A fully read but unresolved check
+can fill a poll slot. It supplies neither a failure nor a recovery timestamp. Handback and release-to-merge claims need their own transition
 and join coverage checks. In particular, tasks released before activation
 may merge with no matching release fact.

@@ -22,6 +22,7 @@ class Coverage:
     observed_at: datetime
     complete: bool
     cadence_seconds: int | None
+    reason: str | None
 
 
 def _text(value: Mapping[str, object], key: str) -> str:
@@ -52,6 +53,7 @@ def conductor_log(row: Mapping[str, object]) -> LifecycleEvent | Coverage:
     timestamp = _text(value, "observed_at")
     complete = value.get("complete")
     cadence = value.get("cadence_seconds")
+    reason = value.get("reason")
     if type(complete) is not bool:
         raise ValueError("coverage must declare complete or incomplete")
     if cadence is not None and (type(cadence) is not int or cadence <= 0):
@@ -61,4 +63,6 @@ def conductor_log(row: Mapping[str, object]) -> LifecycleEvent | Coverage:
     observed_at = datetime.fromisoformat(timestamp)
     if observed_at.utcoffset() is None:
         raise ValueError("coverage requires an explicit timezone")
-    return Coverage(kind, board, repo, observed_at, complete, cadence)
+    if reason is not None and not isinstance(reason, str):
+        raise ValueError("coverage reason must be a string")
+    return Coverage(kind, board, repo, observed_at, complete, cadence, reason)

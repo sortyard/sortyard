@@ -89,6 +89,10 @@ def _covered_cadence(records: list[Coverage], kind: str, window: ScorecardWindow
             if not record.complete or record.cadence_seconds != cadence:
                 return None
             observed_slots.add(slot)
+    if kind == "red_main":
+        latest = max(candidates, key=lambda record: record.observed_at)
+        if latest.reason != "sample_observed":
+            return None
     return cadence if len(observed_slots) == end_slot - first_slot else None
 
 
