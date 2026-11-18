@@ -1,0 +1,217 @@
+{
+  "scope": "isolated replica",
+  "fixture_sha256": "21ecd571ce036a596987ed9d7e8f2950ab6c8f7452eb7782ed4c597292ca668d",
+  "original_id": "cr_orig_d10718a25644144a1a2a1cc8",
+  "feedback_original_id": "cr_orig_2d970bf48bae5f11d604cb90",
+  "score_events": [
+    {
+      "score_event_id": "cr_score_7b8e2f63a17f4f1f83836566ae74d403"
+    },
+    {
+      "score_event_id": "cr_score_6189291b920149278cd5cce5691d0995"
+    }
+  ],
+  "ranking": {
+    "view_id": "cr_view_b03c4f285cfa4d93b52b24c55219fcd1",
+    "policy_id": "cr_pol_1afeff46e83e",
+    "policy_version": 1,
+    "stale": false,
+    "stale_reason": null,
+    "entries": [
+      {
+        "item_id": "cr_item_1afeff46e83eowner",
+        "rank": 1,
+        "title": "Owner first",
+        "summary": null,
+        "composite": 5,
+        "dimension_values": {
+          "Avoided Retry": 5
+        }
+      },
+      {
+        "item_id": "cr_item_1afeff46e83eretry",
+        "rank": 2,
+        "title": "Wait and retry",
+        "summary": null,
+        "composite": 4,
+        "dimension_values": {
+          "Avoided Retry": 4
+        }
+      }
+    ]
+  },
+  "loop": {
+    "id": "lc_loop_7d010d68-fd07-496a-9825-4be75844bebb",
+    "name": "Checkout retry policy qualification",
+    "loop_type": "objective-tracking",
+    "state": "closed",
+    "accountable_who_id": "lc_who_1afeff46e83e",
+    "closing_when_id": "lc_when_1afeff46e83e",
+    "authority": "joe-approves-each",
+    "opened_at": "2026-11-18T04:48:47.339+00:00",
+    "closed_at": "2026-11-18T04:48:47.372+00:00",
+    "close_reason": null,
+    "ageing_policy_id": "lc_policy_ageing_default",
+    "ageing_policy_version": 1,
+    "escalation_policy_id": "lc_policy_escalation_default",
+    "escalation_policy_version": 1,
+    "key_result_ref": null
+  },
+  "loop_id": "lc_loop_7d010d68-fd07-496a-9825-4be75844bebb",
+  "closer_ledger_event_types": [
+    "loop_proposed",
+    "loop_accepted",
+    "when_fired",
+    "transition"
+  ],
+  "fire_receipt": {
+    "ledger_event": {
+      "id": "lc_evt_2fb5ae63-ccf5-45fa-8fbc-e28531d582a5",
+      "at": "2026-11-18T04:48:47.367Z",
+      "actor": "system:fire_event",
+      "event_type": "when_fired",
+      "subject_ids": [
+        "lc_when_1afeff46e83e",
+        "lc_loop_7d010d68-fd07-496a-9825-4be75844bebb"
+      ],
+      "payload": {
+        "when_ids": [
+          "lc_when_1afeff46e83e"
+        ],
+        "loop_ids": [
+          "lc_loop_7d010d68-fd07-496a-9825-4be75844bebb"
+        ],
+        "event_payload": {
+          "outcome_sha256": "7109d56b713113faff3db25e3b467f7102ef46c730a2fb968a6c7d922d68405a",
+          "policy_version": 3,
+          "retry_commands_avoided": 1
+        }
+      },
+      "idempotency_key": "checkout-outcome-1afeff46e83e"
+    },
+    "applied": true,
+    "loop_ids": [
+      "lc_loop_7d010d68-fd07-496a-9825-4be75844bebb"
+    ],
+    "workflow_runs": []
+  },
+  "outcome_sha256": "7109d56b713113faff3db25e3b467f7102ef46c730a2fb968a6c7d922d68405a",
+  "policy_history": [
+    {
+      "version": 1,
+      "action": "propose",
+      "actor": "agent:flywheel",
+      "why": "Bind the local qualification baseline",
+      "at": "2026-11-18T04:48:47.269997+00:00"
+    },
+    {
+      "version": 2,
+      "action": "edit",
+      "actor": "agent:flywheel",
+      "why": "Local adoption for accepted loop lc_loop_7d010d68-fd07-496a-9825-4be75844bebb",
+      "at": "2026-11-18T04:48:47.343887+00:00"
+    },
+    {
+      "version": 3,
+      "action": "promote",
+      "actor": "agent:flywheel",
+      "why": "Exercise the policy owner promotion ladder locally",
+      "at": "2026-11-18T04:48:47.351483+00:00"
+    }
+  ],
+  "outcome": {
+    "baseline": {
+      "binding": {
+        "id": "checkout-retry-proof",
+        "version": 1,
+        "scope_ref": "checkout-proof",
+        "parameters": {
+          "selector": "wait-and-retry"
+        }
+      },
+      "retry_commands": 1,
+      "outcomes": {
+        "sortyard/sortyard": "recovered",
+        "fixture/unrelated": "completed"
+      },
+      "completion_ticks": {
+        "fixture/unrelated": 1,
+        "sortyard/sortyard": 20
+      },
+      "verification_runs": {
+        "fixture/unrelated": "fixture/run",
+        "sortyard/sortyard": "43961502003"
+      },
+      "decision_receipts": [
+        {
+          "tick": 0,
+          "repo": "sortyard/sortyard",
+          "stage": "retry_decision",
+          "evidence": "43799510804/1",
+          "policy": "wait-and-retry@1",
+          "reason": "Allow one bounded diagnostic retry"
+        },
+        {
+          "tick": 7,
+          "repo": "sortyard/sortyard",
+          "stage": "retry_decision",
+          "evidence": "43799510804/2",
+          "policy": "wait-and-retry@1",
+          "reason": "Diagnostic retry budget spent; wait for owner evidence"
+        }
+      ]
+    },
+    "observed_adoption": {
+      "binding": {
+        "id": "checkout-retry-proof",
+        "version": 3,
+        "scope_ref": "checkout-proof",
+        "parameters": {
+          "selector": "owner-first"
+        }
+      },
+      "retry_commands": 0,
+      "outcomes": {
+        "sortyard/sortyard": "recovered",
+        "fixture/unrelated": "completed"
+      },
+      "completion_ticks": {
+        "fixture/unrelated": 1,
+        "sortyard/sortyard": 20
+      },
+      "verification_runs": {
+        "fixture/unrelated": "fixture/run",
+        "sortyard/sortyard": "43961502003"
+      },
+      "decision_receipts": [
+        {
+          "tick": 0,
+          "repo": "sortyard/sortyard",
+          "stage": "retry_decision",
+          "evidence": "43799510804/1",
+          "policy": "owner-first@1",
+          "reason": "Checkout access needs fresh evidence from the repository owner"
+        }
+      ]
+    },
+    "retry_commands_avoided": 1
+  },
+  "restart_readback": {
+    "ranked_view_identical": true,
+    "loop_state": "closed",
+    "feedback_bytes_hash_matches": true,
+    "effective_policy_version": 3
+  },
+  "qualification_limits": {
+    "ranker_storage": "local filesystem adapter",
+    "ranker_classification": "candidate rows seeded in isolated Postgres; classification API unavailable",
+    "policy": "deployed engine implementation with isolated policy database",
+    "scope": "localhost only, all times are simulation ticks"
+  },
+  "source_commits": {
+    "ranker": "b8abc1043a8f6afedc1346ea97eb7cf9450cff11",
+    "closer": "565ffdd71b281874550c055ce37fc9ff302a0aa4",
+    "policy_engine": "9577e8d1cfeddd6368f61d35d3124e68e529d0f0",
+    "sortyard": "5f6087a098ad078bad09051670df812f8627c491"
+  }
+}

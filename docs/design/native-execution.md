@@ -95,6 +95,7 @@ owner API. Finally run a single opted-in improvement from evidence capture to ve
 Each adapter reports an owned wait when its provider is unavailable, and the execution queue
 continues. This work can use the existing execution adapter during the native task transition.
 See [the integration baseline and provider evidence](../requirements/integrations.md).
+The [checkout qualification](evidence/checkout-flywheel.md) records the first measured replica run and the remaining estate dependencies.
 
 ### The first runnable slice
 
