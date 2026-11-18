@@ -190,7 +190,10 @@ derived from them:
   one object's events in ledger order.
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the same checks on every pull
-request and every push to `main`, plus `helm lint`/`helm template` and a container build.
+request to `main` and every push to `main`, plus `helm lint`/`helm template` and a container
+build, in one job, `test`: the one required status check on `main` (strict, up to date with
+`main`). The replica boot runs nightly and on demand in
+[`.github/workflows/slow.yml`](.github/workflows/slow.yml).
 
 ## Layout
 
