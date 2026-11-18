@@ -103,7 +103,8 @@ SELECT scope.name AS scope_name, scope.version AS scope_version, name AS span_na
        ) AS observed_at,
        attributes_string['mh.request.id'] AS request_id,
        attributes_string['mh.stage.name'] AS stage_name,
-       toUInt64(attributes_number['mh.stage.sequence']) AS stage_sequence,
+       if(mapContains(attributes_number, 'mh.stage.sequence'),
+          attributes_number['mh.stage.sequence'], NULL) AS stage_sequence,
        attributes_string['mh.state.current'] AS current_state
 FROM signoz_traces.signoz_index_v3
 WHERE timestamp >= toDateTime64('2026-11-17 00:00:00', 9, 'UTC')

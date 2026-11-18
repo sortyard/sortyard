@@ -73,5 +73,6 @@ can report zero.
 The optional `--dv32` intake accepts a JSON array of minimized incumbent SigNoz span records.
 It projects version 1 `mh.stage.state` markers for `running`, `done`, and `failed` into stage
 start and end facts. Ingestion totals record unmapped and invalid records. These facts carry
-request, stage and trace identity. Board, repository and delivery-task attribution are unknown
+request, stage and trace identity. Version 1 timestamps retain microseconds and use the span
+ID for deduplication. Board, repository and delivery-task attribution are unknown
 under the deployed convention, so the adapter can attest to execution activity only.
