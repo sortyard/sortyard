@@ -80,7 +80,7 @@ Packages and directories:
 | `replica/` | The one-command local replica (see [Local replica](#local-replica)): `replica/replica.sh`, the kind config, replica values, and fake outside providers in `replica/fakes/`. |
 | `tests/` | Tests for the package, chart, CI, replica, docs and this brief. `tests/pg.py` gives tests a throwaway Postgres. |
 | `docs/` | Reports and findings. `docs/goldfish/` holds zero-context install runs; `docs/findings/` holds friction found building the repo itself. |
-| `.github/` | CI, in `.github/workflows/ci.yml`: lint, typecheck, tests (with a real Postgres and helm), spec tests, chart lint/render, image build, and the replica boot. |
+| `.github/` | CI. `.github/workflows/ci.yml` runs one job, `test`, on every pull request to main and every push to main: lint, typecheck, tests (with a real Postgres and helm), spec tests, chart lint/render and the image build. `.github/workflows/slow.yml` boots the replica nightly and on demand, outside the merge gate. |
 | `DESIGN.md`, `DECISIONS.md`, `MILESTONES.md`, `CORPUS.md` | The design record: architecture (§4), stack decision, the phase plan, and the milestone corpus (M1.x items). Read the relevant section before changing behaviour. |
 
 Data flow worth knowing before you touch it:
@@ -126,6 +126,12 @@ CI sets `SORTYARD_REQUIRE_HELM=1` and `SORTYARD_REQUIRE_POSTGRES=1`. With those 
 missing tool fails the run instead of skipping tests. Set them locally to get CI's behaviour.
 
 `pytest spec` runs the Phase 0 seed tests; CI gates on it.
+
+The one required status check on `main` is `test` (the one job in `ci.yml`), strict: a pull
+request must be up to date with `main` before it merges (policies/placement-defaults.yaml#gates).
+`main` runs no other job, so everything it runs is proven on the pull request first. Keep
+`ci.yml` to that one job; put a slow suite in `slow.yml` (nightly and on demand) instead.
+`tests/test_ci.py` holds this.
 
 ## Local replica
 
