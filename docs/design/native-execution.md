@@ -4,6 +4,10 @@ Status: proposed architecture. The checkout replay below is the first executable
 existing [requirements baseline](../requirements/README.md) still governs installed APIs and
 migration authority. This design proposes how to replace the legacy execution and task owners.
 
+The [legacy failure modes][lessons], [factory trajectory][trajectory], and [owner direction][intent]
+are the inputs to this proposal. The [cutover evidence contract](#5-cutover-evidence) specifies how
+Sortyard will demonstrate comparable delivery before it takes authority.
+
 ## 1. Ownership and boundaries
 
 Sortyard owns native tasks, the execution state machine, and the relationship between a task and its
@@ -21,6 +25,20 @@ facts and returns a decision with a reason, without credentials or external effe
 independent owner evidence. It never trusts a worker's recovery claim as proof. Scale the components
 that need different concurrency or isolation. Keep these as module boundaries even when a single
 process hosts several components.
+
+Give each gate a typed input containing the task revision and fresh evidence. Return `pass`,
+`hold` or `warn` with a reason and the policy binding used. Read typed fields such as task kind,
+dependencies, inputs and needs. Inspect declared job effects and permissions when deciding whether
+CI is safe to rerun. A match in a title, job name or description can warn the submitter. It cannot
+hold work. Register waits, retry limits and budget defaults with their schema, owner and consumer
+version. Validate that a consumer supports a parameter before allowing it to govern a run.
+
+Keep transport, state access, gate evaluation and verification in separate modules. Review whether
+a new behavior fits a boundary before adding it to the coordinator. Separate move-only splits from
+behavior changes so each review can verify the right property. Propose the same size ratchet for
+handwritten Sortyard Python: 800 lines per source module and 1,500 per test module. Existing
+oversized modules can shrink while staged splits proceed. Generated files are measured separately.
+File size is a backstop. A small module still needs a coherent responsibility.
 
 Humans and the concierge use the same resource and action contracts. A canonical resource link can
 lead from a failed stage to its run, task, policy version, actor, connection, and owning service.
@@ -47,6 +65,12 @@ reconcile ambiguous effects by stable operation ID before another attempt. Keep 
 outside the transition transaction. An accepted write survives a lost response, and an unverified
 write cannot advance a run to recovered.
 
+A check that already fails on the base or independently matches an established shared incident
+creates an owned hold with the failing evidence and a recheck trigger. Keep the task's priority
+and repair budget intact. Record the hold, operator-visible reason and lifecycle event together.
+Deduplicate repeated observations against the owning incident, and count alarms, holds and actual
+handbacks separately. A missing, stale or ambiguous observation leaves an explicit unknown state.
+
 ## 3. Kubernetes and observability
 
 Use distinct executor contracts for a pod-backed harness, native CI, and ad hoc work. A harness
@@ -56,6 +80,10 @@ lane admission, while Kubernetes owns pod placement and scaling. A CI adapter ob
 and runner capacity and reports queue time separately from run time. An ad hoc task uses the same
 admission and evidence contracts. Pod replacement and runner changes cannot reset the run's budget.
 The coordinator receives normalized outcomes and does not call Kubernetes or GitHub itself.
+Publish the runtime and console as versioned artifacts with separate release boundaries. Reserve
+ConfigMaps for configuration. Test provider contracts in CI and run real dependency and failure
+injection exercises in the replica. Evaluate a latency guard against a recorded comparable
+baseline so a slow provider does not turn an unrelated change into a failed candidate.
 
 The event ledger records decisions, component versions, waits, effects, and verification evidence.
 Project those records into OpenTelemetry spans through an adapter with bounded buffering and export
@@ -126,3 +154,51 @@ establishes checkout access rejection and leaves the backend cause unknown.
 Future slices bring the same boundaries to a durable task/run store, a registered profile executing
 one pod-backed chain in the local replica, and a rehearsed single-project handover. That progression
 keeps the current system available while each native owner earns authority with observable evidence.
+
+## 5. Cutover evidence
+
+Use one scorecard for the incumbent and Sortyard. The current conductor continues delivery and
+produces the baseline through its lifecycle instrumentation. The first Sortyard comparison uses a
+versioned mapping from both event streams to the same facts. A mapping must cite its source
+event types and report unsupported facts. A shadow would-claim event is evidence of a decision
+comparison. Only an observed merge qualifies as a merge in the scorecard.
+
+Each normalized fact carries a stable event ID, event type and version, observed timestamp,
+source revision, board, repository, and the available task, run, stage, PR or check identity.
+Gate decisions, holds and handbacks carry a typed reason, owner and evidence reference. Policy
+decisions carry the effective version. A release observation carries the artifact revision and
+binding. A repeated event ID contributes once. Contradictory duplicates, incomplete source windows
+and unmapped events are coverage findings. The ledger preserves the facts while OpenTelemetry
+projects consistent events and traces into SigNoz.
+
+| Scorecard measure | Comparable evidence |
+| --- | --- |
+| Merged PRs per day | Count distinct observed PR merges in the same board, repository and reporting window. |
+| Real handbacks per day | Count transitions that return responsibility from execution to the owning queue. Keep alarms and holds separate. |
+| Median lead time | Join first eligible release to observed merge for the same task revision. Report missing joins and cohort size. PR-open time measures a different interval. |
+| Red-main hours per product per week | Use observed default-branch failure and recovery intervals for the same required checks. Report gaps and open intervals. |
+| Items not ready for longer than one cycle | Compare a continuing readiness hold with the known reconciliation interval. Report unknown cadence or incomplete observations. |
+| Silent refusals | Identify refusal decisions whose reason is absent from the task projection. Report source coverage alongside the count. |
+
+Compare matched cohorts and windows with the same inclusion rules, or explicitly qualify any
+difference in workload, policy, or external outage. The legacy snapshot leaves fleet throughput
+and released-to-merged lead time unmeasured. Those fields remain unknown until captured. The
+checkout replay proves bounded behavior and independent progress on the fixture. It supplies no
+fleet scorecard values.
+
+For one project, replay the same retained inputs, classify divergences, and verify representative
+faults in the replica. Include provider timeout or quota exhaustion, a shared check failure, an
+ambiguous write, and a telemetry outage. Verify that unrelated work progresses and that recovery
+does not duplicate an effect or lose a committed transition. The checkout fixture already covers
+unrelated progress, policy substitution and independent recovery evidence.
+
+Preserve one writer for each resource during handover and show that the previous writer can be
+restored from the checkpoint. Canary the new binding in one opted-in project. Evaluate adoption
+over a declared window, record the actual binding and effect, and roll back on a confirmed
+scorecard regression.
+Missing comparison evidence keeps cutover pending. Sortyard earns authority when the agreed
+comparison meets or beats the existing delivery scorecard and verifies recovery without data loss.
+
+[lessons]: https://github.com/noncelogic/meta-harness/blob/f1089f2288414f19a6350c626af19ebd92362d6f/projects/harness-console/failure-modes.md
+[trajectory]: https://github.com/noncelogic/meta-harness/blob/f1089f2288414f19a6350c626af19ebd92362d6f/projects/harness-console/TRAJECTORY.md
+[intent]: https://github.com/noncelogic/meta-harness/blob/f1089f2288414f19a6350c626af19ebd92362d6f/company/INTENTS.md#i17-sortyard-design-reboot-by-the-codex-agent
