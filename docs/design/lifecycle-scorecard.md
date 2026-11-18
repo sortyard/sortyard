@@ -76,3 +76,31 @@ start and end facts. Ingestion totals record unmapped and invalid records. These
 request, stage and trace identity. Version 1 timestamps retain microseconds and use the span
 ID for deduplication. Board, repository and delivery-task attribution are unknown
 under the deployed convention, so the adapter can attest to execution activity only.
+
+## Incumbent delivery logs
+
+The new incumbent producer uses the existing Kubernetes-to-OTel log pipeline.
+From the authorized SigNoz ClickHouse reader, export
+[the lifecycle query](evidence/incumbent-lifecycle-query.sql) as JSONEachRow
+with `window_start` and `window_end` set to the collection bounds in UTC.
+Collect enough lookback for task releases, open holds and initial main state.
+For PR-based comparisons to the November 17 baseline, filter merged records
+to the observed `binding` value `github:base:pilot-dispatcher` and account for
+unknown base fields before asserting coverage.
+
+```sh
+jq -s . conductor-lifecycle.ndjson > conductor-lifecycle.json
+python -m sortyard.lifecycle conductor-lifecycle.json --conductor-logs \
+  --start 2026-11-17T00:00:00Z --end 2026-11-18T00:00:00Z \
+  --board HARNESS --repo noncelogic/k3s-harness
+```
+
+The period in this example predates the new producer and yields unknown rows.
+Only add `--complete` for a measured cohort whose authoritative source
+coverage is established. Readiness, refusal and red-main claims additionally
+require complete markers in every expected UTC cadence slot for the selected
+board and repository. Poll timing can miss transitions inside an interval.
+Red-main hours require a complete seven-day window and known recovery
+boundaries. Handback and release-to-merge claims need their own transition
+and join coverage checks. In particular, tasks released before activation
+may merge with no matching release fact.
