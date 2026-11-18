@@ -64,7 +64,39 @@ wait, execution time, and verification lag separately. Keep repository, run, and
 on traces and use bounded dimensions for metrics. Align OTLP transport, naming, and dashboards with
 the ongoing observability refactor. A collector outage must not block a transition.
 
-## 4. Improvement and the first runnable slice
+## 4. Improvement and replay
+
+### The improvement flywheel
+
+The purpose of the execution system is to turn observed work into measured improvements. The
+first end-to-end flywheel should tie an incident to a candidate change, an owned commitment,
+a version used by real work, and the effect of that version. The checkout replay supplies the
+first comparison. An opted-in project supplies the later adoption and outcome evidence.
+
+| Owner | Contribution to the loop | Evidence Sortyard links |
+| --- | --- | --- |
+| Sortyard | Capture a failure or opportunity from a task, run, or stage. Record the baseline and candidate evaluation. | Run and trace IDs, input snapshot, component versions, decision and verification receipts |
+| Corpus Ranker | Retain the original evidence, score candidates under a versioned rubric, and surface candidates for pursuit. | Original ID, score event, ranking result, rubric and ranking policy versions |
+| Loop Closer | Own the accepted commitment and its outcome criterion. Track who follows through and when. | Loop ID, accepted commitment, responsible owner, due time and close event |
+| Existing policy engine | Resolve the effective policy and own proposal, review and promotion within its authority. | Policy family, effective variant/version, promotion receipt and consumer coverage |
+| Sortyard | Bind the approved version to opted-in work and measure the actual effect. Feed the result back into the next ranking. | Adoption and run bindings, outcome observation, costs, guardrails and coverage |
+
+The concierge can take a ranked candidate to the responsible owner through the same authorized
+actions the operator uses. An accepted pursuit links one Closer loop to one bounded Sortyard task.
+Reconcile ambiguous responses with stable operation IDs before trying again. The task delivers a
+reviewed component version. The adopter observes the real binding, and the verifier compares
+actual results against the loop's original criterion before closure. A missed criterion or missing
+coverage remains visible in the loop and becomes evidence for the next decision. The ledger owns
+run evidence while SigNoz helps the operator find the trace and measure the delay.
+
+Start with an effective-policy read and a versioned decision receipt. Then prove Ranker capture,
+score and retrieval through its owner API, and Closer intake and restart-safe readback through its
+owner API. Finally run a single opted-in improvement from evidence capture to verified closure.
+Each adapter reports an owned wait when its provider is unavailable, and the execution queue
+continues. This work can use the existing execution adapter during the native task transition.
+See [the integration baseline and provider evidence](../requirements/integrations.md).
+
+### The first runnable slice
 
 Harness²'s scoped probes and RRSI's constrained selection suggest a practical loop. Pin a baseline
 and one candidate component, run both over the same incident corpus and held-out cases, then compare

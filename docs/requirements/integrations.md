@@ -14,8 +14,8 @@ source version and epoch, a registered read/command/event contract and a scoped 
 | Git/meta-harness | Current definitions, guidance, intended-use, decisions and artifacts | Versioned source refs, proposal/review/adoption routes and conformance inventory | Commit-forward until a family is explicitly transferred; do not archive the whole repository |
 | Appwrite | Human accounts/sessions/Teams and Sortyard native persistence | Identity/membership setup and domain-authorized operations | CRUD/backend credentials are not business authority; use qualified runtime permission fences |
 | CortexPlane | Operator intents, goals/KRs and outer process orchestration | Scoped goal/process refs and harness actions for CP's delegated agent | Owner processes are not silently absorbed into Sortyard |
-| Corpus Ranker | Originals, classifications, scores, rubrics, rankings | Authorized discovery/ranking/explanation links and pursuit proposals | Inspected server exposes health only; declared provider contracts need a served durable API |
-| Loop Closer | Who/what/when commitments, state, supersession, closure | Loop proposal/acceptance/progress/outcome refs tied to improvement work | Inspected default server uses in-memory persistence; require durable owner path before relying on it |
+| Corpus Ranker | Originals, classifications, scores, rubrics, rankings | Authorized discovery/ranking/explanation links and pursuit proposals | Source serves capture, score and top-N. Qualify the installed owner routes and scope before integration. |
+| Loop Closer | Who/what/when commitments, state, supersession, closure | Loop proposal/acceptance/progress/outcome refs tied to improvement work | Production entry point uses Postgres. Qualify the installed API and restart-safe readback before integration. |
 | Walwarden | Memory observations, known/replaced facts and supersession | Provenance/context references and authorized supersession queries | Vault/repo/session retrieval is a source, not the memory authority |
 | Product Lab | Hypotheses, treatments, baselines and experiments | Experiment/evidence refs linked to decisions and proposals | Advertise only the owner's implemented contracts |
 | Notifications | Conditions, delivery, acknowledgement and escalation | Owner-routed attention and acknowledgement views/actions | Use the registered API; no new unaudited send path |
@@ -94,6 +94,21 @@ provenance and scope. Meta-harness stays commit-forward for current records, inc
 planning handoff; task state stays in Plane until its project transfers.
 
 ## Improvement and outer-loop integration
+
+Provider evidence checked November 17, 2026 (New York time):
+
+- The existing policy engine's routes are present in [the deployed harness source](https://github.com/noncelogic/k3s-harness/blob/9577e8d1cfeddd6368f61d35d3124e68e529d0f0/control-plane/api.py).
+  The k3s control-plane Deployment reported one available replica at that source. Sortyard still
+  needs to qualify effective-policy reads and attributable authority for owner actions.
+- [Ranker source](https://github.com/noncelogic/corpus-ranker/blob/b8abc1043a8f6afedc1346ea97eb7cf9450cff11/src/server.ts)
+  serves capture, score and top-N using Postgres, with S3-compatible storage for captured originals.
+  Search, explanation and
+  the rest of its published OpenAPI surface still need route-level qualification.
+- [Closer's production entry point](https://github.com/noncelogic/loop-closer/blob/565ffdd71b281874550c055ce37fc9ff302a0aa4/src/main.ts)
+  constructs a Postgres graph store. Its in-memory entry path is explicitly for tests.
+- No Ranker or Closer Deployment or Service was found in the inspected `aks-obs-01` and harness
+  k3s clusters. The source observations establish implementation progress. Installed endpoint
+  availability, scoped credentials, and a complete cross-service loop remain unverified.
 
 Capture -> classify/rank for project/archetype/stage -> ImprovementProposal -> authorized
 pursuit -> Closer intake plus bounded harness task -> reviewed published version -> project
