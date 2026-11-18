@@ -1,9 +1,16 @@
-# The repo's own checks, on every pull request and every push to main (design draft §9:
+# The repo's own checks, on every pull request to main and every push to main (design draft §9:
 # the harness's own releases go through CI like everything else).
+#
+# One job, `test`, and it is the one required status check on main: strict, up to date with
+# main (policies/placement-defaults.yaml#gates). main runs no other job, so everything main
+# runs is proven on the pull request first. Keep it one job: a second job here would run on
+# main without gating. The slow suite (the kind replica boot) runs outside the gate, in
+# slow.yml.
 name: ci
 
 on:
   pull_request:
+    branches: [main]
   push:
     branches: [main]
 
@@ -15,8 +22,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  python:
-    name: lint, typecheck, test
+  test:
+    name: test
     runs-on: ubuntu-latest
     # The migration + ledger tests (tests/test_migrations.py) need a real Postgres; they are
     # required here, never skipped.
@@ -61,76 +68,16 @@ jobs:
         run: mypy
       - name: Test
         run: pytest tests
-
-  spec:
-    # The seeded Phase 0 spec tests (spec/test_*.py).
-    name: spec (Phase 0 schemas + OpenAPI)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install
-        run: pip install -e '.[dev]'
-      - name: Test
+      # The seeded Phase 0 spec tests (spec/test_*.py).
+      - name: Spec (Phase 0 schemas + OpenAPI)
         run: pytest spec
-
-  chart:
-    name: helm chart
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4
-        with:
-          version: v3.16.3
-      - name: Lint
+      - name: Helm chart lint
         run: helm lint --strict charts/sortyard
-      - name: Render
+      - name: Helm chart render
         run: helm template sortyard charts/sortyard > /dev/null
-
-  image:
-    name: container image
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build
+      - name: Container image build
         run: docker build -t ghcr.io/sortyard/sortyard:ci .
-      - name: Smoke
+      - name: Container image smoke
         run: |
           docker run --rm ghcr.io/sortyard/sortyard:ci sortyard-conductor --once
           docker run --rm ghcr.io/sortyard/sortyard:ci sortyard-api --help
-
-  replica:
-    # The one-command local replica (replica/replica.sh) boots and passes its smoke test on a
-    # fresh kind cluster, with the tool versions AGENTS.md documents.
-    name: local replica (kind)
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4
-        with:
-          version: v3.16.3
-      - uses: azure/setup-kubectl@v4
-        with:
-          version: v1.31.4
-      - name: Install kind
-        run: |
-          mkdir -p "$HOME/.local/bin"
-          curl -fsSLo "$HOME/.local/bin/kind" \
-            https://github.com/kubernetes-sigs/kind/releases/download/v0.25.0/kind-linux-amd64
-          echo "b22ff7e5c02b8011e82cc3223d069d178b9e1543f1deb21e936d11764780a3d8  $HOME/.local/bin/kind" | sha256sum -c -
-          chmod +x "$HOME/.local/bin/kind"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-      - name: Boot + smoke
-        run: ./replica/replica.sh up
-      - name: Diagnostics
-        if: failure()
-        run: |
-          ./replica/replica.sh status || true
-          kubectl --context kind-sortyard -n sortyard describe pods || true
-          kubectl --context kind-sortyard -n sortyard logs --all-containers --prefix -l app.kubernetes.io/name=sortyard --tail=100 || true
-      - name: Tear down
-        if: always()
-        run: ./replica/replica.sh down

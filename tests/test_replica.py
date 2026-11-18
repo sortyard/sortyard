@@ -7,8 +7,8 @@
 - fake only the outside third-party providers (Plane, the production conductor's pass log),
   and fake them faithfully enough that the real adapter (`PlaneSource`) reads them unchanged.
 
-The full boot runs in CI (`replica` job) on a kind cluster; these tests hold the parts that
-need no cluster.
+The full boot runs in CI (`slow.yml`, `replica` job, nightly) on a kind cluster; these tests
+hold the parts that need no cluster.
 """
 
 from __future__ import annotations
