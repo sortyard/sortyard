@@ -29,8 +29,9 @@ EMBEDDED = {"resource-envelope"}
 APPEND_ONLY = {"event", "decision_log", "audit_log"}
 # Rows other rows point at, so they go in first.
 FIRST = ["installation", "workspace"]
-# Tables that are not §3 objects: the API's bearer-token store (0002).
-INFRASTRUCTURE = {"api_token"}
+# Tables that hold no §3 object: the API's tokens, and the workflow kernel's projection (items,
+# runs and links, typed columns written by the item workflow; migration 0003).
+INFRASTRUCTURE = {"api_token", "item", "item_run", "item_link"}
 
 
 def schema(kind: str) -> dict[str, Any]:

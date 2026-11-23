@@ -25,6 +25,10 @@ item from spinning between rounds with no timer:
 - A decision that repeats (the same question, straight after it got the same answer) does not
   give that answer again. It gives the table's `on-repeat` answer, which leads to a wait on a
   named need: "a different answer". That is a stop on evidence of repetition, not on a count.
+
+Nothing outside the workflow changes an item's state. A person or an agent who wants a change
+sends a request (`send_request`); the workflow takes the item to its decision state with the
+request as the question, and the decision service answers it like any other decision.
 """
 
 from __future__ import annotations
@@ -190,6 +194,40 @@ async def send_outcome(
     )
 
 
+async def send_request(
+    engine: Engine,
+    identifier: str,
+    *,
+    request_id: str,
+    answer: str,
+    reason: str,
+    by: Payload,
+) -> None:
+    """Ask the item's workflow for a change: that its next decision be `answer`.
+
+    The request is a question, not a write. The workflow takes the item to its decision state
+    and the decision service answers; the request, the answer and its source are recorded.
+    """
+    await engine.signal(
+        identifier,
+        INPUT_SIGNAL,
+        {
+            "kind": "request",
+            "request": {"id": request_id, "answer": answer, "reason": reason, "by": dict(by)},
+        },
+    )
+
+
+def _request(received: Any) -> dict[str, Any] | None:
+    """The request an input carries, if it is one the workflow can read."""
+    if not isinstance(received, Mapping) or received.get("kind") != "request":
+        return None
+    request = received.get("request")
+    if not isinstance(request, Mapping) or not isinstance(request.get("answer"), str):
+        return None
+    return dict(request)
+
+
 def _apply_default(state: State, default: Default, retries_used: dict[str, int]) -> str:
     """The state the declared default sends the item to; counts the retries it spends."""
     if default.kind == "retry":
@@ -226,13 +264,18 @@ def _outcome(reply: Any) -> tuple[str, dict[str, Any]] | None:
     return reply["outcome"], dict(detail) if isinstance(detail, Mapping) else {}
 
 
+REQUESTED = "@request"
+
+
 async def _outcome_input(
-    ctx: Context, state: State, dispatch: int, deadline: datetime | None
+    ctx: Context, state: State, dispatch: int, deadline: datetime | None, take_requests: bool
 ) -> tuple[str, dict[str, Any]] | None:
     """The next outcome input the state knows, for this stay; nothing once the deadline passes.
 
     Inputs for another state or another stay, inputs that are not understood and outcomes the
-    state does not know are passed over: the item keeps waiting, inside its limit.
+    state does not know are passed over: the item keeps waiting, inside its limit. A request
+    ends the wait too, when the table has a decision state to put it to: it comes back as
+    (`REQUESTED`, the request).
     """
     while True:
         remaining = None if deadline is None else deadline - ctx.now()
@@ -251,6 +294,9 @@ async def _outcome_input(
             outcome = _outcome(received)
             if outcome is not None and outcome[0] in state.next:
                 return outcome
+        request = _request(received) if take_requests else None
+        if request is not None:
+            return REQUESTED, request
 
 
 async def item_workflow(ctx: Context, arg: Any) -> dict[str, Any]:
@@ -270,6 +316,9 @@ async def item_workflow(ctx: Context, arg: Any) -> dict[str, Any]:
     # How the item came to enter `state`; written into the transition event.
     move: dict[str, Any] = {"from_state": None, "from_kind": None, "cause": "start"}
     sequence = 0
+    # Requests that arrived while the item was not waiting for input, oldest first.
+    requests: list[dict[str, Any]] = []
+    deciders = [candidate for candidate in table.states.values() if candidate.decision]
 
     while True:
         entered = ctx.now()
@@ -277,8 +326,12 @@ async def item_workflow(ctx: Context, arg: Any) -> dict[str, Any]:
         attempt[state.name] = attempt.get(state.name, 0) + 1
         limit = None if state.terminal or state.decision else _limit_for(state, tier, detail)
         deadline = None if limit is None else entered + limit
-        # Whatever arrived before now answers an earlier stay, not this one.
-        ctx.drain_signals(INPUT_SIGNAL)
+        # Whatever outcome arrived before now answers an earlier stay, not this one. A request
+        # is not tied to a stay: it is kept.
+        for received in ctx.drain_signals(INPUT_SIGNAL):
+            request = _request(received)
+            if request is not None:
+                requests.append(request)
         await ctx.step(
             RECORD_STEP,
             {
@@ -299,6 +352,7 @@ async def item_workflow(ctx: Context, arg: Any) -> dict[str, Any]:
                 "default": None,
                 "action": None,
                 "decision": None,
+                "request": None,
                 **move,
             },
         )
@@ -317,6 +371,7 @@ async def item_workflow(ctx: Context, arg: Any) -> dict[str, Any]:
                 "outcome": move.get("outcome"),
                 "default": move.get("default"),
                 "action": move.get("action"),
+                "request": move.get("request"),
                 "detail": detail,
             }
             try:
@@ -333,7 +388,8 @@ async def item_workflow(ctx: Context, arg: Any) -> dict[str, Any]:
             answer: str = chosen["answer"]
             reverse: str = chosen["reverse"]
             asked = [question["state"], question["cause"], question["outcome"], detail]
-            if last_decision == [*asked, answer]:
+            # A request is a deliberate act, paced by whoever sends it: never a repetition.
+            if question["cause"] != "request" and last_decision == [*asked, answer]:
                 # The same question, straight after the same answer: giving it again would
                 # go round again. Wait on a named need instead: a different answer.
                 assert default.on_repeat is not None
@@ -358,6 +414,14 @@ async def item_workflow(ctx: Context, arg: Any) -> dict[str, Any]:
             }
             resumed = origin if origin is not None else table.state(table.initial)
             state = resumed if target == ORIGIN else table.state(target)
+            continue
+
+        if requests and deciders:
+            # A request waiting from before: put it to the decision before any work is
+            # dispatched for this stay.
+            origin = state
+            move = {**here, "cause": "request", "request": requests.pop(0)}
+            state = deciders[0]
             continue
 
         # Evidence of repetition: the item enters with a finding it entered with before.
@@ -397,9 +461,13 @@ async def item_workflow(ctx: Context, arg: Any) -> dict[str, Any]:
                     # limit for one that is.
                     cause, unknown, outcome = "unknown-outcome", outcome[0], None
                 if outcome is None:
-                    outcome = await _outcome_input(ctx, state, sequence, deadline)
+                    outcome = await _outcome_input(ctx, state, sequence, deadline, bool(deciders))
 
         origin = state
+        if outcome is not None and outcome[0] == REQUESTED:
+            move = {**here, "cause": "request", "request": outcome[1]}
+            state = deciders[0]
+            continue
         if outcome is None:
             move = {
                 **here,

@@ -42,6 +42,9 @@ claim tasks (§7).
 | `requeueTask` | POST | `/v1/workspaces/{workspace_id}/tasks/{task_id}/requeue` |  | ✓ | ✓ |  |  |  |  |  |
 | `resequenceTask` | POST | `/v1/workspaces/{workspace_id}/tasks/{task_id}/sequence` | `resequence_task` | ✓ | ✓ |  |  |  |  | ✓ |
 | `listTaskDecisionLog` | GET | `/v1/workspaces/{workspace_id}/tasks/{task_id}/decision-log` | `list_task_decision_log` | ✓ | ✓ | ✓ | ✓ |  |  | ✓ |
+| `getProjectQueue` | GET | `/v1/workspaces/{workspace_id}/projects/{project_id}/queue` | `get_project_queue` | ✓ | ✓ | ✓ | ✓ |  |  | ✓ |
+| `getItemTimeline` | GET | `/v1/workspaces/{workspace_id}/items/{item_id}/timeline` | `get_item_timeline` | ✓ | ✓ | ✓ | ✓ |  |  | ✓ |
+| `requestItemChange` | POST | `/v1/workspaces/{workspace_id}/items/{item_id}/requests` |  | ✓ | ✓ |  |  |  |  |  |
 | `listMilestones` | GET | `/v1/workspaces/{workspace_id}/milestones` | `list_milestones` | ✓ | ✓ | ✓ | ✓ |  |  | ✓ |
 | `createMilestone` | POST | `/v1/workspaces/{workspace_id}/milestones` | `create_milestone` | ✓ | ✓ |  |  |  |  | ✓ |
 | `getMilestone` | GET | `/v1/workspaces/{workspace_id}/milestones/{milestone_id}` | `get_milestone` | ✓ | ✓ | ✓ | ✓ |  |  | ✓ |
