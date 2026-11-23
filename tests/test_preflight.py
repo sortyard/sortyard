@@ -13,20 +13,25 @@ import asyncio
 import threading
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import timedelta
 from typing import Any, TypeVar
 
 import pytest
 
-from sortyard.engine import Engine, Recorded, Registry
+from sortyard.engine import Engine, EngineUnavailable, Recorded, Registry
 from sortyard.engine.testing import TestClock, time_skipping_engine
+from sortyard.kernel import preflight as preflight_module
 from sortyard.kernel.capabilities import KINDS, Lane, Need, load
-from sortyard.kernel.item import Owner, register, start_item, workflow_id
+from sortyard.kernel.item import Owner, register, send_outcome, start_item, workflow_id
 from sortyard.kernel.preflight import (
+    CHECKER_OWNER,
+    PLATFORM_RESOLVER,
     PREFLIGHT_NEED,
+    UNKNOWN_LANE,
     GapItem,
     InMemoryGapRegistry,
+    ItemsNotSignalled,
     Preflight,
     ProbeRecord,
     ProbeResult,
@@ -101,6 +106,12 @@ class World:
     calls: list[Mapping[str, Any]] = field(default_factory=list)
     events: list[Mapping[str, Any]] = field(default_factory=list)
     questions: list[Mapping[str, Any]] = field(default_factory=list)
+    # Replies an owner gives instead of the happy one, by state, one per call.
+    replies: dict[str, list[Reply]] = field(default_factory=dict)
+    # How many dispatches the capability-checker takes without ever answering, before it
+    # works. (The engine's test clock does not move while a step is still running, so a
+    # checker that is out is one that took the dispatch and has not reported.)
+    silent_checks: int = 0
 
     def probe(self, need: Need, lane: Lane) -> ProbeResult:
         self.probed.append((lane.name, need.text))
@@ -121,7 +132,8 @@ class World:
         if call["state"] not in HAPPY:
             self.unscripted.append(f"owner {call['owner']} in {call['state']}")
             raise AssertionError(f"no reply scripted for {call['state']}")
-        return HAPPY[call["state"]]
+        scripted = self.replies.get(call["state"])
+        return scripted.pop(0) if scripted else HAPPY[call["state"]]
 
     def decide(self, question: Mapping[str, Any]) -> Reply:
         self.questions.append(question)
@@ -130,9 +142,9 @@ class World:
     def record(self, event: Mapping[str, Any]) -> None:
         self.events.append(event)
 
-    def verify(self) -> None:
+    def verify(self, decisions: int = 0) -> None:
         assert self.unscripted == [], self.unscripted
-        assert self.questions == [], "no test here ends in a decision"
+        assert len(self.questions) == decisions, self.questions
 
     def states(self, item: str) -> list[str]:
         return [event["state"] for event in self.events if event["item"] == item]
@@ -199,7 +211,16 @@ async def kernel(world: World, gaps: InMemoryGapRegistry | None = None) -> Async
     owners: dict[str, Owner] = {
         state.owner: world.owner for state in shipped().states.values() if state.owner is not None
     }
-    owners.update(world.preflight(gaps).owners())
+    real = world.preflight(gaps)
+
+    def checker(call: Mapping[str, Any]) -> Reply:
+        if world.silent_checks > 0:
+            world.silent_checks -= 1
+            return None
+        return real.check(call)
+
+    owners.update(real.owners())
+    owners[CHECKER_OWNER] = checker
     registry = Registry()
     register(registry, owners=owners, decide=world.decide, record=world.record)
     async with time_skipping_engine() as skipping:
@@ -227,7 +248,9 @@ def call(item: str, **over: Any) -> dict[str, Any]:
     return {**made, **over}
 
 
-def test_a_failed_probe_dispatches_no_build_and_opens_one_gap_item() -> None:
+def test_a_failed_probe_dispatches_no_build_and_opens_one_gap_item_with_the_need_and_the_probe_output() -> (  # noqa: E501
+    None
+):
     """A failed probe dispatches no build and opens one gap item with the need and the probe
     output."""
     world = World()
@@ -333,6 +356,7 @@ def test_waiting_items_return_to_preflight_when_the_gap_item_closes() -> None:
             # The resolver grants the read and closes the gap item. Nothing else is done.
             world.findings[SECRET] = OK
             closed = await close_gap(k.engine, k.gaps, gap.id)
+            assert closed is not None
             return [await k.result(item) for item in ("ITEM-1", "ITEM-2")], closed
 
     results, closed = asyncio.run(scenario())
@@ -443,7 +467,7 @@ def test_a_gap_that_closes_before_the_item_reaches_the_wait_does_not_strand_it()
             result = await k.result("ITEM-1")
             # Closing again, with the item's workflow ended, is passed over, not an error.
             again = await close_gap(k.engine, k.gaps, gaps.closed_early[0])
-            assert not again.open
+            assert again is not None and not again.open
             return result
 
     assert asyncio.run(scenario())["state"] == "merged"
@@ -571,22 +595,340 @@ def test_the_need_owner_takes_the_wait_and_answers_only_for_a_gap_already_closed
     waiting = {"state": "waiting", "owner": "need", "dispatch": 3}
     on_gap = call("ITEM-1", **waiting, detail={"gaps": [gap.id]})
     assert preflight.wait(on_gap) is None
-    # A wait on some other need, or on a gap item nobody knows, is taken and left alone.
+    # So is a wait that names no gap item while the item is linked to an open one.
     assert preflight.wait(call("ITEM-1", **waiting, detail={"need": "a-different-answer"})) is None
-    assert preflight.wait(call("ITEM-1", **waiting, detail={"gaps": ["gap-unknown"]})) is None
     gaps.close(gap.id)
-    assert preflight.wait(on_gap) == {"outcome": "closed", "detail": {"closed_gaps": [gap.id]}}
+    closed = {"outcome": "closed", "detail": {"closed_gaps": [gap.id]}}
+    assert preflight.wait(on_gap) == closed
+    # The registry's link answers even when the detail no longer names the gap item.
+    assert (
+        preflight.wait(call("ITEM-1", **waiting, detail={"need": "a-different-answer"})) == closed
+    )
     assert len(gaps.all()) == 1
     # Preflight ran out of its limit: the table hands the need's owner the action, and the
     # gap item names the preflight itself for the lane's resolver.
     late = call("ITEM-1", **waiting, cause="limit", action="open-capability-gap")
     assert preflight.wait(late) is None
     opened = gaps.all()[-1]
-    assert (opened.need, opened.resolver, opened.items, opened.open) == (
+    assert (opened.need, opened.lane, opened.resolver, opened.items, opened.open) == (
         PREFLIGHT_NEED,
+        "walwarden",
         "platform",
         ("ITEM-1",),
         True,
     )
     assert "limit" in opened.output
+    # The item now waits on an open gap item: the wait is taken, whatever closed before it.
+    assert preflight.wait(on_gap) is None
+    assert [g.id for g in gaps.for_item(TENANT, "ITEM-1")] == [gap.id, opened.id]
     world.verify()
+
+
+def test_a_gap_item_the_registry_does_not_know_holds_no_item() -> None:
+    # What a worker restart does to the in-memory registry: the gap item is gone.
+    world = World()
+    waiting = {"state": "waiting", "owner": "need", "dispatch": 3}
+    lost = call("ITEM-1", **waiting, detail={"gaps": ["gap-7"]})
+    restarted = world.preflight(InMemoryGapRegistry())
+    assert restarted.wait(lost) == {"outcome": "closed", "detail": {"closed_gaps": ["gap-7"]}}
+    # One known and still open among those named keeps the wait.
+    gaps = InMemoryGapRegistry()
+    gap = gaps.open_or_link(
+        tenant=TENANT, lane="walwarden", need=SECRET, resolver="platform", output="x", item="ITEM-1"
+    )
+    both = call("ITEM-1", **waiting, detail={"gaps": ["gap-7", gap.id]})
+    assert world.preflight(gaps).wait(both) is None
+
+    async def scenario() -> None:
+        async with kernel(world) as k:
+            # Closing a gap item nobody knows tells nobody and is not an error.
+            assert await close_gap(k.engine, k.gaps, "gap-7") is None
+
+    asyncio.run(scenario())
+    world.verify()
+
+
+def test_an_item_waiting_on_something_that_is_not_a_capability_gap_keeps_waiting() -> None:
+    # The build ends without a change, twice: the decision repeats and the kernel has the item
+    # wait on "a different answer". The item had a gap item earlier, closed since. The need's
+    # owner must leave that wait alone, or the item goes round again with no timer.
+    world = World()
+    world.findings[SECRET] = DENIED
+    world.replies["building"] = [{"outcome": "no-change"}, {"outcome": "no-change"}]
+
+    async def scenario() -> Recorded:
+        async with kernel(world) as k:
+            await k.start("ITEM-1", SECRET)
+            await k.idle_in("ITEM-1", "waiting")
+            world.findings[SECRET] = OK
+            await close_gap(k.engine, k.gaps, k.gaps.all()[0].id)
+            await until(
+                lambda: asyncio.sleep(0, world.states("ITEM-1")),
+                lambda states: states.count("waiting") == 2,
+                "the wait on a different answer",
+            )
+            waiting = await k.idle_in("ITEM-1", "waiting")
+            assert k.gaps.for_item(TENANT, "ITEM-1") == ()
+            return waiting
+
+    waiting = asyncio.run(scenario())
+    world.verify(decisions=2)
+    assert world.states("ITEM-1") == [
+        "admitted",
+        "preflight",
+        "waiting",
+        "preflight",
+        "building",
+        "decision",
+        "building",
+        "decision",
+        "waiting",
+    ]
+    assert world.events[-1]["detail"]["need"] == "a-different-answer"
+    assert len(world.builds("ITEM-1")) == 2
+    # It waits on the table's own limit for a wait, on one timer.
+    assert len(waiting.pending_timers) == 1
+    assert timedelta(hours=23) < waiting.pending_timers[0] <= timedelta(hours=24)
+    # Called directly: no gap item named, none linked, so no answer.
+    owner = world.preflight(InMemoryGapRegistry())
+    waits = {"state": "waiting", "owner": "need", "detail": {"need": "a-different-answer"}}
+    assert owner.wait(call("ITEM-1", **waits)) is None
+    assert owner.wait(call("ITEM-1", state="waiting", owner="need", cause="decision")) is None
+
+
+def test_the_checker_called_twice_for_one_dispatch_links_the_item_once() -> None:
+    world = World()
+    world.findings[SECRET] = DENIED
+    world.findings["service:cluster-api"] = ProbeResult(False, "connection refused")
+    world.tasks["ITEM-1"] = (SECRET, "service:cluster-api")
+    gaps = InMemoryGapRegistry()
+    preflight = world.preflight(gaps)
+    first = preflight.check(call("ITEM-1"))
+    assert preflight.check(call("ITEM-1")) == first and first["outcome"] == "gap"
+    assert [(gap.need, gap.items) for gap in gaps.all()] == [
+        (SECRET, ("ITEM-1",)),
+        ("service:cluster-api", ("ITEM-1",)),
+    ]
+    assert [gap.id for gap in gaps.for_item(TENANT, "ITEM-1")] == first["detail"]["gaps"]
+    # A later attempt that finds one need met leaves the item waiting on the other alone, and
+    # one that finds every need met leaves it waiting on none: no stale link to an open gap.
+    world.findings[SECRET] = OK
+    second = preflight.check(call("ITEM-1"))
+    assert second["detail"]["gaps"] == [gaps.all()[1].id]
+    assert [(gap.need, gap.items, gap.open) for gap in gaps.all()] == [
+        (SECRET, (), True),
+        ("service:cluster-api", ("ITEM-1",), True),
+    ]
+    world.findings["service:cluster-api"] = OK
+    assert preflight.check(call("ITEM-1"))["outcome"] == "ready"
+    assert gaps.for_item(TENANT, "ITEM-1") == ()
+    assert [gap.items for gap in gaps.all()] == [(), ()]
+    world.verify()
+
+
+def test_a_lookup_that_raises_ends_in_a_gap_item_naming_the_preflight() -> None:
+    world = World()
+
+    def lookup(tenant: str, item: str) -> TaskNeeds:
+        raise TimeoutError("task store did not answer")
+
+    gaps = InMemoryGapRegistry()
+    preflight = Preflight(
+        lookup=lookup, probes=dict.fromkeys(KINDS, world.probe), gaps=gaps, sink=world.sunk.append
+    )
+    reply = preflight.check(call("ITEM-1"))
+    output = "the lookup of the item's needs raised TimeoutError: task store did not answer"
+    (gap,) = gaps.all()
+    assert gap == GapItem(
+        gap.id, TENANT, UNKNOWN_LANE, PREFLIGHT_NEED, PLATFORM_RESOLVER, output, ("ITEM-1",)
+    )
+    assert reply == {
+        "outcome": "gap",
+        "detail": {
+            "lane": UNKNOWN_LANE,
+            "probes": [{"need": PREFLIGHT_NEED, "passed": False, "output": output}],
+            "need": PREFLIGHT_NEED,
+            "needs": [PREFLIGHT_NEED],
+            "gaps": [gap.id],
+            "resolver": PLATFORM_RESOLVER,
+        },
+    }
+    assert [(r.need, r.passed, r.output) for r in world.sunk] == [(PREFLIGHT_NEED, False, output)]
+    # The limit path does not depend on the lookup either: a second item joins the gap item.
+    waiting = {"state": "waiting", "owner": "need", "cause": "limit"}
+    assert preflight.wait(call("ITEM-2", **waiting, action="open-capability-gap")) is None
+    assert gaps.all() == (replace(gap, items=("ITEM-1", "ITEM-2")),)
+    # A lookup that answers with something else is no better.
+    wordless = Preflight(
+        lookup=lambda tenant, item: None,  # type: ignore[arg-type,return-value]
+        probes=dict.fromkeys(KINDS, world.probe),
+        gaps=InMemoryGapRegistry(),
+    )
+    assert wordless.check(call("ITEM-1"))["detail"]["need"] == PREFLIGHT_NEED
+    assert world.probed == []
+    world.verify()
+
+
+def test_close_gap_that_fails_part_way_still_resumes_the_other_items(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    world = World()
+    world.findings[SECRET] = DENIED
+    items = ["ITEM-1", "ITEM-2", "ITEM-3"]
+    refused: list[str] = []
+
+    async def flaky(engine: Engine, identifier: str, **outcome: Any) -> None:
+        # The engine refuses the first signal for ITEM-1, the first item linked.
+        if identifier == workflow_id(TENANT, "ITEM-1") and not refused:
+            refused.append(identifier)
+            raise EngineUnavailable("UNAVAILABLE: engine restarting")
+        await send_outcome(engine, identifier, **outcome)
+
+    monkeypatch.setattr(preflight_module, "send_outcome", flaky)
+
+    async def scenario() -> list[Any]:
+        async with kernel(world) as k:
+            for item in items:
+                await k.start(item, SECRET)
+                await k.idle_in(item, "waiting")
+            (gap,) = k.gaps.all()
+            world.findings[SECRET] = OK
+            with pytest.raises(ItemsNotSignalled) as caught:
+                await close_gap(k.engine, k.gaps, gap.id)
+            assert caught.value.items == ("ITEM-1",) and not caught.value.gap.open
+            assert "ITEM-1" in str(caught.value) and "engine restarting" in str(caught.value)
+            # The items after the failure were told all the same, and build.
+            done = [await k.result(item) for item in items[1:]]
+            assert world.states("ITEM-1")[-1] == "waiting" and world.builds("ITEM-1") == []
+            # The repeat call tells the one that was missed.
+            again = await close_gap(k.engine, k.gaps, gap.id)
+            assert again is not None and not again.open
+            return [await k.result("ITEM-1"), *done]
+
+    results = asyncio.run(scenario())
+    world.verify()
+    assert [result["state"] for result in results] == ["merged"] * 3
+    assert len(refused) == 1 and all(len(world.builds(item)) == 1 for item in items)
+
+
+def test_an_item_never_told_its_gap_closed_returns_to_preflight_at_its_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    world = World()
+    world.findings[SECRET] = DENIED
+
+    async def lost(engine: Engine, identifier: str, **outcome: Any) -> None:
+        raise EngineUnavailable("UNAVAILABLE: engine restarting")
+
+    monkeypatch.setattr(preflight_module, "send_outcome", lost)
+
+    async def scenario() -> Any:
+        async with kernel(world) as k:
+            await k.start("ITEM-1", SECRET)
+            await k.idle_in("ITEM-1", "waiting")
+            world.findings[SECRET] = OK
+            with pytest.raises(ItemsNotSignalled):
+                await close_gap(k.engine, k.gaps, k.gaps.all()[0].id)
+            # The wait's limit (the lane's gap-limit) passes: the decision resumes the wait,
+            # and the need's owner finds the gap item closed.
+            await k.clock.advance(timedelta(hours=2))
+            return await k.result("ITEM-1")
+
+    assert asyncio.run(scenario())["state"] == "merged"
+    world.verify(decisions=1)
+    assert world.states("ITEM-1") == [
+        "admitted",
+        "preflight",
+        "waiting",
+        "decision",
+        "waiting",
+        "preflight",
+        *TO_MERGED,
+    ]
+
+
+def test_an_item_on_two_gap_items_waits_again_on_the_one_still_open() -> None:
+    world = World()
+    service = "service:cluster-api"
+    world.findings[SECRET] = DENIED
+    world.findings[service] = ProbeResult(False, "connection refused")
+
+    async def scenario() -> tuple[tuple[GapItem, ...], Any]:
+        async with kernel(world) as k:
+            await k.start("ITEM-1", SECRET, service)
+            await k.idle_in("ITEM-1", "waiting")
+            secret_gap, service_gap = k.gaps.all()
+            assert (secret_gap.need, service_gap.need) == (SECRET, service)
+            assert world.events[-1]["detail"]["gaps"] == [secret_gap.id, service_gap.id]
+            # One of the two is resolved and closed.
+            world.findings[SECRET] = OK
+            await close_gap(k.engine, k.gaps, secret_gap.id)
+            await until(
+                lambda: asyncio.sleep(0, world.states("ITEM-1")),
+                lambda states: states.count("waiting") == 2,
+                "the second wait",
+            )
+            await k.idle_in("ITEM-1", "waiting")
+            after_one = k.gaps.all()
+            assert world.events[-1]["detail"]["gaps"] == [service_gap.id]
+            assert world.events[-1]["detail"]["needs"] == [service]
+            assert world.builds("ITEM-1") == []
+            world.findings[service] = OK
+            await close_gap(k.engine, k.gaps, service_gap.id)
+            return after_one, await k.result("ITEM-1")
+
+    after_one, result = asyncio.run(scenario())
+    world.verify()
+    # Still two gap items: the closed one, and the open one the item is still linked to.
+    assert [(gap.need, gap.open, gap.items) for gap in after_one] == [
+        (SECRET, False, ("ITEM-1",)),
+        (service, True, ("ITEM-1",)),
+    ]
+    assert result["state"] == "merged" and len(world.builds("ITEM-1")) == 1
+    assert world.states("ITEM-1") == [
+        "admitted",
+        "preflight",
+        "waiting",
+        "preflight",
+        "waiting",
+        "preflight",
+        *TO_MERGED,
+    ]
+    assert (world.probes_of(SECRET), world.probes_of(service)) == (3, 3)
+
+
+def test_a_checker_that_does_not_answer_within_its_limit_ends_in_a_preflight_gap_item() -> None:
+    world = World(silent_checks=1)
+
+    async def scenario() -> tuple[GapItem, Recorded, Any]:
+        async with kernel(world) as k:
+            await k.start("ITEM-1")
+            preflight = await k.idle_in("ITEM-1", "preflight")
+            assert preflight.pending_timers and world.probed == []
+            # The preflight limit of the shipped table passes with the checker still out.
+            await k.clock.advance(timedelta(minutes=5))
+            waiting = await k.idle_in("ITEM-1", "waiting")
+            (gap,) = k.gaps.all()
+            assert world.builds("ITEM-1") == []
+            # The checker comes back; the resolver closes the gap item; the item is probed again.
+            await close_gap(k.engine, k.gaps, gap.id)
+            return gap, waiting, await k.result("ITEM-1")
+
+    gap, waiting, result = asyncio.run(scenario())
+    world.verify()
+    assert (gap.need, gap.lane, gap.resolver, gap.items, gap.open) == (
+        PREFLIGHT_NEED,
+        "walwarden",
+        "platform",
+        ("ITEM-1",),
+        True,
+    )
+    assert gap.output == "the preflight did not finish within its limit"
+    entered = next(e for e in world.events if e["state"] == "waiting")
+    assert (entered["cause"], entered["action"]) == ("limit", "open-capability-gap")
+    # The owner of a wait cannot set its limit, so this wait has the table's own.
+    assert len(waiting.pending_timers) == 1
+    assert timedelta(hours=23) < waiting.pending_timers[0] <= timedelta(hours=24)
+    assert result["state"] == "merged"
+    assert world.states("ITEM-1") == ["admitted", "preflight", "waiting", "preflight", *TO_MERGED]
+    assert len(world.builds("ITEM-1")) == 1

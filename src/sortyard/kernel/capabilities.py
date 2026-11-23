@@ -10,8 +10,9 @@ that breaks one of the section's two rules:
 
 A task lists its needs against the file as references (`secret:NAME`, `repository:owner/name`,
 `service:NAME`, `runner-pool`, `worker-image`). A need the lane does not declare is refused:
-`Lane.needs_for` is the only way a task's list becomes needs to exercise, and it adds the
-lane's defaults. `sortyard.kernel.preflight` exercises them.
+`Lane.check` refuses one need, and `Lane.needs_for` turns a task's whole list into the needs to
+exercise, lane defaults first. `sortyard.kernel.preflight` exercises them; it checks a task's
+needs one at a time with `Lane.check`, so that a refused need is named in a gap item.
 
 Loading is a pure function of the text, as the state table's is. `lane_example.toml`, shipped
 next to this module, shows the format.
@@ -38,9 +39,9 @@ SERVICE = "service"
 KINDS = (WORKER_IMAGE, RUNNER_POOL, REPOSITORY, SECRET, SERVICE)
 _UNNAMED = frozenset({WORKER_IMAGE, RUNNER_POOL})
 
-_DIGEST = re.compile(r"^[^@\s]+@(sha256:[0-9a-f]{64})$")
-_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
-_REPOSITORY_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$")
+_DIGEST = re.compile(r"[^@\s]+@(sha256:[0-9a-f]{64})")
+_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+_REPOSITORY_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*")
 _TOP_KEYS = frozenset(
     {
         "version",
@@ -104,7 +105,7 @@ class Need:
                 raise CapabilityError("malformed-need", f"{text!r}: {kind} takes no name")
             return cls(kind)
         pattern = _REPOSITORY_NAME if kind == REPOSITORY else _NAME
-        if not pattern.match(name):
+        if not pattern.fullmatch(name):
             form = "owner/name" if kind == REPOSITORY else "a name"
             raise CapabilityError("malformed-need", f"{text!r}: {kind} needs {form} after ':'")
         return cls(kind, name)
@@ -185,7 +186,7 @@ def _text(raw: Mapping[str, Any], key: str, lane: str, where: str = "") -> str:
 
 def _image(raw: Mapping[str, Any], key: str, lane: str) -> Image:
     reference = _text(raw, key, lane, "images.")
-    match = _DIGEST.match(reference)
+    match = _DIGEST.fullmatch(reference)
     if not match:
         raise _fail(
             "image-by-digest",
@@ -204,7 +205,7 @@ def _entries(raw: Mapping[str, Any], section: str, lane: str) -> list[Mapping[st
     seen: set[str] = set()
     for entry in entries:
         name = entry.get("name")
-        if not isinstance(name, str) or not pattern.match(name):
+        if not isinstance(name, str) or not pattern.fullmatch(name):
             raise _fail("malformed-file", lane, f"{section}: {name!r} is not a valid name")
         unknown = sorted(set(entry) - _ENTRY_KEYS[section])
         if unknown:
@@ -222,9 +223,9 @@ def load(text: str) -> Lane:
     except tomllib.TOMLDecodeError as error:
         raise CapabilityError("malformed-file", f"not TOML: {error}") from error
     lane = raw.get("lane")
-    if not isinstance(lane, str) or not _NAME.match(lane):
+    if not isinstance(lane, str) or not _NAME.fullmatch(lane):
         raise CapabilityError("missing-field", f"lane must be a name, not {lane!r}")
-    if raw.get("version") != 1:
+    if type(raw.get("version")) is not int or raw["version"] != 1:
         raise _fail("malformed-file", lane, f"version must be 1, not {raw.get('version')!r}")
     unknown = sorted(set(raw) - _TOP_KEYS)
     if unknown:

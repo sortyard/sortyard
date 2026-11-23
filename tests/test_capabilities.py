@@ -127,6 +127,12 @@ def test_loading_fails_for_a_secret_declared_optional() -> None:
         ('runner-pool = "walwarden-runners"', "", "missing-field"),
         ('lane = "walwarden"', "", "missing-field"),
         ("version = 1", "version = 2", "malformed-file"),
+        ("version = 1", "version = true", "malformed-file"),
+        ("version = 1", "version = 1.0", "malformed-file"),
+        ('lane = "walwarden"', 'lane = "walwarden\\n"', "missing-field"),
+        (f"ci@{DIGEST}", f"ci@{DIGEST}\\n", "image-by-digest"),
+        ('name = "cluster-api"', 'name = "cluster-api\\n"', "malformed-file"),
+        ('name = "walwarden/charts"', 'name = "walwarden/charts\\n"', "malformed-file"),
         ('gap-limit = "2h"', 'gap-limit = "soon"', "malformed-file"),
         ('gap-limit = "2h"', 'gap-limit = "2h"\nrunners = 4', "unknown-key"),
         ('name = "walwarden/charts"', 'name = "walwarden/app"', "duplicate"),
@@ -173,7 +179,18 @@ def test_a_need_the_lane_does_not_declare_is_refused(need: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "text", ["", "secret", "secret:", "repository:app", "worker-image:x", "database:main", 7]
+    "text",
+    [
+        "",
+        "secret",
+        "secret:",
+        "secret:NAME\n",
+        "repository:app",
+        "repository:o/n\n",
+        "worker-image:x",
+        "database:main",
+        7,
+    ],
 )
 def test_a_need_that_is_not_a_reference_is_refused(text: object) -> None:
     with pytest.raises(CapabilityError) as caught:
