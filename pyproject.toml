@@ -14,7 +14,9 @@ requires-python = ">=3.11"
 # jsonschema: the API validates every document against its full §3 JSON Schema before storing.
 # temporalio: the durable workflow engine SDK, imported only by src/sortyard/engine
 # (docs/decisions/workflow-engine.md).
-dependencies = ["jsonschema>=4.21", "psycopg[binary]>=3.1", "temporalio>=1.36,<2"]
+# cryptography: signs the GitHub App token (RS256), imported only by src/sortyard/lane/github.py
+# (DECISIONS.md SY-DEC-008).
+dependencies = ["cryptography>=42", "jsonschema>=4.21", "psycopg[binary]>=3.1", "temporalio>=1.36,<2"]
 
 [project.optional-dependencies]
 dev = [

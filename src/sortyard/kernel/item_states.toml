@@ -112,7 +112,7 @@ owner = "merge-adapter"
 limit = "30m"
 default = { redispatch = true, action = "update-branch" }
 reason = "merge-in-progress"
-next = { merged = "merged", conflict = "fixing" }
+next = { merged = "merged", conflict = "fixing", moved = "checking" }
 
 [states.waiting]
 owner = "need"
