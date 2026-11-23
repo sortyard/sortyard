@@ -48,17 +48,27 @@ Run 2026-11-23 on the build worker: Python 3.11.2, **dbos 3.6.0**, Postgres 16.1
 Each test runs real worker processes (`tests/engine_worker.py`) on the sample workflow
 `tests/engine_sample.py` against a throwaway database, and stops workers with SIGKILL.
 
+The tests use no fixed sleeps to wait for the engine (a guard test in the same file holds this).
+A worker is killed only after the engine has durably recorded the position the test means to
+kill it at. `Client.recorded` reads the finished steps and registered waits, and the test polls
+it with a deadline. The timer test also has a recovery barrier: the worker's test clock reports
+the wait it computed from the recorded deadline. The test asserts that the timer is still pending
+only after that report, and checks the reported wait against the deadline recorded before the
+kill.
+
 | Test (`tests/test_engine_failure.py`) | Result |
 | --- | --- |
 | A workflow finishes after its worker is killed mid-step, and finished steps do not run again | **pass.** Step one ran once. The step the worker died in ran twice (once interrupted, once to completion), as expected. Step three ran once. |
 | A waiting workflow keeps its position across a worker restart on changed step code | **pass.** The new worker ran a copy whose step bodies and workflow source changed (`-v1` → `-v2`). The finished step was not re-run. The workflow was still waiting, took the signal, and ran the *new* code for the next step. |
-| A seven-day timer fires under the test clock | **pass.** A worker with its clock moved forward 1 day left the workflow waiting. A worker moved forward 7 days + 60 s finished it at once. |
+| A seven-day timer fires under the test clock | **pass.** A worker with its clock moved forward 1 day resumed the timer from its recorded deadline: the wait it reported was the deadline minus its clock, about 6 days. It left the workflow waiting and recorded nothing new. A worker moved forward 7 days + 60 s finished it at once, without waiting again. |
 | A signal sent with no worker running is delivered when a worker starts | **pass.** The signal was sent after the worker was killed, while the workflow was still waiting. The next worker delivered it. |
 | `tests/test_engine_boundary.py`: only `src/sortyard/engine` imports the engine SDK | **pass.** It covers `import`, `from … import` and `importlib.import_module` / `__import__` with a literal name, for `dbos` and `temporalio`. |
 
 Each guard was checked by breaking the engine module on purpose. Making `step` a plain call
 failed the kill test ("a finished step ran again"). Leaving `version` unpinned failed the
-changed-code test. Making `Client.signal` drop the message failed the signal test.
+changed-code test. Making `Client.signal` drop the message failed the signal test. Making
+`timer` record a deadline of under one day failed the timer test at its recovery barrier: the
+resumed worker reported no pending wait and ran the next step.
 
 Facts about DBOS that the boundary encodes:
 

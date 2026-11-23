@@ -5,16 +5,17 @@
 names and signatures.
 
 Public: `workflow`, `step`, `timer`, `wait_for_signal`, `Engine` (a worker: launch, start,
-shutdown), `Client` (signal, status, result from any process), `WorkflowFailed`,
-`engine_version`, `ENGINE`.
+shutdown), `Client` (signal, status, recorded, result from any process), `WorkflowFailed`,
+`Recorded`, `engine_version`, `ENGINE`.
 """
 
 from __future__ import annotations
 
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from importlib.metadata import version as _dist_version
-from typing import Any, Literal, ParamSpec, TypeVar
+from typing import Any, Literal, ParamSpec, TypeVar, cast
 
 from dbos import DBOS, DBOSClient, DBOSConfig, SetWorkflowID
 
@@ -36,6 +37,25 @@ _STATUS: dict[str, Status] = {
     "MAX_RECOVERY_ATTEMPTS_EXCEEDED": "failed",
     "CANCELLED": "cancelled",
 }
+
+
+_WAIT = "DBOS.sleep"  # a timer's deadline, or the deadline of a wait for a signal
+_SIGNAL = "DBOS.recv"  # a signal taken by `wait_for_signal`
+
+
+@dataclass(frozen=True)
+class Recorded:
+    """One thing the engine recorded for a workflow, in order.
+
+    `kind` is "step" (a finished step, `name` its function name), "wait" (a `timer` or a
+    `wait_for_signal` registered its deadline, `deadline` in epoch seconds) or "signal" (a
+    `wait_for_signal` took its signal). Once recorded, a worker that resumes the workflow
+    replays it rather than doing it again.
+    """
+
+    kind: Literal["step", "wait", "signal"]
+    name: str | None = None
+    deadline: float | None = None
 
 
 class WorkflowFailed(Exception):
@@ -133,6 +153,19 @@ class Client:
         """The workflow's status, or None if no workflow has that id."""
         found = self._client.list_workflows(workflow_ids=[workflow_id])
         return _STATUS[found[0].status] if found else None
+
+    def recorded(self, workflow_id: str) -> list[Recorded]:
+        """What the engine has durably recorded for the workflow so far, in order."""
+        found: list[Recorded] = []
+        for row in self._client.list_workflow_steps(workflow_id):
+            name = row["function_name"]
+            if name == _WAIT:
+                found.append(Recorded("wait", deadline=cast(float, row["output"])))
+            elif name == _SIGNAL:
+                found.append(Recorded("signal"))
+            elif row["error"] is None:
+                found.append(Recorded("step", name))
+        return found
 
     def result(self, workflow_id: str, timeout_seconds: float, poll_seconds: float = 0.2) -> Any:
         """Wait for the workflow to finish and return its result."""

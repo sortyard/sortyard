@@ -18,6 +18,7 @@ Results and the engine version are recorded in docs/decisions/workflow-engine.md
 
 from __future__ import annotations
 
+import ast
 import os
 import pathlib
 import signal
@@ -29,7 +30,7 @@ from urllib.parse import quote
 
 import pytest
 
-from sortyard.engine import Client
+from sortyard.engine import Client, Recorded
 from tests.pg import fresh_database, requires_postgres
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -37,6 +38,7 @@ SAMPLE = ROOT / "tests" / "engine_sample.py"
 WORKER = ROOT / "tests" / "engine_worker.py"
 DAY = 24 * 60 * 60
 WAIT = 60.0
+WAITING = Recorded("wait")  # a registered wait, whatever its deadline
 
 pytestmark = requires_postgres
 
@@ -76,6 +78,33 @@ class Run:
             if time.monotonic() > deadline:
                 raise AssertionError(f"timed out waiting for {what}; marks: {self.lines()}")
             time.sleep(0.05)
+
+    def waits(self) -> list[float]:
+        """The long waits the workers' test clocks were asked for (`tests/engine_worker.py`)."""
+        return [float(line.split()[1]) for line in self.lines() if line.startswith("wait ")]
+
+    def wait_for_position(self, workflow_id: str, expected: list[Recorded]) -> list[Recorded]:
+        """Wait until the engine has durably recorded `expected` for the workflow, and no more.
+
+        A wait matches `WAITING` whatever its deadline. Killing a worker only after this keeps
+        the kill from racing the engine's own recording of a step result or a wait.
+        """
+
+        def matches(found: list[Recorded]) -> bool:
+            return len(found) == len(expected) and all(
+                want == (WAITING if got.kind == "wait" else got)
+                for got, want in zip(found, expected, strict=True)
+            )
+
+        found: list[Recorded] = []
+
+        def reached() -> bool:
+            nonlocal found
+            found = self.connect().recorded(workflow_id)
+            return matches(found)
+
+        self.wait_for(f"{workflow_id} to record {expected}", reached)
+        return found
 
     def worker(
         self,
@@ -129,6 +158,7 @@ def test_a_workflow_finishes_after_its_worker_is_killed_mid_step_and_finished_st
     run.hold.touch()
     first = run.worker(start=("three_steps", "kill-mid-step"))
     run.wait_for("step two to start", lambda: run.count("two-start") == 1)
+    run.wait_for_position("kill-mid-step", [Recorded("step", "one")])
     run.kill(first)
     assert run.connect().status("kill-mid-step") == "running"
 
@@ -151,12 +181,10 @@ def test_a_waiting_workflow_keeps_its_position_across_a_worker_restart_on_change
     changed.write_text(source.replace("-v1", "-v2"))
 
     first = run.worker(start=("waits_for_signal", "waits"))
-    run.wait_for("the first step", lambda: run.count("before-v1") == 1)
-    time.sleep(1.0)  # let the workflow reach its wait
+    run.wait_for_position("waits", [Recorded("step", "before"), WAITING])
     run.kill(first)
 
     run.worker(sample=changed)
-    time.sleep(1.0)
     assert run.connect().status("waits") == "running"
     run.connect().signal("waits", "go", "proceed")
 
@@ -170,26 +198,40 @@ def test_a_waiting_workflow_keeps_its_position_across_a_worker_restart_on_change
 def test_a_seven_day_timer_fires_under_the_test_clock(run: Run) -> None:
     started = time.monotonic()
     first = run.worker(start=("seven_day_timer", "timer"))
-    run.wait_for("the first step", lambda: run.count("before-v1") == 1)
-    time.sleep(1.0)  # let the workflow record the timer's deadline
+    position = run.wait_for_position("timer", [Recorded("step", "before"), WAITING])
+    deadline = position[1].deadline
+    assert deadline is not None
+    run.wait_for("the first worker to wait on the timer", lambda: len(run.waits()) == 1)
     run.kill(first)
 
+    # Recovery barrier: the worker one day ahead reports the wait it computed from the recorded
+    # deadline; only then is "still pending" a statement about the evaluated timer.
+    before_spawn = time.time()
     early = run.worker(clock_offset=1 * DAY)
-    time.sleep(2.0)
+    run.wait_for(
+        "the resumed timer to be evaluated",
+        lambda: len(run.waits()) == 2 or run.count("after-v1") > 0,
+    )
+    after_wait = time.time()
+    assert run.count("after-v1") == 0, "the timer fired after one day"
+    left = run.waits()[1]
+    assert deadline - DAY - after_wait <= left <= deadline - DAY - before_spawn, (
+        f"the resumed timer waits {left}s, not what is left of the recorded deadline one day on"
+    )
     assert run.connect().status("timer") == "running", "the timer fired after one day"
-    assert run.count("after-v1") == 0
+    assert run.connect().recorded("timer") == position, "the resumed timer re-recorded its wait"
     run.kill(early)
 
     run.worker(clock_offset=7 * DAY + 60)
     assert run.connect().result("timer", timeout_seconds=WAIT) == ["before-v1", "after-v1"]
     assert run.count("before-v1") == 1
+    assert len(run.waits()) == 2, "the timer waited again once its deadline had passed"
     assert time.monotonic() - started < 4 * WAIT
 
 
 def test_a_signal_sent_with_no_worker_running_is_delivered_when_a_worker_starts(run: Run) -> None:
     first = run.worker(start=("waits_for_signal", "signalled"))
-    run.wait_for("the first step", lambda: run.count("before-v1") == 1)
-    time.sleep(1.0)
+    run.wait_for_position("signalled", [Recorded("step", "before"), WAITING])
     run.kill(first)
 
     run.connect().signal("signalled", "go", "sent-while-down")
@@ -199,3 +241,22 @@ def test_a_signal_sent_with_no_worker_running_is_delivered_when_a_worker_starts(
     result = run.connect().result("signalled", timeout_seconds=WAIT)
     assert result == ["before-v1", "sent-while-down", "after-v1"]
     assert run.count("before-v1") == 1
+
+
+def test_the_failure_tests_synchronise_on_recorded_state_not_on_fixed_sleeps() -> None:
+    """A fixed sleep before a kill or an assertion leaves the engine's progress uncontrolled.
+
+    Each test waits for state the engine has recorded (a finished step, a registered wait) or a
+    worker has reported (the wait its test clock was asked for), with a deadline (`Run.wait_for`).
+    """
+    tree = ast.parse(pathlib.Path(__file__).read_text())
+    sleeps = [
+        f"{fn.name}:{node.lineno}"
+        for fn in tree.body
+        if isinstance(fn, ast.FunctionDef) and fn.name.startswith("test_")
+        for node in ast.walk(fn)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "sleep"
+    ]
+    assert sleeps == [], f"fixed sleeps used as synchronisation: {sleeps}"

@@ -10,7 +10,9 @@ vocabulary:
 - `Client.signal` / `wait_for_signal`: a signal from outside, stored durably, so one sent while
   no worker runs is delivered when a worker starts;
 - `step`: a function whose result is recorded once it finishes, retried on exception, and never
-  run again after it finished, including after the worker is killed.
+  run again after it finished, including after the worker is killed;
+- `Client.recorded`: what the engine has durably recorded for a workflow (finished steps,
+  registered waits and their deadlines), so a caller can tell where a workflow stands.
 
 The engine is DBOS Transact on Postgres (docs/decisions/workflow-engine.md records why, the
 versions tested and the failure tests' results). Swapping it for another engine changes only
@@ -29,6 +31,7 @@ from sortyard.engine._dbos import (
     ENGINE,
     Client,
     Engine,
+    Recorded,
     WorkflowFailed,
     engine_version,
     step,
@@ -41,6 +44,7 @@ __all__ = [
     "ENGINE",
     "Client",
     "Engine",
+    "Recorded",
     "WorkflowFailed",
     "engine_version",
     "step",
