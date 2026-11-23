@@ -89,11 +89,11 @@ def register(
 
     `owners` maps an owner name from the state table to the function that does that owner's
     work. It gets the call (item, tenant, state, owner, dispatch, attempt, cause, action,
-    detail) and returns `{"outcome": ..., "detail": {...}}`, or nothing when the outcome will
-    arrive as an input. `decide` gets the question and returns `{"answer": ..., "reverse":
-    ...}` or nothing. `record` gets every transition event and must persist it; the item does
-    not move on until it has. It may be called more than once for a transition; the item and
-    the event's sequence identify it.
+    detail, limit_seconds: what is left of the stay's limit) and returns `{"outcome": ...,
+    "detail": {...}}`, or nothing when the outcome will arrive as an input. `decide` gets the
+    question and returns `{"answer": ..., "reverse": ...}` or nothing. `record` gets every
+    transition event and must persist it; the item does not move on until it has. It may be
+    called more than once for a transition; the item and the event's sequence identify it.
 
     Every owner `table` names (the shipped table unless given) must be in `owners`: a worker
     that cannot do a state's work is refused here, not found out by an item waiting in it.
@@ -510,6 +510,10 @@ async def item_workflow(ctx: Context, arg: Any) -> dict[str, Any]:
                 "cause": move["cause"],
                 "action": move.get("action"),
                 "detail": detail,
+                # What is left of the stay's limit: work the owner starts need not outlive it.
+                "limit_seconds": None
+                if deadline is None
+                else (deadline - ctx.now()).total_seconds(),
             }
             answered = True
             reply = None

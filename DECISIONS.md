@@ -121,3 +121,24 @@ provenance; where they conflict, the amendment wins.
   development server (in-memory store) and its time-skipping test server; no server is deployed.
 - **Options, results, what the tests showed and how to reverse:**
   [workflow engine record](docs/decisions/workflow-engine.md).
+
+## SY-DEC-008 — Signing the GitHub App token: `cryptography` (2026-11-23)
+
+- **Context:** the GitHub port (`src/sortyard/lane/github.py`, SY-V3-GITHUB-PORT) mints
+  installation tokens as a GitHub App. GitHub accepts only a JSON web token signed RS256 with
+  the App's RSA key for that, and the Python standard library has no RSA signing.
+- **Options:**
+  1. `cryptography` for the one signature; the token itself (two base64 JSON parts) is built
+     by hand. One audited dependency with wheels for every platform the image builds on.
+  2. `PyJWT[crypto]`: builds the token too, but brings `cryptography` anyway, so it is two
+     dependencies for about ten lines saved.
+  3. RSA PKCS#1 v1.5 written by hand on `pow()` with a hand-written PEM/DER reader: no
+     dependency, but hand-written key parsing and signing in the path that holds the
+     estate's most powerful credential.
+  4. Calling the `openssl` binary: no Python dependency, but the image would need the binary
+     and the key would pass through a child process.
+- **Choice:** option 1, `cryptography>=42`, imported only by `src/sortyard/lane/github.py`.
+- **Consequences:** one more runtime dependency in the image. The tests use the same library
+  to make a throwaway key and, in the fake GitHub, to verify the client's signature with the
+  public key. To reverse: replace the two `cryptography` calls in `HttpGitHub` (load the key,
+  sign); nothing else imports it.

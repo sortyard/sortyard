@@ -216,6 +216,25 @@ def test_an_item_passes_admitted_to_merged_through_fake_owner_steps() -> None:
     assert fakes.questions == []
 
 
+def test_an_owner_is_told_what_is_left_of_the_stays_limit() -> None:
+    """An owner call carries limit_seconds: what is left of the stay's limit, or nothing for a
+    state with no limit."""
+    fakes = Fakes(script={"building": [SILENT]})
+
+    async def scenario() -> None:
+        async with kernel(fakes) as k:
+            identifier = await k.start()
+            one_timer(await k.idle_in(identifier, "building"), timedelta(hours=1))
+
+    asyncio.run(scenario())
+    (build,) = fakes.calls_for("building")
+    assert 3600 - DEADLINE < build["limit_seconds"] <= 3600  # medium risk tier: one hour
+    (queued,) = fakes.calls_for("admitted")
+    assert queued["limit_seconds"] is None
+    (preflight,) = fakes.calls_for("preflight")
+    assert 300 - DEADLINE < preflight["limit_seconds"] <= 300
+
+
 def test_a_limit_that_passes_applies_the_declared_default_and_records_it() -> None:
     """A limit that passes applies the declared default and records it."""
     # The reviewer takes the review twice and never reports. The checks, later, never report.

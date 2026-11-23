@@ -14,7 +14,9 @@ requires-python = ">=3.11"
 # jsonschema: the API validates every document against its full §3 JSON Schema before storing.
 # temporalio: the durable workflow engine SDK, imported only by src/sortyard/engine
 # (docs/decisions/workflow-engine.md).
-dependencies = ["jsonschema>=4.21", "psycopg[binary]>=3.1", "temporalio>=1.36,<2"]
+# cryptography: signs the GitHub App token (RS256), imported only by src/sortyard/lane/github.py
+# (DECISIONS.md SY-DEC-008).
+dependencies = ["cryptography>=42", "jsonschema>=4.21", "psycopg[binary]>=3.1", "temporalio>=1.36,<2"]
 
 [project.optional-dependencies]
 dev = [
@@ -37,6 +39,8 @@ sortyard-context-assembler = "sortyard.services.context_assembler:main"
 sortyard-eval-runner = "sortyard.services.eval_runner:main"
 sortyard-sensor-runner = "sortyard.services.sensor_runner:main"
 sortyard-integrator = "sortyard.services.integrator:main"
+# What a worker Job runs (SY-V3-WORKER-LAUNCHER); not one of the six services.
+sortyard-worker = "sortyard.services.worker:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
