@@ -1,6 +1,6 @@
 # Sortyard
 
-Sortyard is an open-source delivery harness — conductor, control plane and task manager —
+Sortyard is a source-available delivery harness — conductor, control plane and task manager —
 deployed with one Helm chart, with a UI for everything for the operator and APIs for everything
 for agents. The design record is [`DESIGN.md`](DESIGN.md) (architecture: §4); the stack is
 decided in [`DECISIONS.md`](DECISIONS.md) (SY-DEC-001); the frozen domain model and API
@@ -224,3 +224,18 @@ Execution state, ordering, parent scopes and blocked-by relations live on the
 Product changes target `sortyard/sortyard`. Meta-harness stays commit-forward for unmigrated
 governance and definitions; it is not a second task-status store. The historical design and
 corpus remain provenance, with the active baseline taking precedence where they conflict.
+
+## Licence
+
+Sortyard is source-available. Sortyard is licensed under the Functional Source License,
+Version 1.1, ALv2 Future License (FSL-1.1-ALv2); see LICENSE.md. You may use,
+copy, modify and redistribute it for any purpose other than a Competing Use as that licence
+defines it. Each version becomes available under the Apache License, Version 2.0 on the second
+anniversary of the date that version was made available. The spec/ directory is licensed under
+the Apache License, Version 2.0; see LICENSE-APACHE. Versions of this repository published
+before the commit that added this notice were published under the Apache License, Version 2.0
+and remain available under it.
+
+The licence text is in [`LICENSE.md`](LICENSE.md) and the same statement is in
+[`NOTICE`](NOTICE). The Apache License 2.0 text is in [`LICENSE-APACHE`](LICENSE-APACHE) and
+[`spec/LICENSE`](spec/LICENSE).
