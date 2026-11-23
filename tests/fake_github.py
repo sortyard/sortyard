@@ -67,6 +67,8 @@ NEEDS = {
     "git/list-matching-refs": ("contents", "read"),
     "git/create-ref": ("contents", "write"),
     "git/delete-ref": ("contents", "write"),
+    "git/get-commit": ("contents", "read"),
+    "repos/compare-commits": ("contents", "read"),
 }
 APP_OPERATIONS = ("apps/get-repo-installation", "apps/create-installation-access-token")
 
@@ -97,6 +99,7 @@ class Operation:
     pattern: re.Pattern[str]
     query: Mapping[str, Any]
     body: Any
+    body_required: bool
     responses: Mapping[str, Any]
 
 
@@ -112,7 +115,11 @@ class Contract:
             # A ref or a branch may hold slashes; no other path parameter does.
             pattern = re.sub(
                 r"\{(\w+)\}",
-                lambda m: f"(?P<{m[1]}>.+)" if m[1] in ("ref", "branch") else f"(?P<{m[1]}>[^/]+)",
+                lambda m: (
+                    f"(?P<{m[1]}>.+)"
+                    if m[1] in ("ref", "branch", "basehead")
+                    else f"(?P<{m[1]}>[^/]+)"
+                ),
                 template,
             )
             for method, operation in methods.items():
@@ -128,6 +135,7 @@ class Contract:
                             if p["in"] == "query"
                         },
                         body=operation["requestBody"],
+                        body_required=operation["requestBodyRequired"],
                         responses=operation["responses"],
                     )
                 )
@@ -163,6 +171,8 @@ class Contract:
                 int(value) if schema.get("type") == "integer" and value.isdigit() else value
             )
             found += [f"query {name} {e}" for e in self.errors(schema, typed)]
+        if body is None and operation.body_required:
+            found.append("no body where one is required")
         if body is not None:
             if operation.body is None:
                 return [*found, "a body where none is documented"]
@@ -206,6 +216,9 @@ class FakePull:
     merge_sha: str | None = None
     conflict: bool = False
     computing: int = 0  # how many more reads answer "mergeability not known yet"
+    draft: bool = False
+    blocked: bool = False  # GitHub blocks the merge for a reason that is not a check
+    pending: bool = False  # an update of the branch was accepted and has not landed yet
     merges: int = 0  # merge calls GitHub carried out
     updates: int = 0  # update-branch calls GitHub carried out
 
@@ -214,6 +227,8 @@ class FakePull:
 class FakeRepo:
     full_name: str
     refs: dict[str, str]
+    commits: dict[str, list[str]] = field(default_factory=dict)  # a commit's parents
+    methods: set[str] = field(default_factory=lambda: {"merge", "squash", "rebase"})
     required: dict[str, list[str]] = field(default_factory=dict)
     strict: set[str] = field(default_factory=set)
     pulls: list[FakePull] = field(default_factory=list)
@@ -251,29 +266,46 @@ class FakeGitHub:
         self.violations: list[str] = []
         # Changes a reply before it is checked and sent: how a test makes the fake wrong.
         self.mutate: Callable[[str, Any], Any] | None = None
+        # update-branch answers 202 and the head moves only when the test calls `land`.
+        self.slow_updates = False
+        # The next reply says it is longer than it is, and the connection closes.
+        self.truncate = False
         self._lock = threading.Lock()
         self._count = 0
 
     # What a test arranges.
 
-    def sha(self) -> str:
+    def commit(self, repo: FakeRepo, parents: list[str]) -> str:
         self._count += 1
-        return hashlib.sha1(str(self._count).encode()).hexdigest()
+        sha = hashlib.sha1(str(self._count).encode()).hexdigest()
+        repo.commits[sha] = parents
+        return sha
 
     def repo(self, full_name: str, granted: Mapping[str, str] | None = None) -> FakeRepo:
         owner = full_name.split("/")[0]
         if granted is not None or owner not in self.granted:
             self.granted[owner] = dict(GRANTED if granted is None else granted)
-        self.repos[full_name] = FakeRepo(full_name, {"refs/heads/main": self.sha()})
-        return self.repos[full_name]
+        repo = self.repos[full_name] = FakeRepo(full_name, {})
+        repo.refs["refs/heads/main"] = self.commit(repo, [])
+        return repo
 
-    def push(self, repo: FakeRepo, branch: str) -> str:
-        """A new commit on a branch; an open pull request of the branch gets it as its head."""
-        sha = repo.refs[f"refs/heads/{branch}"] = self.sha()
+    def push(self, repo: FakeRepo, branch: str, parents: list[str] | None = None) -> str:
+        """A new commit on a branch (on its head, or on main's for a new branch, unless
+        `parents` says otherwise); an open pull request of the branch gets it as its head."""
+        ref = f"refs/heads/{branch}"
+        on = repo.refs.get(ref, repo.refs["refs/heads/main"])
+        sha = repo.refs[ref] = self.commit(repo, [on] if parents is None else parents)
         for pull in repo.pulls:
             if pull.open and pull.branch == branch:
                 pull.head = sha
         return sha
+
+    def land(self, repo: FakeRepo, pull: FakePull) -> str:
+        """The branch update lands: a merge of the base into the branch becomes the head."""
+        base = repo.refs[f"refs/heads/{pull.base}"]
+        pull.head = repo.refs[f"refs/heads/{pull.branch}"] = self.commit(repo, [pull.head, base])
+        pull.synced, pull.pending = base, False
+        return pull.head
 
     def protect(
         self, repo: FakeRepo, branch: str, contexts: list[str], strict: bool = False
@@ -283,12 +315,29 @@ class FakeGitHub:
             repo.strict.add(branch)
 
     def check(
-        self, repo: FakeRepo, sha: str, name: str, conclusion: str | None = "success"
+        self,
+        repo: FakeRepo,
+        sha: str,
+        name: str,
+        conclusion: str | None = "success",
+        *,
+        again: bool = False,
+        listed_first: bool = False,
     ) -> None:
-        """A check run reports on a commit; with no conclusion it is still in progress."""
-        runs = [run for run in repo.runs.get(sha, []) if run["name"] != name]
-        status = "in_progress" if conclusion is None else "completed"
-        repo.runs[sha] = [*runs, {"name": name, "status": status, "conclusion": conclusion}]
+        """A check run reports on a commit; with no conclusion it is still in progress.
+
+        It replaces the runs of that name unless `again`: then it is a later run beside them,
+        listed after them, or before them when `listed_first`.
+        """
+        self._count += 1
+        run = {
+            "name": name,
+            "status": "in_progress" if conclusion is None else "completed",
+            "conclusion": conclusion,
+            "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(1_767_225_600 + self._count)),
+        }
+        runs = [each for each in repo.runs.get(sha, []) if again or each["name"] != name]
+        repo.runs[sha] = [run, *runs] if listed_first else [*runs, run]
 
     def verify(self) -> None:
         assert not self.violations, self.violations
@@ -472,11 +521,12 @@ class FakeGitHub:
         pull = self._find(repo, params)
         if body.get("expected_head_sha", pull.head) != pull.head:
             raise Refused(422, "expected head sha didn't match current head ref.")
-        if pull.synced == repo.refs[f"refs/heads/{pull.base}"]:
+        if pull.pending or pull.synced == repo.refs[f"refs/heads/{pull.base}"]:
             raise Refused(422, "There are no new commits on the base branch.")
-        pull.head = repo.refs[f"refs/heads/{pull.branch}"] = self.sha()
-        pull.synced = repo.refs[f"refs/heads/{pull.base}"]
+        pull.pending = True
         pull.updates += 1
+        if not self.slow_updates:
+            self.land(repo, pull)
         url = f"{self.url}/repos/{repo.full_name}/pulls/{pull.number}"
         return 202, {"message": "Updating pull request branch.", "url": url}
 
@@ -488,10 +538,14 @@ class FakeGitHub:
             raise Refused(405, "Pull Request is not mergeable")
         if body.get("sha", pull.head) != pull.head:
             raise Refused(409, "Head branch was modified. Review and try the merge again.")
+        method = body.get("merge_method", "merge")
+        if method not in repo.methods:
+            raise Refused(405, f"{method.title()} merges are not allowed on this repository.")
         mergeable, state = self._mergeable(repo, pull, reading=False)
         if not mergeable or state != "clean":
             raise Refused(405, f"Pull Request is not mergeable ({state})")
-        pull.merge_sha = repo.refs[f"refs/heads/{pull.base}"] = self.sha()
+        base = repo.refs[f"refs/heads/{pull.base}"]
+        pull.merge_sha = repo.refs[f"refs/heads/{pull.base}"] = self.commit(repo, [base])
         pull.merged, pull.open = True, False
         pull.merges += 1
         return 200, {
@@ -511,24 +565,7 @@ class FakeGitHub:
         contexts = repo.required.get(name, [])
         return 200, {
             "name": name,
-            "commit": {
-                "url": f"{url}/commits/{sha}",
-                "sha": sha,
-                "node_id": f"C_{sha[:8]}",
-                "html_url": f"{url}/commit/{sha}",
-                "comments_url": f"{url}/commits/{sha}/comments",
-                "commit": {
-                    "author": None,
-                    "committer": None,
-                    "comment_count": 0,
-                    "message": "a change",
-                    "tree": {"sha": sha, "url": f"{url}/git/trees/{sha}"},
-                    "url": f"{url}/git/commits/{sha}",
-                },
-                "author": None,
-                "committer": None,
-                "parents": [],
-            },
+            "commit": self._commit(repo, sha),
             "_links": {"html": f"{url}/tree/{name}", "self": f"{url}/branches/{name}"},
             "protected": name in repo.required,
             "protection": {
@@ -557,8 +594,8 @@ class FakeGitHub:
                 "details_url": None,
                 "status": run["status"],
                 "conclusion": run["conclusion"],
-                "started_at": WHEN,
-                "completed_at": WHEN if run["conclusion"] else None,
+                "started_at": run["at"],
+                "completed_at": run["at"] if run["conclusion"] else None,
                 "external_id": None,
                 "check_suite": {"id": 1},
                 "output": {
@@ -576,6 +613,99 @@ class FakeGitHub:
         size, page = int(query.get("per_page", 30)), int(query.get("page", 1))
         return 200, {"total_count": len(runs), "check_runs": runs[(page - 1) * size : page * size]}
 
+    def _git_get_commit(
+        self, repo: FakeRepo, params: Mapping[str, str], query: Any, body: Any
+    ) -> Any:
+        sha, url = params["commit_sha"], f"{self.url}/repos/{repo.full_name}"
+        if sha not in repo.commits:
+            raise Refused(404, "Not Found")
+        who = {"date": WHEN, "email": "bot@example.test", "name": "bot"}
+        return 200, {
+            "sha": sha,
+            "node_id": f"C_{sha[:8]}",
+            "url": f"{url}/git/commits/{sha}",
+            "html_url": f"{url}/commit/{sha}",
+            "author": who,
+            "committer": who,
+            "tree": {"sha": sha, "url": f"{url}/git/trees/{sha}"},
+            "message": "a change",
+            "parents": self._commit(repo, sha)["parents"],
+            "verification": {
+                "verified": False,
+                "reason": "unsigned",
+                "signature": None,
+                "payload": None,
+                "verified_at": None,
+            },
+        }
+
+    def _repos_compare_commits(
+        self, repo: FakeRepo, params: Mapping[str, str], query: Mapping[str, str], body: Any
+    ) -> Any:
+        names = params["basehead"].split("...")
+        shas = [repo.refs.get(f"refs/heads/{name}", name) for name in names]
+        if len(shas) != 2 or any(sha not in repo.commits for sha in shas):
+            raise Refused(404, "Not Found")
+        base, head = (self._ancestry(repo, sha) for sha in shas)
+        ahead, behind = [sha for sha in head if sha not in base], base.keys() - head.keys()
+        status = ("ahead" if ahead else "identical") if not behind else "behind"
+        url = f"{self.url}/repos/{repo.full_name}/compare/{params['basehead']}"
+        # The newest commit both have: `head` is listed nearest first.
+        common = next((sha for sha in head if sha in base), shas[0])
+        return 200, {
+            "url": url,
+            "html_url": url,
+            "permalink_url": url,
+            "diff_url": f"{url}.diff",
+            "patch_url": f"{url}.patch",
+            "base_commit": self._commit(repo, shas[0]),
+            "merge_base_commit": self._commit(repo, common),
+            "status": "diverged" if ahead and behind else status,
+            "ahead_by": len(ahead),
+            "behind_by": len(behind),
+            "total_commits": len(ahead),
+            "commits": [self._commit(repo, sha) for sha in ahead[: int(query.get("per_page", 30))]],
+        }
+
+    def _ancestry(self, repo: FakeRepo, sha: str) -> dict[str, None]:
+        """The commit and everything it descends from, nearest first."""
+        found: dict[str, None] = {}
+        queue = [sha]
+        while queue:
+            each = queue.pop(0)
+            if each not in found:
+                found[each] = None
+                queue += repo.commits[each]
+        return found
+
+    def _commit(self, repo: FakeRepo, sha: str) -> dict[str, Any]:
+        url = f"{self.url}/repos/{repo.full_name}"
+        return {
+            "url": f"{url}/commits/{sha}",
+            "sha": sha,
+            "node_id": f"C_{sha[:8]}",
+            "html_url": f"{url}/commit/{sha}",
+            "comments_url": f"{url}/commits/{sha}/comments",
+            "commit": {
+                "author": None,
+                "committer": None,
+                "comment_count": 0,
+                "message": "a change",
+                "tree": {"sha": sha, "url": f"{url}/git/trees/{sha}"},
+                "url": f"{url}/git/commits/{sha}",
+            },
+            "author": None,
+            "committer": None,
+            "parents": [
+                {
+                    "sha": parent,
+                    "url": f"{url}/commits/{parent}",
+                    "html_url": f"{url}/commit/{parent}",
+                }
+                for parent in repo.commits[sha]
+            ],
+        }
+
     def _git_list_matching_refs(
         self, repo: FakeRepo, params: Mapping[str, str], query: Any, body: Any
     ) -> Any:
@@ -584,7 +714,7 @@ class FakeGitHub:
 
     def _git_create_ref(self, repo: FakeRepo, params: Any, query: Any, body: dict[str, Any]) -> Any:
         name, sha = body["ref"], body["sha"]
-        if not name.startswith("refs/") or name.count("/") < 2 or sha not in repo.refs.values():
+        if not name.startswith("refs/") or name.count("/") < 2 or sha not in repo.commits:
             raise Refused(422, "Reference update failed")
         if name in repo.refs:
             raise Refused(422, "Reference already exists")
@@ -618,8 +748,12 @@ class FakeGitHub:
             return False, "dirty"
         if pull.base in repo.strict and pull.synced != repo.refs[f"refs/heads/{pull.base}"]:
             return True, "behind"
-        runs = {run["name"]: run["conclusion"] for run in repo.runs.get(pull.head, [])}
-        if any(runs.get(name) != "success" for name in repo.required.get(pull.base, [])):
+        if pull.draft:
+            return True, "draft"
+        latest = sorted(repo.runs.get(pull.head, []), key=lambda run: str(run["at"]))
+        runs = {run["name"]: run["conclusion"] for run in latest}
+        required = repo.required.get(pull.base, [])
+        if pull.blocked or any(runs.get(name) != "success" for name in required):
             return True, "blocked"
         return True, "clean"
 
@@ -783,6 +917,7 @@ class FakeGitHub:
             "updated_at": WHEN,
             "closed_at": None if pull.open else WHEN,
             "merged_at": WHEN if pull.merged else None,
+            "draft": pull.draft,
             "author_association": "MEMBER",
             "auto_merge": None,
             "url": url,
@@ -834,7 +969,8 @@ class _Handler(BaseHTTPRequestHandler):
         data = b"" if payload is None else json.dumps(payload).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(data)))
+        cut, self.fake.truncate = self.fake.truncate, False
+        self.send_header("Content-Length", str(len(data) + (64 if cut else 0)))
         self.end_headers()
         self.wfile.write(data)
 

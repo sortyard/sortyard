@@ -3,9 +3,10 @@
 Usage: python tests/contracts/github/extract.py <api.github.com.json> <commit of the source>
 
 Writes `fragment.json` beside this file: for each operation in `OPERATIONS`, its documented
-parameters, request body schema and response schemas, plus every component schema they refer
-to. Schemas are kept as published except that descriptions and examples are dropped (they
-carry no shape). Nothing here runs in a test; it is how the fragment is refreshed.
+parameters, request body schema (and whether a body is required) and response schemas, plus
+every component schema they refer to. Schemas are kept as published except that descriptions
+and examples are dropped (they carry no shape). Nothing here runs in a test; it is how the
+fragment is refreshed.
 """
 
 from __future__ import annotations
@@ -29,6 +30,8 @@ OPERATIONS = (
     ("get", "/repos/{owner}/{repo}/git/matching-refs/{ref}"),
     ("post", "/repos/{owner}/{repo}/git/refs"),
     ("delete", "/repos/{owner}/{repo}/git/refs/{ref}"),
+    ("get", "/repos/{owner}/{repo}/git/commits/{commit_sha}"),
+    ("get", "/repos/{owner}/{repo}/compare/{basehead}"),
 )
 PROSE = ("description", "example", "examples", "summary", "externalDocs")
 SCHEMAS = "#/components/schemas/"
@@ -81,6 +84,7 @@ def main(source: str, commit: str) -> None:
                 for each in parameters
             ],
             "requestBody": body(operation["requestBody"]) if "requestBody" in operation else None,
+            "requestBodyRequired": bool(resolve(operation.get("requestBody", {})).get("required")),
             "responses": {code: body(each) for code, each in operation["responses"].items()},
         }
     fragment = {

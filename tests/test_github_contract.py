@@ -13,11 +13,13 @@ from __future__ import annotations
 
 import copy
 import json
+import threading
 import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 import pytest
@@ -76,6 +78,17 @@ def every_call(fake: FakeGitHub, port: HttpGitHub) -> tuple[FakeRepo, Token]:
     port.update_branch(token, REPO, opened.number, head)
     updated = port.find_pull(token, REPO, "sortyard/ITEM-1")
     assert updated is not None and updated.head != head
+    # The update is a merge of the base on top of the old head.
+    base = repo.refs["refs/heads/main"]
+    assert port.parents(token, REPO, updated.head) == (head, base)
+    assert port.parents(token, REPO, head) == (repo.commits[head][0],)
+    assert port.on_branch(token, REPO, "main", base)
+    assert port.on_branch(token, REPO, "main", repo.commits[base][0])
+    assert not port.on_branch(token, REPO, "main", head)
+    assert not port.on_branch(token, REPO, "main", updated.head)
+    assert port.on_branch(token, REPO, "sortyard/ITEM-1", head)
+    assert refused(lambda: port.parents(token, REPO, "0" * 40)) == 404
+    assert refused(lambda: port.on_branch(token, REPO, "main", "0" * 40)) == 404
     fake.check(repo, updated.head, "test")
     merge_sha = port.merge(token, REPO, opened.number, updated.head, "squash")
     assert repo.refs["refs/heads/main"] == merge_sha
@@ -174,6 +187,8 @@ def test_the_fake_refuses_what_the_published_description_does_not_document() -> 
         ("GET", f"/repos/{REPO}/pulls?branch=x", None, "undocumented query parameter branch"),
         ("GET", f"/repos/{REPO}/pulls?state=merged", None, "query state"),
         ("POST", f"/repos/{REPO}/git/refs", {"ref": "refs/heads/x"}, "body"),
+        ("POST", f"/repos/{REPO}/git/refs", None, "no body where one is required"),
+        ("POST", f"/repos/{REPO}/pulls", None, "no body where one is required"),
         ("PUT", f"/repos/{REPO}/pulls/1/merge", {"head_sha": "abc"}, "undocumented body field"),
         ("PUT", f"/repos/{REPO}/pulls/1/merge", {"merge_method": "fast"}, "pulls/merge: body"),
     ]
@@ -232,6 +247,10 @@ def test_the_http_client_sends_the_documented_method_path_and_body_for_each_port
     merge = sent("pulls/merge")[-1]
     assert merge[:2] == ("PUT", f"/repos/{REPO}/pulls/{pull.number}/merge")
     assert merge[3] == {"sha": pull.head, "merge_method": "squash"}
+    commit = sent("git/get-commit")[0]
+    assert commit == ("GET", f"/repos/{REPO}/git/commits/{pull.head}", None, None)
+    compared = sent("repos/compare-commits")[0]
+    assert compared[:3] == ("GET", f"/repos/{REPO}/compare/main...{pull.synced}", {"per_page": "1"})
     assert sent("git/list-matching-refs") == [
         ("GET", f"/repos/{REPO}/git/matching-refs/heads", None, None)
     ]
@@ -292,3 +311,52 @@ def test_the_fake_refuses_an_app_token_github_would_refuse() -> None:
         assert refused(lambda: port.refs(token, REPO, "heads")) == 401
     assert fake.minted() == [token.value]
     fake.verify()
+
+
+def test_a_redirect_is_refused_and_the_credential_goes_to_no_other_host() -> None:
+    """A redirect is an error: the host it points at sees no request, so no credential."""
+    arrived: list[str | None] = []
+
+    class Elsewhere(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            arrived.append(self.headers.get("Authorization"))
+            self.send_response(200)
+            self.send_header("Content-Length", "2")
+            self.end_headers()
+            self.wfile.write(b"[]")
+
+        def log_message(self, format: str, *args: Any) -> None:
+            return
+
+    class Redirects(Elsewhere):
+        target = ""
+
+        def do_GET(self) -> None:
+            self.send_response(301)
+            self.send_header("Location", self.target + self.path)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+    servers = [ThreadingHTTPServer(("127.0.0.1", 0), each) for each in (Elsewhere, Redirects)]
+    threads = [threading.Thread(target=server.serve_forever, daemon=True) for server in servers]
+    for thread in threads:
+        thread.start()
+    try:
+        elsewhere, redirecting = (f"http://localhost:{s.server_address[1]}" for s in servers)
+        Redirects.target = elsewhere
+        port = HttpGitHub(APP_ID, PEM, base_url=redirecting)
+        token = Token("ghs_" + "s" * 36, "", {})
+        with pytest.raises(GitHubError) as caught:
+            port.refs(token, REPO, "heads")
+        assert caught.value.status == 301 and arrived == []
+        assert refused(lambda: port.token(REPO, ALL)) == 301 and arrived == []
+        # The redirect is real: a client that follows redirects ends up at the other host.
+        request = urllib.request.Request(f"{redirecting}/x", headers={"Authorization": "none"})
+        with urllib.request.urlopen(request, timeout=10) as response:
+            assert response.read() == b"[]"
+        assert len(arrived) == 1
+    finally:
+        for server, thread in zip(servers, threads, strict=True):
+            server.shutdown()
+            server.server_close()
+            thread.join()

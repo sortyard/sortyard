@@ -1155,6 +1155,82 @@
     "title": "Commit",
     "type": "object"
    },
+   "commit-comparison": {
+    "properties": {
+     "ahead_by": {
+      "type": "integer"
+     },
+     "base_commit": {
+      "$ref": "#/components/schemas/commit"
+     },
+     "behind_by": {
+      "type": "integer"
+     },
+     "commits": {
+      "items": {
+       "$ref": "#/components/schemas/commit"
+      },
+      "type": "array"
+     },
+     "diff_url": {
+      "format": "uri",
+      "type": "string"
+     },
+     "files": {
+      "items": {
+       "$ref": "#/components/schemas/diff-entry"
+      },
+      "type": "array"
+     },
+     "html_url": {
+      "format": "uri",
+      "type": "string"
+     },
+     "merge_base_commit": {
+      "$ref": "#/components/schemas/commit"
+     },
+     "patch_url": {
+      "format": "uri",
+      "type": "string"
+     },
+     "permalink_url": {
+      "format": "uri",
+      "type": "string"
+     },
+     "status": {
+      "enum": [
+       "diverged",
+       "ahead",
+       "behind",
+       "identical"
+      ],
+      "type": "string"
+     },
+     "total_commits": {
+      "type": "integer"
+     },
+     "url": {
+      "format": "uri",
+      "type": "string"
+     }
+    },
+    "required": [
+     "url",
+     "html_url",
+     "permalink_url",
+     "diff_url",
+     "patch_url",
+     "base_commit",
+     "merge_base_commit",
+     "status",
+     "ahead_by",
+     "behind_by",
+     "total_commits",
+     "commits"
+    ],
+    "title": "Commit Comparison",
+    "type": "object"
+   },
    "deployment-simple": {
     "properties": {
      "created_at": {
@@ -1343,6 +1419,151 @@
      "avatar_url"
     ],
     "title": "Enterprise",
+    "type": "object"
+   },
+   "git-commit": {
+    "properties": {
+     "author": {
+      "properties": {
+       "date": {
+        "format": "date-time",
+        "type": "string"
+       },
+       "email": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "email",
+       "name",
+       "date"
+      ],
+      "type": "object"
+     },
+     "committer": {
+      "properties": {
+       "date": {
+        "format": "date-time",
+        "type": "string"
+       },
+       "email": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "email",
+       "name",
+       "date"
+      ],
+      "type": "object"
+     },
+     "html_url": {
+      "format": "uri",
+      "type": "string"
+     },
+     "message": {
+      "type": "string"
+     },
+     "node_id": {
+      "type": "string"
+     },
+     "parents": {
+      "items": {
+       "properties": {
+        "html_url": {
+         "format": "uri",
+         "type": "string"
+        },
+        "sha": {
+         "type": "string"
+        },
+        "url": {
+         "format": "uri",
+         "type": "string"
+        }
+       },
+       "required": [
+        "sha",
+        "url",
+        "html_url"
+       ],
+       "type": "object"
+      },
+      "type": "array"
+     },
+     "sha": {
+      "type": "string"
+     },
+     "tree": {
+      "properties": {
+       "sha": {
+        "type": "string"
+       },
+       "url": {
+        "format": "uri",
+        "type": "string"
+       }
+      },
+      "required": [
+       "sha",
+       "url"
+      ],
+      "type": "object"
+     },
+     "url": {
+      "format": "uri",
+      "type": "string"
+     },
+     "verification": {
+      "properties": {
+       "payload": {
+        "nullable": true,
+        "type": "string"
+       },
+       "reason": {
+        "type": "string"
+       },
+       "signature": {
+        "nullable": true,
+        "type": "string"
+       },
+       "verified": {
+        "type": "boolean"
+       },
+       "verified_at": {
+        "nullable": true,
+        "type": "string"
+       }
+      },
+      "required": [
+       "verified",
+       "reason",
+       "signature",
+       "payload",
+       "verified_at"
+      ],
+      "type": "object"
+     }
+    },
+    "required": [
+     "sha",
+     "node_id",
+     "url",
+     "html_url",
+     "author",
+     "committer",
+     "tree",
+     "message",
+     "parents",
+     "verification"
+    ],
+    "title": "Git Commit",
     "type": "object"
    },
    "git-ref": {
@@ -4235,6 +4456,7 @@
      },
      "type": "object"
     },
+    "requestBodyRequired": false,
     "responses": {
      "201": {
       "$ref": "#/components/schemas/installation-token"
@@ -4281,6 +4503,7 @@
      }
     ],
     "requestBody": null,
+    "requestBodyRequired": false,
     "responses": {
      "200": {
       "$ref": "#/components/schemas/branch-with-protection"
@@ -4375,6 +4598,7 @@
      }
     ],
     "requestBody": null,
+    "requestBodyRequired": false,
     "responses": {
      "200": {
       "properties": {
@@ -4393,6 +4617,121 @@
        "check_runs"
       ],
       "type": "object"
+     }
+    }
+   }
+  },
+  "/repos/{owner}/{repo}/compare/{basehead}": {
+   "get": {
+    "operationId": "repos/compare-commits",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "owner",
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "repo",
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page",
+      "schema": {
+       "default": 1,
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "per_page",
+      "schema": {
+       "default": 30,
+       "type": "integer"
+      }
+     },
+     {
+      "in": "path",
+      "name": "basehead",
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": null,
+    "requestBodyRequired": false,
+    "responses": {
+     "200": {
+      "$ref": "#/components/schemas/commit-comparison"
+     },
+     "404": {
+      "$ref": "#/components/schemas/basic-error"
+     },
+     "422": {
+      "$ref": "#/components/schemas/validation-error"
+     },
+     "500": {
+      "$ref": "#/components/schemas/basic-error"
+     },
+     "503": {
+      "properties": {
+       "code": {
+        "type": "string"
+       },
+       "documentation_url": {
+        "type": "string"
+       },
+       "message": {
+        "type": "string"
+       }
+      },
+      "type": "object"
+     }
+    }
+   }
+  },
+  "/repos/{owner}/{repo}/git/commits/{commit_sha}": {
+   "get": {
+    "operationId": "git/get-commit",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "owner",
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "repo",
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "commit_sha",
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": null,
+    "requestBodyRequired": false,
+    "responses": {
+     "200": {
+      "$ref": "#/components/schemas/git-commit"
+     },
+     "404": {
+      "$ref": "#/components/schemas/basic-error"
+     },
+     "409": {
+      "$ref": "#/components/schemas/basic-error"
      }
     }
    }
@@ -4424,6 +4763,7 @@
      }
     ],
     "requestBody": null,
+    "requestBodyRequired": false,
     "responses": {
      "200": {
       "items": {
@@ -4471,6 +4811,7 @@
      ],
      "type": "object"
     },
+    "requestBodyRequired": true,
     "responses": {
      "201": {
       "$ref": "#/components/schemas/git-ref"
@@ -4511,6 +4852,7 @@
      }
     ],
     "requestBody": null,
+    "requestBodyRequired": false,
     "responses": {
      "204": null,
      "409": {
@@ -4540,6 +4882,7 @@
      }
     ],
     "requestBody": null,
+    "requestBodyRequired": false,
     "responses": {
      "200": {
       "$ref": "#/components/schemas/installation"
@@ -4641,6 +4984,7 @@
      }
     ],
     "requestBody": null,
+    "requestBodyRequired": false,
     "responses": {
      "200": {
       "items": {
@@ -4707,6 +5051,7 @@
      ],
      "type": "object"
     },
+    "requestBodyRequired": true,
     "responses": {
      "201": {
       "$ref": "#/components/schemas/pull-request"
@@ -4747,6 +5092,7 @@
      }
     ],
     "requestBody": null,
+    "requestBodyRequired": false,
     "responses": {
      "200": {
       "$ref": "#/components/schemas/pull-request"
@@ -4830,6 +5176,7 @@
      },
      "type": "object"
     },
+    "requestBodyRequired": false,
     "responses": {
      "200": {
       "$ref": "#/components/schemas/pull-request-merge-result"
@@ -4903,6 +5250,7 @@
      },
      "type": "object"
     },
+    "requestBodyRequired": false,
     "responses": {
      "202": {
       "properties": {

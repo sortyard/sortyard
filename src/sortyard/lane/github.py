@@ -3,21 +3,22 @@
 `GitHub` is the port: mint an installation token scoped to one repository with named
 permissions, find and open the pull request of a branch, read the required checks of a base
 branch and the check runs of a head commit, update a pull request branch, merge with the head
-commit matched, and list, create and delete refs. `HttpGitHub` is the real client (standard
-library HTTP, the App's JSON web token signed with `cryptography`: SY-DEC-008).
+commit matched, read a commit's parents and whether a commit is on a branch, and list, create
+and delete refs. `HttpGitHub` is the real client (standard library HTTP, the App's JSON web
+token signed with `cryptography`: SY-DEC-008).
 
 Built on the port:
 
-- `CiAdapter`, the `ci-adapter` owner of `checking`: `green` when every required check of the
-  head passed, `red` with the failing check names as the finding when one failed, nothing while
-  a check is pending or missing. A base branch with no required checks takes every check run
-  of the head.
-- `MergeAdapter`, the `merge-adapter` owner of `merging`: merges a pull request whose head is
-  the commit the review approved (`detail["head"]`) and answers `merged`; answers `conflict`
-  when GitHub reports the branch cannot be merged; updates the branch when it is behind and the
-  action is `update-branch`; answers `merged` without merging again when it is already merged.
-  A head that differs from the reviewed one is never merged: the stay is left open with the
-  reason, and the state's limit applies.
+- `CiAdapter`, the `ci-adapter` owner of `checking`: `green` when every check the head must
+  pass has passed, `red` with the failing check names as the finding when one failed, nothing
+  while one is pending or has not reported. Which checks: `Target.checks`.
+- `MergeAdapter`, the `merge-adapter` owner of `merging`. It merges a pull request whose head
+  is the commit the review approved (`detail["head"]`), or that commit with only merges of the
+  base branch on top, once that head is green by the ci-adapter's rule, and answers `merged`;
+  it answers `merged` without merging again when it is already merged. A branch that is
+  behind is updated at once. A head with other new commits answers `moved`. What cannot clear
+  by itself (GitHub reports a conflict, the pull request is closed, a draft, missing, on
+  another base, blocked, or refused by the merge call) answers `conflict` with a finding.
 - `RepositoryProbe`, the preflight probe of a `repository` need: pushes and deletes a scratch
   ref with a token minted for that one repository, and for a repository declared with
   workflow-files asks for, and checks it was given, the workflows permission.
@@ -37,6 +38,7 @@ A token is never printed or returned in an error: `Token` hides its value from `
 from __future__ import annotations
 
 import base64
+import http.client
 import json
 import secrets
 import time
@@ -64,6 +66,9 @@ PASSED = frozenset({"success", "neutral", "skipped"})
 # The `mergeable_state` values GitHub gives a pull request it would merge now.
 MERGEABLE_STATES = frozenset({"clean", "unstable", "has_hooks"})
 SCRATCH_PREFIX = "refs/heads/sortyard-probe/"
+CHECKS_FAILED = "checks failed: "
+# How many merges of the base on top of the reviewed commit are followed before giving up.
+BASE_MERGES = 10
 
 
 class GitHubError(Exception):
@@ -75,7 +80,7 @@ class GitHubError(Exception):
 
     def __init__(self, status: int, method: str, path: str, message: str) -> None:
         super().__init__(f"GitHub answered {status} to {method} {path}: {message}")
-        self.status = status
+        self.status, self.said = status, message
 
 
 @dataclass(frozen=True)
@@ -108,6 +113,7 @@ class Check:
     name: str
     status: str
     conclusion: str | None
+    at: str = ""  # when it completed, else when it started: the latest run of a name counts
 
     @property
     def done(self) -> bool:
@@ -151,6 +157,14 @@ class GitHub(Protocol):
 
     def merge(self, token: Token, repository: str, number: int, head: str, method: str) -> str:
         """Merge the pull request if its head is `head`; the merge commit."""
+        ...
+
+    def parents(self, token: Token, repository: str, sha: str) -> tuple[str, ...]:
+        """The parent commits of a commit, in order."""
+        ...
+
+    def on_branch(self, token: Token, repository: str, branch: str, sha: str) -> bool:
+        """Whether the commit is the branch's head or an ancestor of it."""
         ...
 
     def refs(self, token: Token, repository: str, prefix: str) -> tuple[Ref, ...]:
@@ -256,7 +270,7 @@ class HttpGitHub:
                 said = error.reason
             said = str(said).replace(bearer, "[credential]")[:300]
             raise GitHubError(error.code, method, path, said) from None
-        except OSError as error:  # no connection, a timeout, a reset
+        except (OSError, http.client.HTTPException) as error:  # no answer, or a broken one
             raise GitHubError(0, method, path, f"no answer ({type(error).__name__})") from None
         try:
             return json.loads(raw) if raw else None
@@ -330,7 +344,12 @@ class HttpGitHub:
     def checks(self, token: Token, repository: str, sha: str) -> tuple[Check, ...]:
         def shape(reply: Any) -> tuple[int, list[Check]]:
             runs = [
-                Check(str(run["name"]), str(run["status"]), run["conclusion"])
+                Check(
+                    str(run["name"]),
+                    str(run["status"]),
+                    run["conclusion"],
+                    str(run.get("completed_at") or run.get("started_at") or ""),
+                )
                 for run in reply["check_runs"]
             ]
             return int(reply["total_count"]), runs
@@ -360,6 +379,20 @@ class HttpGitHub:
         sha: str = self._read(shape, "PUT", path, token, body={"sha": head, "merge_method": method})
         return sha
 
+    def parents(self, token: Token, repository: str, sha: str) -> tuple[str, ...]:
+        def shape(reply: Any) -> tuple[str, ...]:
+            return tuple(str(parent["sha"]) for parent in reply["parents"])
+
+        found: tuple[str, ...] = self._read(
+            shape, "GET", f"/repos/{repository}/git/commits/{sha}", token
+        )
+        return found
+
+    def on_branch(self, token: Token, repository: str, branch: str, sha: str) -> bool:
+        path = f"/repos/{repository}/compare/{branch}...{sha}"
+        status = self._read(lambda r: r["status"], "GET", path, token, query={"per_page": 1})
+        return status in ("identical", "behind")
+
     def refs(self, token: Token, repository: str, prefix: str) -> tuple[Ref, ...]:
         def shape(reply: Any) -> tuple[Ref, ...]:
             return tuple(Ref(str(each["ref"]), str(each["object"]["sha"])) for each in reply)
@@ -378,12 +411,18 @@ class HttpGitHub:
 
 @dataclass(frozen=True)
 class Target:
-    """Where an item's change goes: the repository, its base branch, and whether the lane
-    declares workflow files there (the merge token then asks for the workflows permission)."""
+    """Where an item's change goes: the repository and its base branch.
+
+    `workflow_files`: the lane declares workflow files there, so the merge token asks for the
+    workflows permission. `checks` names the checks a head must pass. None: the base branch's
+    required checks, and when it requires none, every check run of the head, of which there
+    must be at least one. An empty tuple: the repository runs no checks on a pull request.
+    """
 
     repository: str
     base: str
     workflow_files: bool = False
+    checks: tuple[str, ...] | None = None
 
 
 # From (tenant, item) to the item's repository and base branch.
@@ -433,13 +472,41 @@ class _Adapter:
         branch = branch_of(call["item"])
         pull = self._port.find_pull(token, target.repository, branch)
         if pull is None:
-            return _waiting(f"no pull request for branch {branch}")
+            return self._stuck(f"no pull request for branch {branch}")
+        seen = {"pull": pull.number, "head": pull.head}
         if pull.base != target.base:
-            return _waiting(f"pull request {pull.number} targets {pull.base}, not {target.base}")
-        return self._look(call, target, token, pull)
+            return self._stuck(f"pull request targets {pull.base}, not {target.base}", **seen)
+        if not pull.open and not pull.merged:
+            return self._stuck("pull request is closed unmerged", **seen)
+        return self._look(call, target, token, pull, seen)
 
-    def _look(self, call: Payload, target: Target, token: Token, pull: Pull) -> Observation:
+    def _stuck(self, why: str, **seen: Any) -> Observation:
+        """A wait nothing on GitHub's side will end."""
+        return _waiting(why, **seen)
+
+    def _look(
+        self, call: Payload, target: Target, token: Token, pull: Pull, seen: dict[str, Any]
+    ) -> Observation:
         raise NotImplementedError
+
+    def _checks(self, token: Token, target: Target, pull: Pull) -> tuple[str, list[str]]:
+        """`green`, `red` or `pending` for the pull request's head, with the checks that say so
+        (the failed ones for `red`). The latest run of each name is the one that counts."""
+        names = target.checks
+        if names is None:
+            names = self._port.required_checks(token, target.repository, pull.base) or None
+        latest: dict[str, Check] = {}
+        runs = self._port.checks(token, target.repository, pull.head)
+        for run in sorted(runs, key=lambda run: run.at):
+            latest[run.name] = run
+        wanted = sorted(latest if names is None else set(names))
+        failed = [name for name in wanted if name in latest and latest[name].failed]
+        if failed:
+            return "red", failed
+        # A wanted check with no run has not reported: it is pending, not passed.
+        if any(name not in latest or not latest[name].done for name in wanted):
+            return "pending", wanted
+        return ("pending" if names is None and not wanted else "green"), wanted
 
 
 class CiAdapter(_Adapter):
@@ -451,61 +518,103 @@ class CiAdapter(_Adapter):
         "checks": "read",
     }
 
-    def _look(self, call: Payload, target: Target, token: Token, pull: Pull) -> Observation:
-        if not pull.open:
-            return _waiting(f"pull request {pull.number} is closed")
-        seen = {"pull": pull.number, "head": pull.head}
-        runs = self._port.checks(token, target.repository, pull.head)
-        required = self._port.required_checks(token, target.repository, pull.base)
-        by_name: dict[str, list[Check]] = {name: [] for name in required}
-        for run in runs:
-            if not required or run.name in by_name:
-                by_name.setdefault(run.name, []).append(run)
-        failed = sorted(name for name, its in by_name.items() if any(r.failed for r in its))
-        if failed:
-            finding = "checks failed: " + ", ".join(failed)
-            return Observation("red", {**seen, "finding": finding, "failed": failed})
-        # A required check with no run has not reported: it is pending, not passed.
-        pending = sorted(n for n, its in by_name.items() if not its or not all(r.done for r in its))
-        if pending or not by_name:
-            return _waiting("checks pending" if pending else "no check has reported", **seen)
-        return Observation("green", {**seen, "checks": sorted(by_name)})
+    def _look(
+        self, call: Payload, target: Target, token: Token, pull: Pull, seen: dict[str, Any]
+    ) -> Observation:
+        if pull.merged:
+            return _waiting("pull request is already merged", **seen)
+        state, names = self._checks(token, target, pull)
+        if state == "red":
+            return Observation(
+                "red", {**seen, "finding": CHECKS_FAILED + ", ".join(names), "failed": names}
+            )
+        if state == "pending":
+            return _waiting("checks pending" if names else "no check has reported", **seen)
+        return Observation("green", {**seen, "checks": names})
 
 
 class MergeAdapter(_Adapter):
-    """The `merge-adapter` owner of `merging`."""
+    """The `merge-adapter` owner of `merging`.
 
-    PERMISSIONS: ClassVar[Mapping[str, str]] = {"contents": "write", "pull_requests": "write"}
+    Nothing waits here on something that cannot clear by itself: a head with new commits
+    answers `moved` (back to checking and review), and what only a change to the pull request
+    can clear answers `conflict` with a finding that is the same on every look, so the
+    repeat-finding limit of `fixing` bounds it.
+    """
+
+    PERMISSIONS: ClassVar[Mapping[str, str]] = {
+        "contents": "write",
+        "pull_requests": "write",
+        "checks": "read",
+    }
 
     def __init__(self, port: GitHub, target_of: TargetLookup, *, method: str = "squash") -> None:
         super().__init__(port, target_of)
         self._method = method
 
-    def _look(self, call: Payload, target: Target, token: Token, pull: Pull) -> Observation:
-        seen = {"pull": pull.number, "head": pull.head}
+    def _stuck(self, why: str, **seen: Any) -> Observation:
+        return Observation("conflict", {**seen, "finding": why})
+
+    def _reviewed(self, token: Token, repository: str, pull: Pull, reviewed: Any) -> bool:
+        """Whether the head is the reviewed commit, or the reviewed commit with only merges of
+        the base branch on top: a moved base does not ask for another review (3.6)."""
+        sha = pull.head
+        for _ in range(BASE_MERGES):
+            if sha == reviewed or not isinstance(reviewed, str):
+                break
+            parents = self._port.parents(token, repository, sha)
+            if len(parents) != 2:
+                return False
+            if not self._port.on_branch(token, repository, pull.base, parents[1]):
+                return False
+            sha = parents[0]
+        return bool(sha == reviewed)
+
+    def _look(
+        self, call: Payload, target: Target, token: Token, pull: Pull, seen: dict[str, Any]
+    ) -> Observation:
+        repository = target.repository
+        reviewed = (call.get("detail") or {}).get("head")
+        seen = {**seen, "reviewed": reviewed}
         if pull.merged:
             return Observation("merged", {**seen, "sha": pull.merge_sha})
-        if not pull.open:
-            return _waiting(f"pull request {pull.number} is closed", **seen)
-        reviewed = (call.get("detail") or {}).get("head")
-        if reviewed != pull.head:
-            return _waiting("head moved since review", reviewed=reviewed, **seen)
+        if not self._reviewed(token, repository, pull, reviewed):
+            return Observation("moved", seen)
         if pull.mergeable is False:
-            return Observation("conflict", {**seen, "finding": f"merge conflict with {pull.base}"})
-        try:
-            if pull.mergeable_state == "behind" and call.get("action") == UPDATE_BRANCH_ACTION:
-                self._port.update_branch(token, target.repository, pull.number, pull.head)
+            return self._stuck(f"merge conflict with {pull.base}", **seen)
+        if pull.mergeable is None or pull.mergeable_state == "unknown":
+            return _waiting("GitHub has not said yet whether it merges", **seen)
+        behind = pull.mergeable_state == "behind"
+        if behind or call.get("action") == UPDATE_BRANCH_ACTION:
+            try:
+                self._port.update_branch(token, repository, pull.number, pull.head)
                 return _waiting("branch updated from its base", **seen)
-            if pull.mergeable is None or pull.mergeable_state not in MERGEABLE_STATES:
-                return _waiting(f"not mergeable yet: {pull.mergeable_state}", **seen)
-            merged = self._port.merge(
-                token, target.repository, pull.number, pull.head, self._method
-            )
+            except GitHubError as error:
+                if error.status != 422:
+                    raise
+            # 422: nothing to update, or an update is already under way.
+            if behind:
+                return _waiting("branch update under way", **seen)
+        state, names = self._checks(token, target, pull)
+        if state == "red":
+            return self._stuck(CHECKS_FAILED + ", ".join(names), **seen)
+        if state == "pending":
+            return _waiting("checks pending on the head to merge", **seen)
+        if pull.mergeable_state not in MERGEABLE_STATES:
+            return self._stuck(f"GitHub will not merge: {pull.mergeable_state}", **seen)
+        try:
+            merged = self._port.merge(token, repository, pull.number, pull.head, self._method)
         except GitHubError as error:
             if error.status not in (405, 409, 422):
                 raise
-            # GitHub would not: not mergeable after all, or the head moved under the call.
-            return _waiting(f"GitHub refused: {error}", **seen)
+            # GitHub would not. Look again before saying why: it may be merged by now (this
+            # call delivered twice), or the head moved under the call.
+            now = self._port.find_pull(token, repository, branch_of(call["item"]))
+            if now is not None and now.merged:
+                return Observation("merged", {**seen, "sha": now.merge_sha})
+            if error.status == 409 or now is None or now.head != pull.head:
+                return _waiting("the head moved under the merge", **seen)
+            return self._stuck(f"merge refused: {error.said}", **seen)
         return Observation("merged", {**seen, "sha": merged})
 
 
