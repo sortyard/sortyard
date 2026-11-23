@@ -4,11 +4,13 @@ Build an sdist and then a wheel from that sdist, away from checkout build caches
 on their metadata and bundled licences exercise what a packager receives. The standalone
 spec/ licence must agree with the shipped Apache text. Checkout configuration guards are
 supplementary and do not establish distribution contents.
+The dev extra provisions a pinned backend; acceptance builds cannot fetch dependencies.
 """
 
 from __future__ import annotations
 
 import hashlib
+import os
 import pathlib
 import re
 import shutil
@@ -20,6 +22,7 @@ import zipfile
 from dataclasses import dataclass
 from email.message import Message
 from email.parser import BytesParser
+from importlib.metadata import version
 
 import pytest
 
@@ -64,8 +67,23 @@ def distributions(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Distrib
         ),
     )
     result = subprocess.run(
-        [sys.executable, "-m", "build", "--outdir", str(work / "dist"), str(source)],
+        [
+            sys.executable,
+            "-m",
+            "build",
+            "--no-isolation",
+            "--outdir",
+            str(work / "dist"),
+            str(source),
+        ],
         cwd=work,
+        # A package-index install during acceptance is a failure, even with a warm cache.
+        env={
+            **os.environ,
+            "PIP_NO_INDEX": "1",
+            "PIP_FIND_LINKS": "",
+            "PIP_CONFIG_FILE": os.devnull,
+        },
         capture_output=True,
         text=True,
         timeout=180,
@@ -112,6 +130,12 @@ def distribution(
 def _flat(text: str) -> str:
     """Collapse line wrapping so wrapped prose compares equal to the one-line statement."""
     return " ".join(text.split())
+
+
+def test_build_backend_is_provisioned_at_a_pinned_version() -> None:
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
+    assert "setuptools==80.9.0" in project["optional-dependencies"]["dev"]
+    assert version("setuptools") == "80.9.0"
 
 
 def test_distribution_publishes_fsl_metadata_and_all_licence_files(
