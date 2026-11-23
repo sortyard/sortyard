@@ -158,34 +158,49 @@ def seen(root: pathlib.Path, name: str = "seen") -> dict[str, Any]:
 def run_worker(
     root: pathlib.Path, brief: dict[str, Any], token: str = TOKEN, *, token_in: str = "file"
 ) -> tuple[int, str]:
-    """Run the real entry point as a Job would: brief and token from files, the result in a
-    file. Returns its exit status and the result text (the termination message)."""
+    """Run the real entry point as a Job's pod would: `clone`, then `agent`, then `push`, each
+    its own process with its own environment, sharing the workspace directory. Only `clone`
+    and `push` are given the state directory and the token file. Returns the exit status and
+    the result text (the termination message) of `push`, or of `clone` when it failed, as a
+    failed init container ends the pod.
+
+    With `token_in="env"` the token is instead put in the environment of all three, the agent
+    step included: the worst a deployment could do.
+    """
     root.mkdir(parents=True, exist_ok=True)
-    work = root / "work"
-    work.mkdir(exist_ok=True)
+    for directory in ("work", "state"):
+        (root / directory).mkdir(exist_ok=True)
     (root / "brief.json").write_text(json.dumps(brief))
-    env = {
+    shared = {
         **{k: v for k, v in os.environ.items() if not k.startswith("SORTYARD_")},
         "GIT_CONFIG_GLOBAL": os.devnull,
         "GIT_CONFIG_SYSTEM": os.devnull,
         "SORTYARD_BRIEF": str(root / "brief.json"),
-        "SORTYARD_WORKDIR": str(work),
+        "SORTYARD_WORKDIR": str(root / "work"),
         "SORTYARD_RESULT": str(root / "result.json"),
-        # A lane secret the agent is meant to have: only the GitHub token is withheld.
-        "MODEL_API_KEY": "model-key-for-the-agent",
     }
+    trusted = {**shared, "SORTYARD_STATE": str(root / "state")}
+    # A lane secret the agent is meant to have: only the GitHub token is withheld.
+    untrusted = {**shared, "MODEL_API_KEY": "model-key-for-the-agent"}
     if token_in == "file":
         (root / "token").write_text(token + "\n")
-        env["SORTYARD_GITHUB_TOKEN_FILE"] = str(root / "token")
+        trusted["SORTYARD_GITHUB_TOKEN_FILE"] = str(root / "token")
     else:
-        env["SORTYARD_GITHUB_TOKEN"] = token
-    done = subprocess.run(
-        [sys.executable, "-m", "sortyard.services.worker"],
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=120,
-        check=False,
-    )
-    assert token not in done.stdout + done.stderr, "the worker printed the token"
-    return done.returncode, (root / "result.json").read_text()
+        trusted["SORTYARD_GITHUB_TOKEN"] = untrusted["SORTYARD_GITHUB_TOKEN"] = token
+    status, text = 0, ""
+    for step in ("clone", "agent", "push"):
+        done = subprocess.run(
+            [sys.executable, "-m", "sortyard.services.worker", step],
+            env=untrusted if step == "agent" else trusted,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+        assert token not in done.stdout + done.stderr, f"{step} printed the token"
+        status, text = done.returncode, (root / "result.json").read_text()
+        if step == "agent":
+            assert status == 0, "the agent container always exits 0"
+        elif status != 0:
+            break
+    return status, text

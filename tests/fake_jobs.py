@@ -169,6 +169,7 @@ class FakeCluster:
         self, method: str, target: str, headers: dict[str, str], raw: bytes
     ) -> tuple[int, dict[str, Any]]:
         with self._lock:
+            headers = {name.title(): value for name, value in headers.items()}
             split = urllib.parse.urlsplit(target)
             query = dict(urllib.parse.parse_qsl(split.query, keep_blank_values=True))
             try:
@@ -214,6 +215,12 @@ class FakeCluster:
             self.violations.append(f"{what}: undocumented query {sorted(set(query) - allowed)}")
             return self._status(400, "BadRequest", "unknown query parameter")
         body_schema = next((p["schema"]["$ref"] for p in parameters if p["in"] == "body"), None)
+        if request is not None:
+            consumes = operation.get("consumes") or ["*/*"]
+            accepted = ["application/json"] if consumes == ["*/*"] else consumes
+            if headers.get("Content-Type", "").split(";")[0].strip() not in accepted:
+                self.violations.append(f"{what}: Content-Type {headers.get('Content-Type')!r}")
+                return self._status(415, "UnsupportedMediaType", "unsupported media type")
         if request is not None or method == "POST":
             errors = (
                 self.contract.errors(body_schema, request) if body_schema else ["a body was sent"]
@@ -229,8 +236,8 @@ class FakeCluster:
         name = where.get("name", "")
         if method == "POST":
             return self._create(resource, request)
-        if resource == "pod":
-            return 200, self._pods(query.get("labelSelector", ""))
+        if operation["operationId"].startswith("list"):
+            return 200, self._list(resource, query.get("labelSelector", ""))
         current = self.objects.get((resource, name))
         if current is None:
             return self._status(404, "NotFound", f'{resource}s "{name}" not found')
@@ -238,6 +245,23 @@ class FakeCluster:
             orphan = (request or {}).get("propagationPolicy") == "Orphan"
             self._remove(resource, name, cascade=not orphan)
             return self._status(200, "", "")
+        if method == "PATCH":
+            # A JSON merge patch (RFC 7386) of a Secret, as far as the port uses one.
+            merged = copy.deepcopy(current)
+            merged["metadata"].setdefault("annotations", {}).update(
+                (request.get("metadata") or {}).get("annotations") or {}
+            )
+            for key, value in (request.get("stringData") or {}).items():
+                merged["data"][key] = base64.b64encode(value.encode()).decode()
+            if set(request) - {"metadata", "stringData"} or self.contract.errors(
+                "io.k8s.api.core.v1.Secret", merged
+            ):
+                self.violations.append(f"{what}: the patch is not one the fake applies")
+                return self._status(422, "Invalid", "patch refused")
+            self._serial += 1
+            merged["metadata"]["resourceVersion"] = str(self._serial)
+            self.objects[(resource, name)] = merged
+            return 200, copy.deepcopy(merged)
         if resource == "secret":
             if headers.get("Accept") == METADATA_ONLY:
                 return 200, {
@@ -293,17 +317,19 @@ class FakeCluster:
         meta = job["metadata"]
         return {"apiVersion": "batch/v1", "kind": "Job", "name": meta["name"], "uid": meta["uid"]}
 
-    def _pods(self, selector: str) -> dict[str, Any]:
+    def _list(self, resource: str, selector: str) -> dict[str, Any]:
         wanted = dict(part.split("=", 1) for part in selector.split(",") if "=" in part)
-        if selector and len(wanted) != len(selector.split(",")):
+        if selector and (len(wanted) != len(selector.split(",")) or "!" in selector):
             self.violations.append(f"label selector {selector!r} is not key=value pairs")
         items = [
-            copy.deepcopy(pod)
-            for (resource, _), pod in sorted(self.objects.items())
-            if resource == "pod"
-            and all(pod["metadata"]["labels"].get(k) == v for k, v in wanted.items())
+            copy.deepcopy(found)
+            for (kind, _), found in sorted(self.objects.items())
+            if kind == resource
+            and all((found["metadata"].get("labels") or {}).get(k) == v for k, v in wanted.items())
         ]
-        return {"kind": "PodList", "apiVersion": "v1", "metadata": {}, "items": items}
+        kind = {"pod": "PodList", "job": "JobList"}[resource]
+        version = "v1" if resource == "pod" else "batch/v1"
+        return {"kind": kind, "apiVersion": version, "metadata": {}, "items": items}
 
     def _remove(self, resource: str, name: str, *, cascade: bool = True) -> None:
         gone = self.objects.pop((resource, name), None)
@@ -361,7 +387,7 @@ class FakeCluster:
                     self.objects
                 ):
                     missing.append(f"secret {volume['secret']['secretName']}")
-            for container in spec["containers"]:
+            for container in [*spec.get("initContainers", ()), *spec["containers"]]:
                 for variable in container.get("env") or ():
                     ref = (variable.get("valueFrom") or {}).get("secretKeyRef")
                     if ref and ref["key"] not in self.objects.get(("secret", ref["name"]), {}).get(
@@ -370,8 +396,9 @@ class FakeCluster:
                         missing.append(f"secret {ref['name']} key {ref['key']}")
             return missing
 
-    def finish(self, job: str, message: str, exit_code: int = 0) -> None:
-        """The Job's pod ran and its worker container ended with this termination message.
+    def finish(self, job: str, message: str, exit_code: int = 0, container: str = "push") -> None:
+        """The Job's pod ran: `container` ended with this exit status and termination message,
+        the others with success and none.
 
         As the kubelet does, the message is cut at 4096 bytes. A pod that mounts something
         that does not exist never starts, so finishing it is a mistake of the test's subject.
@@ -379,26 +406,30 @@ class FakeCluster:
         with self._lock:
             assert not self.unstartable(job), f"the pod cannot start: {self.unstartable(job)}"
             pod = self._pod_of(job)
-            container = pod["spec"]["containers"][0]
+            names = [made["name"] for made in pod["spec"]["containers"]]
+            assert container in names, f"the pod has no container {container}: {names}"
             cut = message.encode()[:4096].decode(errors="ignore")
+
+            def ended(made: dict[str, Any]) -> dict[str, Any]:
+                code = exit_code if made["name"] == container else 0
+                terminated = {"exitCode": code, "reason": "Completed" if code == 0 else "Error"}
+                if made["name"] == container:
+                    terminated["message"] = cut
+                return {
+                    "name": made["name"],
+                    "image": made["image"],
+                    "imageID": made["image"],
+                    "ready": False,
+                    "restartCount": 0,
+                    "state": {"terminated": terminated},
+                }
+
             pod["status"] = {
                 "phase": "Succeeded" if exit_code == 0 else "Failed",
-                "containerStatuses": [
-                    {
-                        "name": container["name"],
-                        "image": container["image"],
-                        "imageID": container["image"],
-                        "ready": False,
-                        "restartCount": 0,
-                        "state": {
-                            "terminated": {
-                                "exitCode": exit_code,
-                                "reason": "Completed" if exit_code == 0 else "Error",
-                                "message": cut,
-                            }
-                        },
-                    }
+                "initContainerStatuses": [
+                    ended(made) for made in pod["spec"].get("initContainers", ())
                 ],
+                "containerStatuses": [ended(made) for made in pod["spec"]["containers"]],
             }
             done = {"type": "Complete", "status": "True"}
             failed = {"type": "Failed", "status": "True", "reason": "BackoffLimitExceeded"}

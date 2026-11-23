@@ -54,6 +54,36 @@
    ],
    "type": "object"
   },
+  "io.k8s.api.batch.v1.JobList": {
+   "properties": {
+    "apiVersion": {
+     "type": "string"
+    },
+    "items": {
+     "items": {
+      "$ref": "#/definitions/io.k8s.api.batch.v1.Job"
+     },
+     "type": "array"
+    },
+    "kind": {
+     "type": "string"
+    },
+    "metadata": {
+     "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+    }
+   },
+   "required": [
+    "items"
+   ],
+   "type": "object",
+   "x-kubernetes-group-version-kind": [
+    {
+     "group": "batch",
+     "kind": "JobList",
+     "version": "v1"
+    }
+   ]
+  },
   "io.k8s.api.batch.v1.JobSpec": {
    "properties": {
     "activeDeadlineSeconds": {
@@ -3848,6 +3878,9 @@
    "type": "object",
    "x-kubernetes-map-type": "atomic"
   },
+  "io.k8s.apimachinery.pkg.apis.meta.v1.Patch": {
+   "type": "object"
+  },
   "io.k8s.apimachinery.pkg.apis.meta.v1.Preconditions": {
    "properties": {
     "resourceVersion": {
@@ -3951,6 +3984,9 @@
  "paths": {
   "/api/v1/namespaces/{namespace}/configmaps": {
    "post": {
+    "consumes": [
+     "*/*"
+    ],
     "operationId": "createCoreV1NamespacedConfigMap",
     "parameters": [
      {
@@ -4004,6 +4040,9 @@
   },
   "/api/v1/namespaces/{namespace}/configmaps/{name}": {
    "delete": {
+    "consumes": [
+     "*/*"
+    ],
     "operationId": "deleteCoreV1NamespacedConfigMap",
     "parameters": [
      {
@@ -4060,6 +4099,9 @@
   },
   "/api/v1/namespaces/{namespace}/pods": {
    "get": {
+    "consumes": [
+     "*/*"
+    ],
     "operationId": "listCoreV1NamespacedPod",
     "parameters": [
      {
@@ -4123,6 +4165,9 @@
   },
   "/api/v1/namespaces/{namespace}/secrets": {
    "post": {
+    "consumes": [
+     "*/*"
+    ],
     "operationId": "createCoreV1NamespacedSecret",
     "parameters": [
      {
@@ -4176,6 +4221,9 @@
   },
   "/api/v1/namespaces/{namespace}/secrets/{name}": {
    "delete": {
+    "consumes": [
+     "*/*"
+    ],
     "operationId": "deleteCoreV1NamespacedSecret",
     "parameters": [
      {
@@ -4230,6 +4278,9 @@
     }
    },
    "get": {
+    "consumes": [
+     "*/*"
+    ],
     "operationId": "readCoreV1NamespacedSecret",
     "parameters": [
      {
@@ -4254,10 +4305,138 @@
       }
      }
     }
+   },
+   "patch": {
+    "consumes": [
+     "application/json-patch+json",
+     "application/merge-patch+json",
+     "application/strategic-merge-patch+json",
+     "application/apply-patch+yaml"
+    ],
+    "operationId": "patchCoreV1NamespacedSecret",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "name",
+      "required": true
+     },
+     {
+      "in": "path",
+      "name": "namespace",
+      "required": true
+     },
+     {
+      "in": "query",
+      "name": "pretty"
+     },
+     {
+      "in": "body",
+      "name": "body",
+      "required": true,
+      "schema": {
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+      }
+     },
+     {
+      "in": "query",
+      "name": "dryRun"
+     },
+     {
+      "in": "query",
+      "name": "fieldManager"
+     },
+     {
+      "in": "query",
+      "name": "fieldValidation"
+     },
+     {
+      "in": "query",
+      "name": "force"
+     }
+    ],
+    "responses": {
+     "200": {
+      "schema": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.Secret"
+      }
+     },
+     "201": {
+      "schema": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.Secret"
+      }
+     }
+    }
    }
   },
   "/apis/batch/v1/namespaces/{namespace}/jobs": {
+   "get": {
+    "consumes": [
+     "*/*"
+    ],
+    "operationId": "listBatchV1NamespacedJob",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "namespace",
+      "required": true
+     },
+     {
+      "in": "query",
+      "name": "pretty"
+     },
+     {
+      "in": "query",
+      "name": "allowWatchBookmarks"
+     },
+     {
+      "in": "query",
+      "name": "continue"
+     },
+     {
+      "in": "query",
+      "name": "fieldSelector"
+     },
+     {
+      "in": "query",
+      "name": "labelSelector"
+     },
+     {
+      "in": "query",
+      "name": "limit"
+     },
+     {
+      "in": "query",
+      "name": "resourceVersion"
+     },
+     {
+      "in": "query",
+      "name": "resourceVersionMatch"
+     },
+     {
+      "in": "query",
+      "name": "sendInitialEvents"
+     },
+     {
+      "in": "query",
+      "name": "timeoutSeconds"
+     },
+     {
+      "in": "query",
+      "name": "watch"
+     }
+    ],
+    "responses": {
+     "200": {
+      "schema": {
+       "$ref": "#/definitions/io.k8s.api.batch.v1.JobList"
+      }
+     }
+    }
+   },
    "post": {
+    "consumes": [
+     "*/*"
+    ],
     "operationId": "createBatchV1NamespacedJob",
     "parameters": [
      {
@@ -4311,6 +4490,9 @@
   },
   "/apis/batch/v1/namespaces/{namespace}/jobs/{name}": {
    "delete": {
+    "consumes": [
+     "*/*"
+    ],
     "operationId": "deleteBatchV1NamespacedJob",
     "parameters": [
      {
@@ -4365,6 +4547,9 @@
     }
    },
    "get": {
+    "consumes": [
+     "*/*"
+    ],
     "operationId": "readBatchV1NamespacedJob",
     "parameters": [
      {

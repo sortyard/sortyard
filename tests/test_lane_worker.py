@@ -25,16 +25,27 @@ from sortyard.engine.testing import time_skipping_engine
 from sortyard.kernel.capabilities import KINDS, CapabilityError, Image, Need
 from sortyard.kernel.item import register, send_outcome, start_item, workflow_id
 from sortyard.kernel.preflight import InMemoryGapRegistry, Preflight, ProbeResult, TaskNeeds
-from sortyard.lane.jobs import BRIEF_KEY, JOB_LABEL, TOKEN_KEY, KubeJobs
+from sortyard.lane.jobs import (
+    BRIEF_KEY,
+    DISPATCH_LABEL,
+    ITEM_LABEL,
+    JOB_LABEL,
+    MINTED,
+    TOKEN_KEY,
+    KubeJobs,
+)
 from sortyard.lane.worker import (
     BRIEF_DIR,
     BRIEF_ENV,
+    STATE_DIR,
+    STATE_ENV,
     TOKEN_DIR,
     TOKEN_FILE_ENV,
     Launcher,
     Work,
     WorkerConfig,
     branch,
+    item_label,
     job_name,
     outcome_of,
     probes,
@@ -75,6 +86,7 @@ class World:
     config: WorkerConfig
     tokens: Tokens = field(default_factory=Tokens)
     repositories: dict[str, str] = field(default_factory=dict)
+    now: float = 1_000_000.0
 
     def lookup(self, tenant: str, item: str) -> Work:
         assert tenant == TENANT, tenant
@@ -83,7 +95,13 @@ class World:
     def launcher(self) -> Launcher:
         """A launcher as a new process would build it: a new client, nothing carried over."""
         jobs = KubeJobs(self.cluster.url, self.cluster.namespace, token=lambda: self.cluster.token)
-        return Launcher(jobs=jobs, lookup=self.lookup, tokens=self.tokens, config=self.config)
+        return Launcher(
+            jobs=jobs,
+            lookup=self.lookup,
+            tokens=self.tokens,
+            config=self.config,
+            clock=lambda: self.now,
+        )
 
     def posts(self, resource: str) -> list[int]:
         """The status of every create of the resource, in order."""
@@ -149,37 +167,63 @@ def test_the_executor_launches_one_job_per_dispatch_and_a_repeated_call_launches
         pod = job["spec"]["template"]["spec"]
         assert pod["restartPolicy"] == "Never"
         assert job["spec"]["template"]["metadata"]["labels"][JOB_LABEL] == name
-        (container,) = pod["containers"]
-        assert container["image"] == LANE.worker_image.reference
-        assert container["image"].endswith(LANE.worker_image.digest)
-        assert container["terminationMessagePath"] == "/dev/termination-log"
-        # The lane's secrets are read by reference to their names; no value is in the Job.
-        env = {variable["name"]: variable for variable in container["env"]}
+        labels = job["metadata"]["labels"]
+        assert labels[ITEM_LABEL] == item_label(TENANT, "ITEM-1") and labels[DISPATCH_LABEL] == "3"
+        # Three containers of the one image: clone first, then the agent beside the push.
+        (clone,) = pod["initContainers"]
+        agent, push = pod["containers"]
+        assert [c["name"] for c in (clone, agent, push)] == ["clone", "agent", "push"]
+        for container in (clone, agent, push):
+            assert container["image"] == LANE.worker_image.reference
+            assert container["image"].endswith(LANE.worker_image.digest)
+            assert container["command"] == ["sortyard-worker", container["name"]]
+            assert container["terminationMessagePath"] == "/dev/termination-log"
+        volumes = {volume["name"]: volume for volume in pod["volumes"]}
+        assert volumes["brief"]["configMap"]["name"] == name
+        assert volumes["github"]["secret"]["secretName"] == name
+        token_volumes = {v["name"] for v in pod["volumes"] if "secret" in v}
+
+        def env(container: dict[str, Any]) -> dict[str, Any]:
+            return {variable["name"]: variable for variable in container["env"]}
+
+        def mounts(container: dict[str, Any]) -> dict[str, str]:
+            return {mount["name"]: mount["mountPath"] for mount in container["volumeMounts"]}
+
+        # The agent's container has no way to the per-job secret: no volume of it, no variable
+        # from it or naming its path, and not the state volume the other two share.
+        assert set(mounts(agent)) == {"brief", "work"}
+        assert not set(mounts(agent)) & token_volumes
+        assert TOKEN_FILE_ENV not in env(agent) and STATE_ENV not in env(agent)
+        said = json.dumps(agent)
+        assert TOKEN_DIR not in said and STATE_DIR not in said and f'"{name}"' not in said
+        # It alone gets the lane's secrets, read by reference to their names: no value.
         for declared, secret in (
             ("DEPLOY_TOKEN", "deploy-token"),
             ("MODEL_API_KEY", "model-api-key"),
         ):
-            assert env[declared] == {
+            assert env(agent)[declared] == {
                 "name": declared,
                 "valueFrom": {"secretKeyRef": {"name": secret, "key": declared}},
             }
-        # The brief and the per-job secret are mounted where the entry point is told to look,
-        # and both exist, so the pod can start.
-        mounts = {mount["name"]: mount["mountPath"] for mount in container["volumeMounts"]}
-        volumes = {volume["name"]: volume for volume in pod["volumes"]}
-        assert volumes["brief"]["configMap"]["name"] == name
-        assert volumes["github"]["secret"]["secretName"] == name
-        assert (
-            env[BRIEF_ENV]["value"]
-            == f"{mounts['brief']}/{BRIEF_KEY}"
-            == f"{BRIEF_DIR}/{BRIEF_KEY}"
-        )
-        assert env[TOKEN_FILE_ENV]["value"] == f"{mounts['github']}/{TOKEN_KEY}"
-        assert mounts["github"] == TOKEN_DIR
+            assert declared not in env(clone) and declared not in env(push)
+        # Clone and push are told where the brief, the token and their own state are, all
+        # three share the workspace, and everything mounted exists, so the pod can start.
+        for trusted in (clone, push):
+            assert mounts(trusted) == {
+                "brief": BRIEF_DIR,
+                "work": mounts(agent)["work"],
+                "github": TOKEN_DIR,
+                "state": STATE_DIR,
+            }
+            assert env(trusted)[TOKEN_FILE_ENV]["value"] == f"{TOKEN_DIR}/{TOKEN_KEY}"
+            assert env(trusted)[STATE_ENV]["value"] == STATE_DIR
+            assert env(trusted)[BRIEF_ENV] == env(agent)[BRIEF_ENV]
+        assert env(agent)[BRIEF_ENV]["value"] == f"{BRIEF_DIR}/{BRIEF_KEY}"
         assert w.cluster.unstartable(name) == []
         # The token: minted once, for the item's one repository, held by a secret the Job owns.
         assert w.tokens.minted == [("walwarden/app", {"contents": "write"})]
         assert w.cluster.secret_value(name, TOKEN_KEY) == f"{TOKEN}-1"
+        assert w.cluster.get("secret", name)["metadata"]["annotations"] == {MINTED: "1000000"}
         assert TOKEN not in json.dumps(job) + json.dumps(w.cluster.get("configmap", name))
         for kind in ("secret", "configmap"):
             (owner,) = w.cluster.get(kind, name)["metadata"]["ownerReferences"]
@@ -206,14 +250,74 @@ def test_the_executor_launches_one_job_per_dispatch_and_a_repeated_call_launches
         assert w.cluster.get("job", name)["metadata"]["uid"] == job["metadata"]["uid"]
         assert len(w.cluster.names("pod")) == 1
 
-        # Another dispatch of the item, and another item, each get their own Job. A call that
-        # names no limit is bounded by the configured deadline.
-        launcher.launch(call("ITEM-1", "building", 9))
+        # Another item gets its own Job. A call that names no limit is bounded by the
+        # configured deadline.
         launcher.launch(call("ITEM-2", "building", 3))
-        names = {name, job_name(TENANT, "ITEM-1", 9), job_name(TENANT, "ITEM-2", 3)}
-        assert set(w.cluster.names("job")) == names and len(names) == 3
-        later = w.cluster.get("job", job_name(TENANT, "ITEM-1", 9))
-        assert later["spec"]["activeDeadlineSeconds"] == w.config.deadline
+        other = job_name(TENANT, "ITEM-2", 3)
+        assert w.cluster.names("job") == sorted([name, other]) and name != other
+        assert w.cluster.get("job", other)["spec"]["activeDeadlineSeconds"] == w.config.deadline
+
+
+def test_a_job_that_ends_unobserved_leaves_nothing_once_the_next_dispatch_launches() -> None:
+    """The limit passes and the stay closes, so no one observes the Job; when the item is
+    dispatched again nothing of the earlier dispatch remains, ended or still running."""
+    with world() as w:
+        launcher = w.launcher()
+        launcher.launch(call("ITEM-1", "reviewing", 6, limit_seconds=1800.0))
+        launcher.launch(call("ITEM-2", "building", 3))
+        first = job_name(TENANT, "ITEM-1", 6)
+        # The review ran past its limit: the cluster ended the Job, and nobody asked.
+        w.cluster.fail(first)
+        assert first in w.job_secrets() and first in w.cluster.names("configmap")
+        # The state's default dispatches the reviewer again, under a new Job name.
+        launcher.launch(call("ITEM-1", "reviewing", 7, limit_seconds=1800.0))
+        second = job_name(TENANT, "ITEM-1", 7)
+        mine = [n for n in w.cluster.names("job") if n != job_name(TENANT, "ITEM-2", 3)]
+        assert mine == [second]
+        for kind in ("secret", "configmap", "pod"):
+            assert not [n for n in w.cluster.names(kind) if n.startswith(first)], kind
+        # The same when the earlier Job is still running (a worker past a limit the cluster
+        # has not enforced yet): it is deleted, not left to push beside the new one.
+        launcher.launch(call("ITEM-1", "reviewing", 8, limit_seconds=1800.0))
+        third = job_name(TENANT, "ITEM-1", 8)
+        left = sorted([third, job_name(TENANT, "ITEM-2", 3)])
+        assert w.cluster.names("job") == left == w.job_secrets() == w.cluster.names("configmap")
+        assert len(w.cluster.names("pod")) == 2
+        # A repeated call for the current dispatch deletes nothing of its own.
+        launcher.launch(call("ITEM-1", "reviewing", 8, limit_seconds=1800.0))
+        assert w.cluster.names("job") == left and len(w.tokens.minted) == 4
+
+
+def test_a_running_jobs_token_is_replaced_when_it_is_older_than_the_configured_age() -> None:
+    """While a Job runs, observe replaces its token once it is older than the configured age,
+    for the same repository and permissions, and not before."""
+    with world() as w:
+        launcher = w.launcher()
+        build, review = call("ITEM-1", "building", 3), call("ITEM-2", "reviewing", 6)
+        launcher.launch(build)
+        w.now += 600
+        launcher.launch(review)
+        name, other = job_name(TENANT, "ITEM-1", 3), job_name(TENANT, "ITEM-2", 6)
+        w.now += w.config.token_age - 601  # the build's token is one second short of the age
+        assert launcher.observe(build) is None and launcher.observe(review) is None
+        assert len(w.tokens.minted) == 2
+        w.now += 1
+        assert w.launcher().observe(build) is None and launcher.observe(review) is None
+        assert w.tokens.minted[2:] == [("walwarden/app", {"contents": "write"})]
+        assert w.cluster.secret_value(name, TOKEN_KEY) == f"{TOKEN}-3"
+        assert w.cluster.secret_value(other, TOKEN_KEY) == f"{TOKEN}-2"
+        # The new token has its own age: the next poll mints nothing.
+        assert launcher.observe(build) is None and len(w.tokens.minted) == 3
+        w.now += 600
+        assert launcher.observe(review) is None
+        assert w.tokens.minted[3:] == [
+            ("walwarden/app", {"contents": "read", "pull_requests": "read"})
+        ]
+        # A Job that has ended gets no new token: its secret is deleted instead.
+        w.now += 10 * w.config.token_age
+        w.cluster.finish(name, result("built"))
+        assert launcher.observe(build) == {"outcome": "built", "detail": {"head": HEAD}}
+        assert len(w.tokens.minted) == 4 and w.job_secrets() == [other]
 
 
 def test_the_brief_of_a_fix_carries_the_finding_and_each_job_gets_the_token_its_work_needs() -> (
@@ -235,9 +339,9 @@ def test_the_brief_of_a_fix_carries_the_finding_and_each_job_gets_the_token_its_
         assert (fix["mode"], fix["finding"], fix["agent"]) == ("fix", finding, ["agent", "--fix"])
         assert "missing-fix-txt" in fix["text"] and "does not add fix.txt" in fix["text"]
 
-        assert launcher.owners()["reviewer"](call("ITEM-1", "reviewing", 6)) is None
+        assert launcher.owners()["reviewer"](call("ITEM-4", "reviewing", 6)) is None
         review = json.loads(
-            w.cluster.get("configmap", job_name(TENANT, "ITEM-1", 6))["data"][BRIEF_KEY]
+            w.cluster.get("configmap", job_name(TENANT, "ITEM-4", 6))["data"][BRIEF_KEY]
         )
         assert (review["mode"], review["agent"]) == ("review", ["reviewer"])
         assert '"verdict"' in review["text"]
@@ -270,7 +374,7 @@ def test_a_finished_build_is_observed_as_built_with_its_head_commit_and_an_uncha
         launcher = w.launcher()
         built = call("ITEM-1", "building", 3)
         unchanged = call("ITEM-2", "building", 3)
-        fixed = call("ITEM-1", "fixing", 5)
+        fixed = call("ITEM-3", "fixing", 5)
         for made in (built, unchanged, fixed):
             launcher.launch(made)
         # While a Job runs there is nothing to report, and its secret stays.
@@ -279,7 +383,7 @@ def test_a_finished_build_is_observed_as_built_with_its_head_commit_and_an_uncha
 
         w.cluster.finish(job_name(TENANT, "ITEM-1", 3), result("built"))
         w.cluster.finish(job_name(TENANT, "ITEM-2", 3), result("no-change"))
-        w.cluster.finish(job_name(TENANT, "ITEM-1", 5), result("fixed"))
+        w.cluster.finish(job_name(TENANT, "ITEM-3", 5), result("fixed"))
         # A Job that outlived the process that launched it is observed by the next one.
         after_restart = w.launcher()
         assert after_restart.observe(built) == {"outcome": "built", "detail": {"head": HEAD}}
@@ -305,6 +409,8 @@ def test_a_finished_build_is_observed_as_built_with_its_head_commit_and_an_uncha
     assert outcome_of("building", "built") is None
     assert outcome_of("building", "") is None
     assert outcome_of("building", '["built"]') is None
+    for odd in ("[]", "{}", '["built"]', "7", "null"):
+        assert outcome_of("building", f'{{"outcome":{odd},"head":"{HEAD}"}}') is None
     assert outcome_of("merging", result("merged")) is None
 
 
@@ -316,19 +422,19 @@ def test_a_finished_review_is_observed_as_approved_or_as_findings_with_a_finding
     ]
     with world() as w:
         launcher = w.launcher()
-        approved, found, keyless, cut = (call("ITEM-1", "reviewing", n) for n in (6, 8, 10, 12))
+        approved, found, keyless, cut = (call(f"ITEM-{n}", "reviewing", 6) for n in (1, 2, 3, 4))
         for made in (approved, found, keyless, cut):
             launcher.launch(made)
         w.cluster.finish(job_name(TENANT, "ITEM-1", 6), result("approved"))
         w.cluster.finish(
-            job_name(TENANT, "ITEM-1", 8),
+            job_name(TENANT, "ITEM-2", 6),
             result("findings", finding="missing-fix-txt", findings=findings),
         )
         # Findings with no finding key, and a result so long the kubelet cut it.
-        w.cluster.finish(job_name(TENANT, "ITEM-1", 10), result("findings", findings=findings))
+        w.cluster.finish(job_name(TENANT, "ITEM-3", 6), result("findings", findings=findings))
         long = [{"key": "k", "text": "x" * 5000}]
         w.cluster.finish(
-            job_name(TENANT, "ITEM-1", 12), result("findings", finding="k", findings=long)
+            job_name(TENANT, "ITEM-4", 6), result("findings", finding="k", findings=long)
         )
         # Approved names the head that was reviewed: the merge adapter refuses a moved one.
         assert launcher.observe(approved) == {"outcome": "approved", "detail": {"head": HEAD}}
@@ -350,17 +456,19 @@ def test_a_failed_job_gives_no_reply_and_its_per_job_secret_is_deleted() -> None
     """A failed Job gives no reply and its per-job secret is deleted."""
     with world() as w:
         launcher = w.launcher()
-        deadline, crashed, vanished, wrong = (call("ITEM-1", "building", n) for n in (3, 5, 7, 9))
+        deadline, crashed, vanished, wrong = (
+            call(f"ITEM-{n}", "building", 3) for n in (1, 2, 3, 4)
+        )
         for made in (deadline, crashed, vanished, wrong):
             launcher.launch(made)
         assert len(w.job_secrets()) == 4
         # Past its deadline with no result; a worker that reported failure; a worker that
         # exited non-zero while claiming success; a Job that is gone.
         w.cluster.fail(job_name(TENANT, "ITEM-1", 3))
-        w.cluster.finish(job_name(TENANT, "ITEM-1", 5), '{"outcome":"failed","reason":"x"}', 1)
-        w.cluster.finish(job_name(TENANT, "ITEM-1", 9), result("built"), 1)
-        w.cluster.vanish(job_name(TENANT, "ITEM-1", 7))
-        assert job_name(TENANT, "ITEM-1", 7) in w.job_secrets()  # left behind by the cluster
+        w.cluster.finish(job_name(TENANT, "ITEM-2", 3), '{"outcome":"failed","reason":"x"}', 1)
+        w.cluster.finish(job_name(TENANT, "ITEM-4", 3), result("built"), 1)
+        w.cluster.vanish(job_name(TENANT, "ITEM-3", 3))
+        assert job_name(TENANT, "ITEM-3", 3) in w.job_secrets()  # left behind by the cluster
         for made in (deadline, crashed, vanished, wrong):
             assert launcher.observe(made) is None
         assert w.job_secrets() == []
@@ -395,6 +503,7 @@ def test_the_probes_exercise_a_named_secret_a_named_service_and_the_worker_image
         assert present.passed and LANE_SECRET_VALUE not in present.output
         w.cluster._remove("secret", "model-api-key")
         absent = made["secret"](Need("secret", "MODEL_API_KEY"), LANE)
+        w.cluster.add_secret("model-api-key", {"MODEL_API_KEY": LANE_SECRET_VALUE})
         assert not absent.passed and "model-api-key" in absent.output
         mapped = replace(w.config, secrets={"DEPLOY_TOKEN": ("elsewhere", "token")})
         assert not probes(jobs, mapped)["secret"](Need("secret", "DEPLOY_TOKEN"), LANE).passed
@@ -453,6 +562,7 @@ def test_an_item_goes_from_building_to_merged_on_real_jobs_with_one_fix_round(
     }
     config = WorkerConfig(agents=agents, git_url=f"{tmp_path.as_uri()}/{{repository}}.git")
     events: list[Mapping[str, Any]] = []
+    deadlines: list[int] = []
     scripted = {
         "scheduler": "dispatched",
         "capability-checker": "ready",
@@ -487,6 +597,7 @@ def test_an_item_goes_from_building_to_merged_on_real_jobs_with_one_fix_round(
                     # What the cluster would do: start the pod with its brief and its token,
                     # and keep the container's termination message.
                     name = job_name(TENANT, "ITEM-1", stay["dispatch"])
+                    deadlines.append(w.cluster.get("job", name)["spec"]["activeDeadlineSeconds"])
                     brief = json.loads(w.cluster.get("configmap", name)["data"][BRIEF_KEY])
                     token = w.cluster.secret_value(name, TOKEN_KEY)
                     status, text = await asyncio.to_thread(
@@ -545,8 +656,14 @@ def test_an_item_goes_from_building_to_merged_on_real_jobs_with_one_fix_round(
         assert fixing["detail"]["head"] == reported[0]["detail"]["head"]
         told = json.loads((tmp_path / "fix.json").read_text())
         assert "missing-fix-txt" in told["stdin"] and SPEC["outcome"] in told["stdin"]
-        # One Job per dispatch, one token each, and no per-job secret left when all had ended.
-        assert len(w.cluster.names("job")) == 4 and w.job_secrets() == []
+        # One Job per dispatch, one token each. Each launch removed the dispatch before it,
+        # so the last Job alone is left, and no per-job secret once all had ended.
+        assert len(w.posts("job")) == 4 and len(w.cluster.names("job")) == 1
+        assert w.job_secrets() == []
+        # Each Job's deadline is what the workflow said was left of the stay's limit: an hour
+        # to build or fix at the medium risk tier, half an hour to review.
+        for deadline, limit in zip(deadlines, (3600, 1800, 3600, 1800), strict=True):
+            assert limit - 60 <= deadline <= limit
         assert [permissions["contents"] for _, permissions in w.tokens.minted] == [
             "write",
             "read",

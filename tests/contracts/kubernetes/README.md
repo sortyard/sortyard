@@ -6,9 +6,10 @@
 
 - Source: <https://raw.githubusercontent.com/kubernetes/kubernetes/v1.31.4/api/openapi-spec/swagger.json>
 - Version: Kubernetes v1.31.4 (the version the local replica is tested with).
-- Contents: the nine operations the port uses (create, read and delete a batch/v1 Job; create
-  and delete a core/v1 ConfigMap; create, read and delete a core/v1 Secret; list core/v1 Pods)
-  with their parameters resolved, and every definition those operations reach.
+- Contents: the eleven operations the port uses (create, read, list and delete a batch/v1
+  Job; create and delete a core/v1 ConfigMap; create, read, patch and delete a core/v1 Secret;
+  list core/v1 Pods) with their parameters and the media types they consume, and every
+  definition those operations reach.
 - Changes: `description` texts are dropped. Nothing else is edited.
 
 To refresh it, download the document for the new version, set `VERSION` in `extract.py`, and
@@ -29,3 +30,7 @@ Two things the port relies on are not in that document, so the fake states them 
 
 The fake holds bodies more strictly than the published schemas do: a field a schema does not
 name is refused, so a misspelt field in a manifest fails a test.
+
+`test-ca.crt` is a self-signed certificate made for the test of the in-cluster client
+(`openssl req -x509 -newkey rsa:2048 -nodes -keyout /dev/null -days 36500`). Its key was never
+kept; it secures nothing.

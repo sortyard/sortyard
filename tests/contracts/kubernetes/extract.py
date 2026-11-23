@@ -16,12 +16,12 @@ from typing import Any
 VERSION = "v1.31.4"
 SOURCE = f"https://raw.githubusercontent.com/kubernetes/kubernetes/{VERSION}/api/openapi-spec/swagger.json"
 OPERATIONS = {
-    "/apis/batch/v1/namespaces/{namespace}/jobs": ("post",),
+    "/apis/batch/v1/namespaces/{namespace}/jobs": ("get", "post"),
     "/apis/batch/v1/namespaces/{namespace}/jobs/{name}": ("get", "delete"),
     "/api/v1/namespaces/{namespace}/configmaps": ("post",),
     "/api/v1/namespaces/{namespace}/configmaps/{name}": ("delete",),
     "/api/v1/namespaces/{namespace}/secrets": ("post",),
-    "/api/v1/namespaces/{namespace}/secrets/{name}": ("get", "delete"),
+    "/api/v1/namespaces/{namespace}/secrets/{name}": ("get", "patch", "delete"),
     "/api/v1/namespaces/{namespace}/pods": ("get",),
 }
 PREFIX = "#/definitions/"
@@ -68,6 +68,7 @@ def main(source: str) -> None:
         paths[path] = {
             method: {
                 "operationId": item[method]["operationId"],
+                "consumes": item[method].get("consumes", []),
                 "parameters": shared
                 + [parameter(raw) for raw in item[method].get("parameters", [])],
                 "responses": {
