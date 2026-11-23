@@ -209,7 +209,13 @@ five times in a row against one server, then once more after a second run of the
 | A long timer | **Pass, as a different test.** See below. |
 | A signal sent with no worker running is delivered when a worker starts | **Pass.** The same test function. |
 
-Afterwards the `default` namespace had its workflows in `temporal.executions` and in
+The slow workflow gave the same result on a GitHub-hosted runner (Python 3.11; run 45282104013
+on the branch of this item, 2026-11-23): the four tests passed before and after the second run
+of the schema Job, with 8 workflows of the `default` namespace in each database afterwards. In
+the same run the kind replica rolled the server out behind its schema Job, and the API pod
+reached it through `sortyard.engine` at `sortyard-engine:7233`.
+
+Afterwards, on the workstation, the `default` namespace had its workflows in `temporal.executions` and in
 `temporal_visibility.executions_visibility` (4 and 4 after one run of the four tests). The
 server used about 130 MiB of memory after the tests; the four tests take about 54 seconds.
 
@@ -239,10 +245,11 @@ Differences from the SORTYARD-158 run, all in the tests and none in `src/sortyar
   back unchanged after the server container was restarted (finished step kept, still waiting),
   then took its signal and finished on a new worker. The server keeps nothing outside Postgres
   in this deployment (read-only root filesystem, no volume).
-- **The cluster path.** The kind replica (`replica/replica.sh`, slow workflow job `replica`)
-  enables the engine and checks that the server rolls out behind its schema Job and answers
-  the API pod through `sortyard.engine`. The failure tests themselves run against the docker
-  form above, not inside kind. Nothing has been deployed to the estate.
+- **The cluster path stops at kind.** The kind replica (`replica/replica.sh`, slow workflow job
+  `replica`) enables the engine and checks that the server rolls out behind its schema Job and
+  answers the API pod through `sortyard.engine`. The failure tests themselves run against the
+  docker form above, not inside kind. Nothing has been deployed to the estate, and an upgrade
+  from one server version to the next has not been run.
 
 ## How to reverse
 
