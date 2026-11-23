@@ -382,16 +382,26 @@ class Engine:
     async def recorded(self, workflow_id: str) -> Recorded:
         """Where the workflow stands, read from the engine's records, not from any worker."""
         with _engine_errors(workflow_id):
-            return await self._recorded(workflow_id)
+            # The history and the pending work are two reads. Take them again until they
+            # describe the same moment, so a caller never sees one state's timers with
+            # another state's idleness.
+            # A workflow busy enough to change between every pair of reads gets the last pair.
+            for _ in range(20):
+                recorded, consistent = await self._recorded(workflow_id)
+                if consistent:
+                    break
+            return recorded
 
-    async def _recorded(self, workflow_id: str) -> Recorded:
+    async def _recorded(self, workflow_id: str) -> tuple[Recorded, bool]:
         handle = self._client.get_workflow_handle(workflow_id)
+        events = 0
         scheduled: dict[int, str] = {}
         finished: list[str] = []
         timers: dict[int, timedelta] = {}
         signals: list[str] = []
         defect: str | None = None
         async for event in handle.fetch_history_events():
+            events = event.event_id
             kind = event.event_type
             if kind == EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED:
                 attributes = event.activity_task_scheduled_event_attributes
@@ -412,9 +422,9 @@ class Engine:
                 defect = event.workflow_task_failed_event_attributes.failure.message
             elif kind == EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED:
                 defect = None
-        # Read after the history, so `idle` is never older than the steps and timers above.
         description = await handle.describe()
         raw = description.raw_description
+        consistent = raw.workflow_execution_info.history_length == events
         status = _STATUS.get(description.status or WorkflowExecutionStatus.RUNNING, "running")
         steps_running = [
             pending
@@ -426,9 +436,10 @@ class Engine:
         )
         if status != "running":
             defect = None
-        return Recorded(
+        recorded = Recorded(
             status, tuple(finished), tuple(timers.values()), tuple(signals), idle, defect
         )
+        return recorded, consistent
 
     async def run_worker(self, registry: Registry, *, concurrent_steps: int = 32) -> None:
         """Serve `registry` on this engine's task queue until cancelled.
