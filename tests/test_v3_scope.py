@@ -23,17 +23,24 @@ POINTING = (ROOT / "README.md", ROOT / "AGENTS.md", REQUIREMENTS / "delivery-pla
 # "At their top": before the first second-level heading, within the opening lines.
 TOP_LINES = 12
 SY_DEC_005_LINK = re.compile(r"\[SY-DEC-005\]\((?:\.\./)*DECISIONS\.md#sy-dec-005\)")
-# A sentence that makes Appwrite the default or preferred store, unless it says that this no
-# longer holds. Mentions of Appwrite as history, or for product auth, are allowed.
-APPWRITE_AS_DEFAULT = re.compile(
-    r"appwrite[^.\n]*\b(?:is|are|as|remains?)\s+the\s+(?:default|preferred)"
-    r"|(?:default|preferred)[^.\n]*\bappwrite"
-    r"|selects\s+appwrite",
+# A paragraph that makes Appwrite the core's store, substrate or default, unless the paragraph
+# says of Appwrite itself that this no longer holds. Appwrite for product auth is allowed.
+APPWRITE = re.compile(r"appwrite", re.IGNORECASE)
+AS_THE_STORE = re.compile(
+    r"default|preferred|persist|substrate|\bstores?\b|database|backend|selects", re.IGNORECASE
+)
+NO_LONGER = re.compile(
+    r"(?:SY-DEC-004|appwrite)[^.]*\b"
+    r"(?:no longer appl|is not part of|was the default|were the default)",
     re.IGNORECASE,
 )
-SUPERSEDED = re.compile(
-    r"no longer appl|superseded|were the default|was the default", re.IGNORECASE
+# Wording that presents the requirements baseline or its delivery plan as what to build next.
+PLAN_AS_CURRENT = re.compile(
+    r"current (?:build order|delivery sequence|planning authority|requirements authority"
+    r"|dependency order)|build order: follow",
+    re.IGNORECASE,
 )
+NOT_CURRENT = re.compile(r"\bnot\b[^.]*current|is reference|as reference", re.IGNORECASE)
 
 
 def top(path: pathlib.Path) -> str:
@@ -55,10 +62,22 @@ def amendment() -> str:
     return " ".join(part.group(0).split())
 
 
+def paragraphs(text: str) -> list[str]:
+    return [" ".join(p.split()) for p in re.split(r"\n\s*\n", text)]
+
+
 def names_appwrite_as_default(text: str) -> list[str]:
-    """Paragraphs that name Appwrite as the default without saying it no longer applies."""
-    paragraphs = [" ".join(p.split()) for p in re.split(r"\n\s*\n", text)]
-    return [p for p in paragraphs if APPWRITE_AS_DEFAULT.search(p) and not SUPERSEDED.search(p)]
+    """Paragraphs that name Appwrite as the core's store without saying it no longer applies."""
+    return [
+        p
+        for p in paragraphs(text)
+        if APPWRITE.search(p) and AS_THE_STORE.search(p) and not NO_LONGER.search(p)
+    ]
+
+
+def presents_plan_as_current(text: str) -> list[str]:
+    """Paragraphs that present the baseline or its delivery plan as the current build order."""
+    return [p for p in paragraphs(text) if PLAN_AS_CURRENT.search(p) and not NOT_CURRENT.search(p)]
 
 
 def test_decisions_holds_sy_dec_005_with_kernel_scope_postgres_only_and_engine_module() -> None:
@@ -82,10 +101,13 @@ def test_readme_agents_and_delivery_plan_point_at_sy_dec_005_and_none_names_appw
 ):
     """README.md, AGENTS.md and the delivery plan point at SY-DEC-005 and none names Appwrite as
     the core default."""
+    # The links land somewhere: the record carries the anchor they name.
+    assert '<a id="sy-dec-005"></a>' in (ROOT / "DECISIONS.md").read_text()
     for path in POINTING:
         assert SY_DEC_005_LINK.search(top(path)), f"{path.name} does not link SY-DEC-005 at its top"
     for path in (ROOT / "README.md", ROOT / "AGENTS.md"):
         assert names_appwrite_as_default(path.read_text()) == [], path.name
+        assert presents_plan_as_current(path.read_text()) == [], path.name
     # The delivery plan stays as reference (its body is unchanged), so its top must carry the
     # deferral note: it is not presented as the current build order.
     plan_top = " ".join(top(REQUIREMENTS / "delivery-plan.md").split())
@@ -94,19 +116,33 @@ def test_readme_agents_and_delivery_plan_point_at_sy_dec_005_and_none_names_appw
     assert "(reference)" in (REQUIREMENTS / "catalog.md").read_text().splitlines()[0]
 
 
-def test_the_appwrite_default_guard_catches_the_superseded_wording() -> None:
-    """The guard above can fail: it catches the wording this change removed, and lets through
-    history and product auth."""
-    old_agents = (
+def test_the_guards_catch_the_superseded_wording_and_allow_history_and_product_auth() -> None:
+    """The guards above can fail: they catch the wording this change removed and its close
+    variants, and let through history and product auth."""
+    for superseded in (
         "[SY-DEC-004](docs/decisions/appwrite-substrate.md) selects Appwrite as the preferred "
-        "future persistence/auth substrate."
-    )
-    old_baseline = "Appwrite persistence, Auth and Teams are the default per SY-DEC-004."
-    assert names_appwrite_as_default(old_agents)
-    assert names_appwrite_as_default(old_baseline)
-    assert not names_appwrite_as_default("Products may still use Appwrite for their auth.")
-    assert not names_appwrite_as_default(
-        "SY-DEC-004 (Appwrite) no longer applies to it; Appwrite was the default until then."
+        "future persistence/auth substrate.",
+        "Appwrite persistence, Auth and Teams are the default per SY-DEC-004.",
+        "The core persists to Appwrite by default.",
+        "Appwrite is our default store for the core.",
+        "Appwrite is the default store for the core; the Postgres plan is superseded.",
+    ):
+        assert names_appwrite_as_default(superseded), superseded
+    for allowed in (
+        "Products may still use Appwrite for their auth.",
+        "The core stores to Postgres only; SY-DEC-004 (Appwrite) no longer applies to it.",
+        "Appwrite is not part of the core, which stores to Postgres.",
+    ):
+        assert not names_appwrite_as_default(allowed), allowed
+    for superseded in (
+        "The current planning authority is the ecosystem requirements baseline.",
+        "See the ecosystem requirements baseline for the current delivery sequence.",
+        "See the delivery plan for the current build order; build MS1 next.",
+        "Build order: follow the delivery plan, MS1 first.",
+    ):
+        assert presents_plan_as_current(superseded), superseded
+    assert not presents_plan_as_current(
+        "The delivery plan is kept as reference; it is not the current build order."
     )
 
 

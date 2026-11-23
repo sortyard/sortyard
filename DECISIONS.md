@@ -44,9 +44,12 @@ provenance; where they conflict, the amendment wins.
 
 - **Owner direction:** owner, 2026-11-23, on company/HARNESS-V3.md
   ([section 3.7 and the Decisions section](https://github.com/noncelogic/meta-harness/blob/main/company/HARNESS-V3.md)):
-  "agree with all with caveats; the pilot runs to its verdict in half the proposed time;
-  Appwrite is not needed for the harness", and on Appwrite: "just a core foundation tech i had
-  in mind to speed up saas development, not sure we needed appwrite for our harness".
+  "agree with all with caveats". That document's decision table applies the answer: Sortyard
+  is re-scoped to the kernel plus the tracker view, and Appwrite is not part of the core. The
+  owner's words on Appwrite, verbatim: "AppWrite was just a core foundation tech i had in mind
+  to "speed up" saas development, it already handles auth, the idea was to minimize our decision
+  space for common things any saas product needed. Not sure we needed appwrite for our harness,
+  maybe it was just convenient at the time".
 - **Decision:** this amendment supersedes the November 15 scope of SY-DEC-005. Sortyard is the
   workflow kernel plus the tracker view described in company/HARNESS-V3.md. The ecosystem
   control surface (the composed control plane over partner services below) is deferred.
@@ -56,8 +59,8 @@ provenance; where they conflict, the amendment wins.
   one; the rest of the code reaches it only through that module.
 - **Delivery:** delivery-plan increments MS1, MS2 and MS6 are deferred until the kernel runs one
   lane. The [delivery plan](docs/requirements/delivery-plan.md) and the
-  [requirement catalog](docs/requirements/catalog.md) stay in the repository, unchanged in
-  content, as reference; they are not the current build order.
+  [requirement catalog](docs/requirements/catalog.md) stay in the repository as reference,
+  with no requirement or plan row changed; they are not the current build order.
 - **Options considered:** keep the November 15 ecosystem scope with Appwrite (the superseded
   plan: execution only at MS3, after the resource kernel and connected project control);
   hand-write the workflow engine (owns durability and replay bugs the kernel does not need to

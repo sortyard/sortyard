@@ -3,7 +3,7 @@
 > **Reference, not the current build order.** [SY-DEC-005](../../DECISIONS.md#sy-dec-005)
 > (2026-11-23 amendment) makes Sortyard the workflow kernel plus the tracker view, stored to
 > Postgres only, and defers increments MS1, MS2 and MS6 until the kernel runs one lane. This
-> baseline, its catalog and its plan stay unchanged in content as requirement reference.
+> baseline, its catalog and its plan stay as requirement reference; no requirement or plan row changed.
 
 Status: approved. The [operating-process extension review](evidence/operating-process-review.md)
 and [prior baseline review](evidence/technical-review.md) are preserved. It was the consolidated planning baseline until SY-DEC-005's amendment. It replaced
