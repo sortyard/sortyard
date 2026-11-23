@@ -1,0 +1,123 @@
+# The work item state table (company/HARNESS-V3.md section 3.1, SY-V3-STATE-TABLE).
+#
+# This file is the item state machine. One generic workflow (sortyard.kernel.item) interprets
+# it; adding or changing a state is a change here and nowhere else. The loader
+# (sortyard.kernel.states) refuses the file unless every state that an item can wait in names:
+#
+#   owner    the service that moves an item out of the state
+#   limit    how long the item may stay; started as a durable timer when the item enters
+#   default  what happens when the limit passes
+#   reason   why an item is in the state, as a key of [reasons]
+#
+# There is no "blocked" state and no state without an exit: the loader refuses both.
+#
+# limit is one of
+#   "30m", "2h", "7d"            a duration
+#   { by = "risk-tier", low = "..", medium = "..", high = ".." }
+#                                a duration by the item's risk tier
+#   { by = "need", otherwise = ".." }
+#                                the named need the item waits on sets it; otherwise applies
+#                                when the need sets none
+#   "repeat-finding"             by progress, not time: the limit passes when the item enters the
+#                                state with a finding it has entered it with since its last
+#                                decision
+#   "same-pass"                  decision only: the answer is given in the pass that asks
+#   "none"                       queue only: no limit, the item's age is reported instead
+#
+# default is one of
+#   { to = "state" }                     move the item there
+#   { retry = 1, then = "state" }        dispatch the owner again that many times, then move
+#   { redispatch = true }                dispatch the owner again, with a fresh limit
+#   { answer = "..", reverse = ".." }    decision only: the answer when neither policy nor the
+#                                        item gives one, and how to reverse it
+#   "none"                               queue only
+# and may carry action = "..", a word handed to the owner that is dispatched next.
+#
+# Where the numbers come from. checking 10m, reviewing 30m and merging 30m are the limits of
+# HARNESS-V3 section 3.1. That section gives preflight as "minutes" and building as "by risk
+# tier" without numbers, and waiting as "set by the need": the preflight and building durations
+# and the waiting "otherwise" below are provisional and carry no owner decision.
+
+version = 1
+
+[reasons]
+queued = "Admitted with a complete spec and its links done; waiting for a lane slot."
+checking-capabilities = "The lane's declared needs are being exercised before any build is dispatched."
+build-in-progress = "An executor is building the change."
+checks-running = "The change's checks are running."
+review-in-progress = "A reviewer that did not write the change is reading it."
+fix-in-progress = "An executor is fixing a finding or a failing check."
+merge-in-progress = "The merge adapter is landing the change."
+waiting-on-need = "The item waits on a named need that has its own owner and limit."
+decision-required = "A limit passed or an owner could not proceed; the decision service answers."
+done = "The change is merged. Terminal for the item; the release workflow owns what follows."
+
+[states.admitted]
+initial = true
+queue = true
+owner = "scheduler"
+limit = "none"
+default = "none"
+reason = "queued"
+next = { dispatched = "preflight" }
+
+[states.preflight]
+owner = "capability-checker"
+limit = "5m"
+default = { to = "waiting", action = "open-capability-gap" }
+reason = "checking-capabilities"
+next = { ready = "building", gap = "waiting" }
+
+[states.building]
+owner = "executor"
+limit = { by = "risk-tier", low = "30m", medium = "1h", high = "2h" }
+default = { retry = 1, then = "decision" }
+reason = "build-in-progress"
+next = { built = "checking", no-change = "decision" }
+
+[states.checking]
+owner = "ci-adapter"
+limit = "10m"
+default = { retry = 1, then = "decision", action = "rerun-checks" }
+reason = "checks-running"
+next = { green = "reviewing", red = "fixing" }
+
+[states.reviewing]
+owner = "reviewer"
+limit = "30m"
+default = { redispatch = true }
+reason = "review-in-progress"
+next = { approved = "merging", findings = "fixing" }
+
+[states.fixing]
+owner = "executor"
+limit = "repeat-finding"
+default = { to = "decision", action = "narrow-or-split" }
+reason = "fix-in-progress"
+next = { fixed = "checking" }
+
+[states.merging]
+owner = "merge-adapter"
+limit = "30m"
+default = { redispatch = true, action = "update-branch" }
+reason = "merge-in-progress"
+next = { merged = "merged", conflict = "fixing" }
+
+[states.waiting]
+owner = "need"
+limit = { by = "need", otherwise = "24h" }
+default = { to = "decision" }
+reason = "waiting-on-need"
+next = { closed = "preflight" }
+
+[states.decision]
+decision = true
+owner = "decision-service"
+limit = "same-pass"
+default = { answer = "resume", reverse = "Send the item a decision request with a different answer." }
+reason = "decision-required"
+next = { resume = "@origin", rebuild = "building", wait = "waiting" }
+
+[states.merged]
+terminal = true
+reason = "done"
