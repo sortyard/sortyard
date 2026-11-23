@@ -42,7 +42,7 @@ sortyard-integrator = "sortyard.services.integrator:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-sortyard = ["py.typed", "models/schemas.json", "kernel/item_states.toml"]
+sortyard = ["py.typed", "models/schemas.json", "kernel/item_states.toml", "kernel/lane_example.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
