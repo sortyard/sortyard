@@ -29,8 +29,8 @@ from importlib.metadata import version
 from typing import Any, Protocol
 
 from temporalio import activity, workflow
-from temporalio.api.enums.v1 import EventType, PendingActivityState
-from temporalio.client import Client, WorkflowExecutionStatus, WorkflowFailureError
+from temporalio.api.enums.v1 import EventType
+from temporalio.client import Client, WorkflowFailureError
 from temporalio.common import RawValue, RetryPolicy, WorkflowIDReusePolicy
 from temporalio.exceptions import ActivityError, ApplicationError, WorkflowAlreadyStartedError
 from temporalio.service import RPCError, RPCStatusCode
@@ -317,14 +317,12 @@ def _engine_errors(workflow_id: str) -> Iterator[None]:
         raise EngineUnavailable(f"{error.status.name}: {error.message}") from error
 
 
-_STATUS = {
-    WorkflowExecutionStatus.RUNNING: "running",
-    WorkflowExecutionStatus.COMPLETED: "completed",
-    WorkflowExecutionStatus.FAILED: "failed",
-    WorkflowExecutionStatus.CANCELED: "cancelled",
-    WorkflowExecutionStatus.TERMINATED: "terminated",
-    WorkflowExecutionStatus.TIMED_OUT: "timed_out",
-    WorkflowExecutionStatus.CONTINUED_AS_NEW: "running",
+_ENDED = {
+    EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED: "completed",
+    EventType.EVENT_TYPE_WORKFLOW_EXECUTION_FAILED: "failed",
+    EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED: "cancelled",
+    EventType.EVENT_TYPE_WORKFLOW_EXECUTION_TERMINATED: "terminated",
+    EventType.EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT: "timed_out",
 }
 
 
@@ -380,35 +378,52 @@ class Engine:
             raise WorkflowFailed(f"workflow {workflow_id!r}: {error.cause}") from error
 
     async def recorded(self, workflow_id: str) -> Recorded:
-        """Where the workflow stands, read from the engine's records, not from any worker."""
-        with _engine_errors(workflow_id):
-            # The history and the pending work are two reads. Take them again until they
-            # describe the same moment, so a caller never sees one state's timers with
-            # another state's idleness.
-            # A workflow busy enough to change between every pair of reads gets the last pair.
-            for _ in range(20):
-                recorded, consistent = await self._recorded(workflow_id)
-                if consistent:
-                    break
-            return recorded
+        """Where the workflow stands, read from the engine's history, not from any worker.
 
-    async def _recorded(self, workflow_id: str) -> tuple[Recorded, bool]:
-        handle = self._client.get_workflow_handle(workflow_id)
-        events = 0
-        scheduled: dict[int, str] = {}
+        Everything returned comes from one read of the history, so it describes one moment.
+        """
+        with _engine_errors(workflow_id):
+            return await self._recorded(workflow_id)
+
+    async def _recorded(self, workflow_id: str) -> Recorded:
+        status = "running"
+        steps_open: dict[int, str] = {}
+        abandoned: set[int] = set()
         finished: list[str] = []
         timers: dict[int, timedelta] = {}
         signals: list[str] = []
+        pass_due = False  # a pass of the workflow function is scheduled or under way
         defect: str | None = None
+        handle = self._client.get_workflow_handle(workflow_id)
         async for event in handle.fetch_history_events():
-            events = event.event_id
             kind = event.event_type
-            if kind == EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED:
+            if kind in _ENDED:
+                status = _ENDED[kind]
+            elif kind == EventType.EVENT_TYPE_WORKFLOW_TASK_SCHEDULED:
+                pass_due = True
+            elif kind == EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED:
+                pass_due, defect = False, None
+            elif kind == EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED:
+                # The engine retries a failed pass without writing the retries down.
+                pass_due = True
+                defect = event.workflow_task_failed_event_attributes.failure.message
+            elif kind == EventType.EVENT_TYPE_WORKFLOW_TASK_TIMED_OUT:
+                pass_due = True
+            elif kind == EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED:
                 attributes = event.activity_task_scheduled_event_attributes
-                scheduled[event.event_id] = attributes.activity_type.name
+                steps_open[event.event_id] = attributes.activity_type.name
             elif kind == EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED:
-                done = event.activity_task_completed_event_attributes
-                finished.append(scheduled[done.scheduled_event_id])
+                done = event.activity_task_completed_event_attributes.scheduled_event_id
+                finished.append(steps_open.pop(done))
+            elif kind == EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED:
+                steps_open.pop(event.activity_task_failed_event_attributes.scheduled_event_id)
+            elif kind == EventType.EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT:
+                steps_open.pop(event.activity_task_timed_out_event_attributes.scheduled_event_id)
+            elif kind == EventType.EVENT_TYPE_ACTIVITY_TASK_CANCELED:
+                steps_open.pop(event.activity_task_canceled_event_attributes.scheduled_event_id)
+            elif kind == EventType.EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED:
+                requested = event.activity_task_cancel_requested_event_attributes
+                abandoned.add(requested.scheduled_event_id)
             elif kind == EventType.EVENT_TYPE_TIMER_STARTED:
                 started = event.timer_started_event_attributes
                 timers[event.event_id] = started.start_to_fire_timeout.ToTimedelta()
@@ -418,28 +433,16 @@ class Engine:
                 timers.pop(event.timer_canceled_event_attributes.started_event_id, None)
             elif kind == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED:
                 signals.append(event.workflow_execution_signaled_event_attributes.signal_name)
-            elif kind == EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED:
-                defect = event.workflow_task_failed_event_attributes.failure.message
-            elif kind == EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED:
-                defect = None
-        description = await handle.describe()
-        raw = description.raw_description
-        consistent = raw.workflow_execution_info.history_length == events
-        status = _STATUS.get(description.status or WorkflowExecutionStatus.RUNNING, "running")
-        steps_running = [
-            pending
-            for pending in raw.pending_activities
-            if pending.state != PendingActivityState.PENDING_ACTIVITY_STATE_CANCEL_REQUESTED
-        ]
-        idle = (
-            status == "running" and not raw.HasField("pending_workflow_task") and not steps_running
+        running = status == "running"
+        idle = running and not pass_due and not (set(steps_open) - abandoned)
+        return Recorded(
+            status,
+            tuple(finished),
+            tuple(timers.values()) if running else (),
+            tuple(signals),
+            idle,
+            defect if running else None,
         )
-        if status != "running":
-            defect = None
-        recorded = Recorded(
-            status, tuple(finished), tuple(timers.values()), tuple(signals), idle, defect
-        )
-        return recorded, consistent
 
     async def run_worker(self, registry: Registry, *, concurrent_steps: int = 32) -> None:
         """Serve `registry` on this engine's task queue until cancelled.
