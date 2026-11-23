@@ -173,6 +173,8 @@ def target(op_id: str, role: str = "admin") -> tuple[str, Any]:
         "stage_run_id": "sr-1",
         "integrator_id": "integrator-default",
         "role_binding_id": "rb-sensor",
+        "project_id": "proj-a",
+        "item_id": "item-1",
     }
     for name, value in ids.items():
         path = path.replace("{" + name + "}", value)
@@ -184,6 +186,7 @@ def target(op_id: str, role: str = "admin") -> tuple[str, Any]:
 
 
 BODIES: dict[str, Any] = {
+    "requestItemChange": {"answer": "resume", "reason": "the contract test asks"},
     "createTask": task("task-new", origin="sensor", state="backlog"),
     "updateTask": {"title": "Renamed"},
     "claimTask": {"lane_id": "lane-a", "execution_binding_id": "eb-1"},
@@ -284,6 +287,9 @@ def test_unauthenticated_calls_are_refused(api: Api, op_id: str) -> None:
 # A successful call of every routed operation, in an order the state machines accept; each
 # response is checked against the spec. Roles are the matrix's; ``expect`` is the success code.
 SCENARIO: list[tuple[str, str, int]] = [
+    ("getProjectQueue", "grooming-agent", 200),
+    ("getItemTimeline", "viewer", 200),
+    ("requestItemChange", "operator", 202),
     ("listTasks", "viewer", 200),
     ("getTask", "conductor", 200),
     ("createTask", "sensor", 201),

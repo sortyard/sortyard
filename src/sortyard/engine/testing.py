@@ -64,8 +64,11 @@ class TestClock:
 
 @dataclass(frozen=True)
 class TimeSkippingEngine:
+    """A running test server. `target` is what a connection from elsewhere needs."""
+
     engine: Engine
     clock: TestClock
+    target: str
 
 
 @asynccontextmanager
@@ -75,4 +78,7 @@ async def time_skipping_engine(
     async with await WorkflowEnvironment.start_time_skipping(
         test_server_download_version=TEST_SERVER_VERSION
     ) as environment:
-        yield TimeSkippingEngine(Engine(environment.client, task_queue), TestClock(environment))
+        target = environment.client.service_client.config.target_host
+        yield TimeSkippingEngine(
+            Engine(environment.client, task_queue), TestClock(environment), target
+        )

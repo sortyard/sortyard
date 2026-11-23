@@ -24,6 +24,9 @@ import psycopg.conninfo
 from psycopg.types.json import Jsonb
 
 from sortyard.api import auth
+from sortyard.engine import WorkflowNotFound
+from sortyard.kernel.item import INPUT_SIGNAL, workflow_id
+from sortyard.kernel.ledger import Ledger
 from sortyard.services import api
 from tests.pg import fresh_database
 
@@ -287,6 +290,28 @@ class Response:
     headers: dict[str, str] = field(default_factory=dict)
 
 
+ITEM = "item-1"
+
+
+class FakeSignals:
+    """The workflow engine's signal call, as the API service uses it: a strict fake.
+
+    It accepts what the real engine accepts from this service and nothing else: the item input
+    signal, for a workflow that exists. An unknown workflow raises `WorkflowNotFound`, as
+    `Engine.signal` does (tests/test_engine_failure.py holds the real engine to that).
+    """
+
+    def __init__(self, running: set[str]) -> None:
+        self.running = running
+        self.sent: list[tuple[str, Any]] = []
+
+    def __call__(self, workflow: str, name: str, payload: Any) -> None:
+        assert name == INPUT_SIGNAL, f"the API service sends only {INPUT_SIGNAL}, not {name}"
+        if workflow not in self.running:
+            raise WorkflowNotFound(workflow)
+        self.sent.append((workflow, payload))
+
+
 @dataclass
 class Api:
     base: str
@@ -345,7 +370,12 @@ class Api:
         )
 
 
-def running_api() -> Iterator[Api]:
+def running_api(signal_item: Any = None) -> Iterator[Api]:
+    """A migrated, seeded database and the API service on it.
+
+    `signal_item` is how the service reaches the workflow engine. By default it is a
+    `FakeSignals` that knows one running workflow, the seeded item's.
+    """
     for database in fresh_database():
         proc = database.migrate()
         assert proc.returncode == 0, proc.stderr
@@ -357,8 +387,12 @@ def running_api() -> Iterator[Api]:
                 role: auth.issue_operator_token(conn, rb["id"]).token
                 for role, rb in OPERATOR_BINDINGS.items()
             }
+        connect = functools.partial(psycopg.connect, conninfo)
+        # One kernel item, not yet started, for the tracker view's operations.
+        Ledger(connect).create_item(tenant=WS, item=ITEM, project="proj-a", title="An item")
+        signals = signal_item or FakeSignals({workflow_id(WS, ITEM)})
         config = api.Config(host="127.0.0.1", port=0, database_name=database.name)
-        server = api.make_server(config, connect=functools.partial(psycopg.connect, conninfo))
+        server = api.make_server(config, connect=connect, signal_item=signals)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         handle = Api(f"http://127.0.0.1:{server.server_address[1]}", conninfo, tokens)
         try:

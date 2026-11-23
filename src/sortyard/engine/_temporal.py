@@ -356,8 +356,13 @@ class Engine:
     async def connect(
         cls, target: str, *, namespace: str = "default", task_queue: str = DEFAULT_TASK_QUEUE
     ) -> Engine:
-        """Connect to the engine service at `target` (host:port)."""
-        return cls(await Client.connect(target, namespace=namespace), task_queue)
+        """Connect to the engine service at `target` (host:port); `EngineUnavailable` if it
+        cannot be reached."""
+        try:
+            client = await Client.connect(target, namespace=namespace)
+        except (RuntimeError, OSError) as error:
+            raise EngineUnavailable(f"cannot connect to the engine at {target}: {error}") from error
+        return cls(client, task_queue)
 
     async def start(self, workflow_name: str, workflow_id: str, arg: Any = None) -> None:
         """Start the workflow registered as `workflow_name` under `workflow_id`.

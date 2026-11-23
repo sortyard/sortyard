@@ -38,6 +38,10 @@
 #   "none"                               queue only
 # and may carry action = "..", a word handed to the owner that is dispatched next.
 #
+# A state may also name lifecycle = "..": the harness.lifecycle.v1 kind recorded when an item
+# enters it. Only a state that means a merged change says "merged"; a terminal state added later
+# for a cancelled item would not.
+#
 # Where the numbers come from. checking 10m, reviewing 30m and merging 30m are the limits of
 # HARNESS-V3 section 3.1. That section gives preflight as "minutes" and building as "by risk
 # tier" without numbers, waiting as "set by the need" and fixing as "by progress" alone: the
@@ -128,3 +132,4 @@ next = { resume = "@origin", rebuild = "building", wait = "waiting" }
 [states.merged]
 terminal = true
 reason = "done"
+lifecycle = "merged"

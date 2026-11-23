@@ -53,6 +53,21 @@ def _op(
 
 
 _OPERATIONS = [
+    # Work: the kernel's tracker view (HARNESS-V3 §3.2). Two reads of the projection and one
+    # request; nothing here writes item state.
+    _op(
+        "getProjectQueue",
+        "GET",
+        "/projects/{project_id}/queue",
+        "admin operator viewer conductor grooming-agent",
+    ),
+    _op(
+        "getItemTimeline",
+        "GET",
+        "/items/{item_id}/timeline",
+        "admin operator viewer conductor grooming-agent",
+    ),
+    _op("requestItemChange", "POST", "/items/{item_id}/requests", "admin operator"),
     # Work: tasks (§3.3)
     _op("listTasks", "GET", "/tasks", "admin operator viewer conductor grooming-agent"),
     _op("createTask", "POST", "/tasks", "admin operator sensor grooming-agent", "task.create"),

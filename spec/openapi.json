@@ -15504,6 +15504,393 @@
         ],
         "x-sortyard-capability": "token.issue"
       }
+    },
+    "/v1/workspaces/{workspace_id}/projects/{project_id}/queue": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/workspace_id"
+        },
+        {
+          "name": "project_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "common.schema.json#/$defs/id"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getProjectQueue",
+        "summary": "A project's items that are not done, in link order",
+        "tags": [
+          "Work"
+        ],
+        "description": "The tracker view of the workflow kernel (HARNESS-V3 section 3.2): a read of the projection the item workflow writes. An item comes after every item it is blocked by; items no link orders keep their creation order. Each item carries its state, owner, limit, reason and age. A project with no items, or one that does not exist, has an empty queue.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "id",
+                          "title",
+                          "milestone_id",
+                          "risk_tier",
+                          "state",
+                          "owner",
+                          "limit",
+                          "reason",
+                          "entered_at",
+                          "age_seconds",
+                          "blocked_by"
+                        ],
+                        "properties": {
+                          "id": {
+                            "$ref": "common.schema.json#/$defs/id"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "milestone_id": {
+                            "description": "A grouping and a preferred shipping order; it never orders the queue.",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "risk_tier": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "description": "The state the item's workflow last recorded; null before its first transition.",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "owner": {
+                            "description": "The service that owns the item in this state.",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "limit": {
+                            "description": "The state's limit, in words.",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "reason": {
+                            "description": "The state's typed reason.",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "entered_at": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "format": "date-time"
+                          },
+                          "age_seconds": {
+                            "description": "Seconds since the item entered its state (since it was created, for an item not started).",
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "blocked_by": {
+                            "description": "Items of this queue the item is linked as blocked by.",
+                            "type": "array",
+                            "items": {
+                              "$ref": "common.schema.json#/$defs/id"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "security": [
+          {
+            "operatorSession": [
+              "admin"
+            ]
+          },
+          {
+            "operatorSession": [
+              "operator"
+            ]
+          },
+          {
+            "operatorSession": [
+              "viewer"
+            ]
+          },
+          {
+            "serviceAccountToken": [
+              "conductor"
+            ]
+          },
+          {
+            "serviceAccountToken": [
+              "grooming-agent"
+            ]
+          }
+        ],
+        "x-sortyard-roles": [
+          "admin",
+          "operator",
+          "viewer",
+          "conductor",
+          "grooming-agent"
+        ],
+        "x-sortyard-mcp-tool": "get_project_queue"
+      }
+    },
+    "/v1/workspaces/{workspace_id}/items/{item_id}/timeline": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/workspace_id"
+        },
+        {
+          "name": "item_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "common.schema.json#/$defs/id"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getItemTimeline",
+        "summary": "One item's transitions, in ledger order",
+        "tags": [
+          "Work"
+        ],
+        "description": "Every transition of the item's workflow as a ledger Event: the state left, the state entered, the owner, the limit and the typed reason. `facts.lifecycle.kind` is the harness.lifecycle.v1 kind of the transition, or null where that format has none.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "event.schema.json"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "security": [
+          {
+            "operatorSession": [
+              "admin"
+            ]
+          },
+          {
+            "operatorSession": [
+              "operator"
+            ]
+          },
+          {
+            "operatorSession": [
+              "viewer"
+            ]
+          },
+          {
+            "serviceAccountToken": [
+              "conductor"
+            ]
+          },
+          {
+            "serviceAccountToken": [
+              "grooming-agent"
+            ]
+          }
+        ],
+        "x-sortyard-roles": [
+          "admin",
+          "operator",
+          "viewer",
+          "conductor",
+          "grooming-agent"
+        ],
+        "x-sortyard-mcp-tool": "get_item_timeline"
+      }
+    },
+    "/v1/workspaces/{workspace_id}/items/{item_id}/requests": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/workspace_id"
+        },
+        {
+          "name": "item_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "common.schema.json#/$defs/id"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "requestItemChange",
+        "summary": "Ask an item's workflow for a change",
+        "tags": [
+          "Work"
+        ],
+        "description": "Nothing writes an item's state but its workflow. This sends the workflow a request, as a signal; the workflow puts it to the decision service, and the request, the answer and its source appear on the item's timeline. Accepted means the engine has the signal, not that the answer was the one asked for: an answer the item's decision state does not have is not granted, and a request that arrives as the item finishes is not acted on. The request is written to the audit log.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "answer",
+                  "reason"
+                ],
+                "properties": {
+                  "answer": {
+                    "x-sortyard-api-defined": true,
+                    "description": "The decision asked for. It is granted only if it is one of the answers of the decision state of the item's state table.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "reason": {
+                    "x-sortyard-api-defined": true,
+                    "description": "Why the change is asked for.",
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted: the request was delivered to the item's workflow.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "item_id",
+                    "answer",
+                    "reason"
+                  ],
+                  "properties": {
+                    "id": {
+                      "$ref": "common.schema.json#/$defs/id"
+                    },
+                    "item_id": {
+                      "$ref": "common.schema.json#/$defs/id"
+                    },
+                    "answer": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "503": {
+            "description": "The service runs without a workflow engine, or the engine did not answer.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "operatorSession": [
+              "admin"
+            ]
+          },
+          {
+            "operatorSession": [
+              "operator"
+            ]
+          }
+        ],
+        "x-sortyard-roles": [
+          "admin",
+          "operator"
+        ]
+      }
     }
   },
   "components": {

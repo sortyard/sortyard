@@ -152,6 +152,12 @@ Extension Registry (a location, carried as `registry` on Extension), and Observa
 A request-body field that is not a §3 schema property is marked `x-sortyard-api-defined: true`
 in `openapi.json` and explained here (held by `spec/test_openapi.py`).
 
+- `answer` (`requestItemChange`): the decision a person asks an item's workflow for. It is
+  one of the answers of the kernel state table's decision state (`resume`, `rebuild`, `wait` in
+  the shipped table), not a field of a §3 object: items are the workflow kernel's projection
+  (HARNESS-V3 section 3.2) and have no §3 schema.
+- `reason` (`requestItemChange`): why the change is asked for. It is recorded with the request
+  on the item's timeline.
 - `agent_role` (`issueServiceAccountToken`): the §7 agent role (`conductor`, `build-worker`,
   `sensor`, `grooming-agent`) the issued service-account token carries. It is a property of the
   token, not of a §3 object: the RoleBinding's `role` names human roles only, and agent roles

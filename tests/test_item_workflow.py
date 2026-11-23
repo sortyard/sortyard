@@ -19,7 +19,13 @@ import pytest
 
 from sortyard.engine import Engine, Recorded, Registry
 from sortyard.engine.testing import TestClock, time_skipping_engine
-from sortyard.kernel.item import INPUT_SIGNAL, register, send_outcome, start_item
+from sortyard.kernel.item import (
+    INPUT_SIGNAL,
+    register,
+    send_outcome,
+    send_request,
+    start_item,
+)
 from sortyard.kernel.states import StateTable, load, shipped, shipped_text
 
 DEADLINE = 60.0
@@ -408,6 +414,101 @@ def test_an_outcome_delivered_twice_is_not_applied_to_the_next_stay() -> None:
 
     assert asyncio.run(scenario())["state"] == "merged"
     assert fakes.states().count("fixing") == 1 and fakes.questions == []
+
+
+def test_a_request_goes_to_the_decision_and_the_stay_it_interrupted_carries_on() -> None:
+    fakes = Fakes(script={"building": [SILENT]})
+    by = {"kind": "operator", "id": "op-1"}
+    # The decision service grants the first request and has no answer for the second (the
+    # table's default, resume, applies). Both leave the item where it was.
+    fakes.decisions = [{"answer": "resume", "reverse": "Ask again."}, None]
+
+    async def ask(k: Kernel, identifier: str, request_id: str) -> None:
+        await send_request(
+            k.engine,
+            identifier,
+            request_id=request_id,
+            answer="resume",
+            reason="look again",
+            by=by,
+        )
+
+    async def scenario() -> Any:
+        async with kernel(fakes) as k:
+            identifier = await k.start()
+            await k.idle_in(identifier, "building")
+            # Two requests, one of them delivered twice, then the build's own report: all
+            # before the workflow has dealt with the first.
+            await ask(k, identifier, "req-1")
+            await ask(k, identifier, "req-1")
+            await ask(k, identifier, "req-2")
+            await send_outcome(k.engine, identifier, state="building", outcome="built", dispatch=3)
+            # A request the workflow cannot read is passed over like any other stray input.
+            await k.engine.signal(identifier, INPUT_SIGNAL, {"kind": "request", "request": 7})
+            return await k.result(identifier)
+
+    assert asyncio.run(scenario())["state"] == "merged"
+    # Each request was put to the decision once, with the state it interrupted.
+    assert [(q["cause"], q["state"], q["request"]["id"]) for q in fakes.questions] == [
+        ("request", "building", "req-1"),
+        ("request", "building", "req-2"),
+    ]
+    asked = [event for event in fakes.events if event["cause"] == "request"]
+    assert [(e["from_state"], e["state"], e["request"]["by"]) for e in asked] == [
+        ("building", "decision", by),
+        ("building", "decision", by),
+    ]
+    answers = [e["decision"] for e in fakes.events if e["cause"] == "decision"]
+    assert [(d["answer"], d["source"]) for d in answers] == [
+        ("resume", "policy"),
+        ("resume", "table"),
+    ]
+    # The stay carried on: the executor was dispatched once, the stay kept its dispatch number
+    # and its deadline, and the build's report that arrived in between was not lost.
+    assert len(fakes.calls_for("building")) == 1
+    stays = [event for event in fakes.events if event["state"] == "building"]
+    assert [(e["resumed"], e["dispatch"], e["attempt"]) for e in stays] == [
+        (False, 3, 1),
+        (True, 3, 1),
+        (True, 3, 1),
+    ]
+    assert len({event["deadline"] for event in stays}) == 1
+    assert fakes.states()[-5:] == ["building", "checking", "reviewing", "merging", "merged"]
+
+
+def test_a_request_that_asks_for_a_move_is_granted_by_the_decision_not_by_the_sender() -> None:
+    fakes = Fakes(script={"building": [SILENT]})
+    # The decision service grants "wait" for the first request, and nothing for the second:
+    # an answer the table does not have is never taken from the request itself.
+    fakes.decisions = [{"answer": "wait", "reverse": "Close the need."}, None]
+    by = {"kind": "operator", "id": "op-1"}
+
+    async def scenario() -> Any:
+        async with kernel(fakes) as k:
+            identifier = await k.start()
+            await k.idle_in(identifier, "building")
+            await send_request(
+                k.engine, identifier, request_id="req-1", answer="wait", reason="frozen", by=by
+            )
+            await k.idle_in(identifier, "waiting")
+            await send_request(
+                k.engine, identifier, request_id="req-2", answer="merged", reason="skip it", by=by
+            )
+            await until(
+                lambda: asyncio.sleep(0, fakes.questions), lambda q: len(q) == 2, "two decisions"
+            )
+            await k.idle_in(identifier, "waiting")
+            await send_outcome(k.engine, identifier, state="waiting", outcome="closed")
+            return await k.result(identifier)
+
+    assert asyncio.run(scenario())["state"] == "merged"
+    answers = [e["decision"] for e in fakes.events if e["cause"] == "decision"]
+    assert [(d["answer"], d["source"]) for d in answers] == [
+        ("wait", "policy"),
+        ("resume", "table"),
+    ]
+    # The wait the second request interrupted carried on: the need's owner was called once.
+    assert len(fakes.calls_for("waiting")) == 1
 
 
 def test_a_new_state_is_added_by_editing_only_the_data_file() -> None:

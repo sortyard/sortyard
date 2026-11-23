@@ -76,6 +76,7 @@ def dispatch(
     raw_body: bytes,
     connect: Callable[[], Conn],
     token_ttl_seconds: int = auth.DEFAULT_TTL_SECONDS,
+    signal_item: handlers.SignalItem | None = None,
 ) -> Answer | None:
     """The answer to one request, or None when no operation has this route."""
     path, _, query_string = target.partition("?")
@@ -96,7 +97,15 @@ def dispatch(
     try:
         with conn:
             return _authorized(
-                conn, op, params, query_string, token, headers, raw_body, token_ttl_seconds
+                conn,
+                op,
+                params,
+                query_string,
+                token,
+                headers,
+                raw_body,
+                token_ttl_seconds,
+                signal_item,
             )
     except psycopg.Error as exc:
         log.exception("database error in %s", op.operation_id)
@@ -112,6 +121,7 @@ def _authorized(
     headers: Mapping[str, str],
     raw_body: bytes,
     token_ttl_seconds: int,
+    signal_item: handlers.SignalItem | None,
 ) -> Answer:
     principal = auth.authenticate(conn, token)
     if principal is None:
@@ -141,6 +151,7 @@ def _authorized(
             query=dict(parse_qsl(query_string)),
             body=body,
             token_ttl_seconds=token_ttl_seconds,
+            signal_item=signal_item,
         )
         if body is None and method_takes_body(op):
             raise ApiError(400, "Bad Request", "a JSON body is required", "malformed")
@@ -161,4 +172,5 @@ _BODY_REQUIRED = {
     "unblockTask", "cancelTask", "requeueTask", "createLane", "updateLane", "createPolicy",
     "proposePolicyVersion", "createDecision", "answerDecision", "submitStageRunResult",
     "createAlert", "instructIntegrator", "createRoleBinding", "issueServiceAccountToken",
+    "requestItemChange",
 }  # fmt: skip

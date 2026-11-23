@@ -22,7 +22,12 @@ from sortyard import models
 from sortyard.api import auth, store
 from sortyard.api.auth import Principal
 from sortyard.api.store import ApiError, Conn, Doc, conflict, forbidden, not_found, unprocessable
+from sortyard.engine import EngineUnavailable, WorkflowNotFound
+from sortyard.kernel import ledger
+from sortyard.kernel.item import INPUT_SIGNAL, workflow_id
 from sortyard.models import schema
+
+SignalItem = Callable[[str, str, Any], None]
 
 
 @dataclass
@@ -34,6 +39,9 @@ class Request:
     query: dict[str, str]
     body: Any = None
     token_ttl_seconds: int = auth.DEFAULT_TTL_SECONDS
+    #: Delivers a signal to a workflow (workflow id, signal name, payload); None when the
+    #: service runs without an engine.
+    signal_item: SignalItem | None = None
 
     @property
     def actor(self) -> Doc:
@@ -1132,3 +1140,80 @@ def issue_service_account_token(req: Request) -> Reply:
         issuer_project_id=req.principal.project_id,
     )
     return Reply(201, issued.body())
+
+
+# --- the kernel's tracker view (HARNESS-V3 §3.2) --------------------------------------------
+#
+# The item workflow owns item state and sortyard.kernel.ledger records it. These operations
+# read that projection. The one that is not a read sends the workflow a request and writes
+# nothing: no operation here, or anywhere in this module, changes an item's state.
+
+
+@handles("getProjectQueue")
+def get_project_queue(req: Request) -> Reply:
+    project_id = req.params["project_id"]
+    in_project_scope(req.principal, project_id)
+    return Reply(200, {"items": ledger.queue(req.conn, req.workspace_id, project_id)})
+
+
+def load_item(req: Request) -> str:
+    """The item this request names, checked to exist in the workspace and the caller's scope."""
+    item_id = req.params["item_id"]
+    row = req.conn.execute(
+        "SELECT project_id FROM sortyard.item WHERE workspace_id = %s AND id = %s",
+        (req.workspace_id, item_id),
+    ).fetchone()
+    if row is None:
+        raise not_found("item", item_id)
+    in_project_scope(req.principal, row[0])
+    return item_id
+
+
+@handles("getItemTimeline")
+def get_item_timeline(req: Request) -> Reply:
+    item_id = load_item(req)
+    return Reply(200, {"items": ledger.timeline(req.conn, req.workspace_id, item_id) or []})
+
+
+@handles("requestItemChange")
+def request_item_change(req: Request) -> Reply:
+    item_id = load_item(req)
+    body = req.body
+    if not isinstance(body, dict) or set(body) - {"answer", "reason"}:
+        raise unprocessable("the body is {answer, reason}")
+    answer, reason = body.get("answer"), body.get("reason")
+    if not isinstance(answer, str) or not answer.strip():
+        raise unprocessable("answer names the decision asked for")
+    if not isinstance(reason, str) or not reason.strip():
+        raise unprocessable("reason says why the change is asked for")
+    if req.signal_item is None:
+        raise ApiError(
+            503, "Service Unavailable", "this service runs without a workflow engine", "engine"
+        )
+    request_id = store.new_id("req")
+    payload = {
+        "kind": "request",
+        "request": {"id": request_id, "answer": answer, "reason": reason, "by": req.actor},
+    }
+    try:
+        req.signal_item(workflow_id(req.workspace_id, item_id), INPUT_SIGNAL, payload)
+    except WorkflowNotFound:
+        raise conflict(f"item {item_id!r} has no running workflow", "no_workflow") from None
+    except (EngineUnavailable, TimeoutError):
+        raise ApiError(
+            503, "Service Unavailable", "the workflow engine did not answer", "engine"
+        ) from None
+    # The request is an operator's act: it is in the audit log whether or not the workflow
+    # grants it. What the workflow did with it is on the item's timeline.
+    store.audit(
+        req.conn,
+        req.workspace_id,
+        req.actor,
+        "create",
+        "item_request",
+        request_id,
+        None,
+        {"item_id": item_id, "answer": answer},
+        reason,
+    )
+    return Reply(202, {"id": request_id, "item_id": item_id, "answer": answer, "reason": reason})
