@@ -68,3 +68,14 @@ The current code and deployed release still use the original Postgres backend.
   before adoption/activation. They introduce no live policy writes, actor grants or direct
   cluster repair path. Independent review PASS is in the product evidence.
 - **Contract:** [governed operating processes](docs/requirements/operating-processes.md).
+
+## SY-DEC-007 — Durable workflow engine (2026-11-23)
+
+- **Owner direction:** HARNESS-V3 §3.1, accepted 2026-11-23: Temporal on Postgres behind one
+  module, DBOS as the fallback; this item verifies both.
+- **Decision:** DBOS Transact on Postgres, behind `src/sortyard/engine/`, the only package that
+  imports the SDK. Temporal's local test server is downloaded at first use from outside the
+  package index, which the item rules out, so the fallback applies. DBOS 3.6.0 passed all four
+  failure tests: kill mid-step, restart on changed code, a seven-day timer, a signal sent while
+  no worker runs.
+- **Options, results and how to reverse:** [workflow engine record](docs/decisions/workflow-engine.md).

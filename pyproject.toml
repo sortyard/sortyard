@@ -12,7 +12,9 @@ license-files = ["LICENSE.md", "LICENSE-APACHE", "NOTICE"]
 requires-python = ">=3.11"
 # psycopg: the services' Postgres driver (the shadow conductor writes the DecisionLog).
 # jsonschema: the API validates every document against its full §3 JSON Schema before storing.
-dependencies = ["jsonschema>=4.21", "psycopg[binary]>=3.1"]
+# dbos: the durable workflow engine, imported only by src/sortyard/engine
+# (docs/decisions/workflow-engine.md).
+dependencies = ["dbos>=3.6,<4", "jsonschema>=4.21", "psycopg[binary]>=3.1"]
 
 [project.optional-dependencies]
 dev = [
