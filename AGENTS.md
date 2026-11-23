@@ -21,7 +21,7 @@ Planned contracts under `docs/requirements/contracts/` are distinct from the imp
 
 ## What this is
 
-Sortyard is an open-source delivery harness: a conductor, a control plane and a task manager,
+Sortyard is a source-available delivery harness: a conductor, a control plane and a task manager,
 deployed with one Helm chart. The operator gets a UI for everything and agents get APIs for
 everything. The repo is at the **Phase 1 skeleton** stage:
 

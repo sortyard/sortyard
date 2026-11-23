@@ -1,0 +1,9 @@
+Sortyard is licensed under the Functional Source License, Version 1.1, ALv2
+Future License (FSL-1.1-ALv2); see LICENSE.md. You may use, copy, modify and
+redistribute it for any purpose other than a Competing Use as that licence
+defines it. Each version becomes available under the Apache License, Version
+2.0 on the second anniversary of the date that version was made available. The
+spec/ directory is licensed under the Apache License, Version 2.0; see
+LICENSE-APACHE. Versions of this repository published before the commit that
+added this notice were published under the Apache License, Version 2.0 and
+remain available under it.

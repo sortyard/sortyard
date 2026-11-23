@@ -5,10 +5,10 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "sortyard"
 version = "0.1.0"
-description = "Sortyard: an open-source delivery harness (conductor, control plane, task manager)."
+description = "Sortyard: a source-available delivery harness (conductor, control plane, task manager)."
 readme = "README.md"
-license = "Apache-2.0"
-license-files = ["LICENSE"]
+license = "FSL-1.1-ALv2"
+license-files = ["LICENSE.md", "LICENSE-APACHE", "NOTICE"]
 requires-python = ">=3.11"
 # psycopg: the services' Postgres driver (the shadow conductor writes the DecisionLog).
 # jsonschema: the API validates every document against its full §3 JSON Schema before storing.
@@ -16,6 +16,10 @@ dependencies = ["jsonschema>=4.21", "psycopg[binary]>=3.1"]
 
 [project.optional-dependencies]
 dev = [
+    # Licence acceptance builds an sdist and a wheel through the PEP 517 frontend.
+    "build>=1.2",
+    # Provision the acceptance build backend before running tests, without isolation.
+    "setuptools==80.9.0",
     "mypy>=1.10",
     "pytest>=8",
     "pyyaml>=6",
