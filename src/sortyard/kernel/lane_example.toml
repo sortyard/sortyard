@@ -1,0 +1,61 @@
+# An example lane capability file (company/HARNESS-V3.md section 3.3, SY-V3-PREFLIGHT-PROBES).
+#
+# A lane declares here what its work needs to run. sortyard.kernel.capabilities loads the file
+# and refuses it when a rule is broken; sortyard.kernel.preflight exercises each need of a task
+# with one probe before any build is dispatched. Nothing in this file is a real lane: the names
+# and digests are placeholders that show the format.
+#
+# A task lists its needs against this file, as references:
+#
+#   worker-image               the lane's worker image
+#   runner-pool                the lane's runner pool
+#   repository:<owner>/<name>  a repository the lane pushes to
+#   secret:<NAME>              a secret the lane reads
+#   service:<name>             a service the lane calls
+#
+# A need the file does not declare is refused. worker-image and runner-pool are needs of every
+# task; `defaults` adds more.
+
+version = 1
+lane = "example"
+
+# Who resolves a failed need: the capability-gap item is opened for this resolver.
+resolver = "platform"
+
+# Optional: how long an item waits on a capability-gap item before the waiting state's default
+# applies. Left out, the state table's own limit for a wait applies.
+gap-limit = "2h"
+
+runner-pool = "example-runners"
+
+# Needs every task of the lane has, beyond worker-image and runner-pool.
+defaults = ["repository:example/app"]
+
+# The worker image is the CI image: both are pinned by digest and the digests must be equal.
+[images]
+worker = "registry.example/lanes/example-worker@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+ci = "registry.example/lanes/example-ci@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+# Repositories the lane pushes to. workflow-files says the lane must be able to push workflow
+# files there; the probe for the repository exercises that too.
+[[repositories]]
+name = "example/app"
+workflow-files = true
+
+[[repositories]]
+name = "example/charts"
+
+# Secrets the lane reads, by name. There are no optional credentials: `optional = true` is
+# refused, and a secret that cannot be read fails preflight.
+[[secrets]]
+name = "EXAMPLE_DEPLOY_TOKEN"
+
+[[secrets]]
+name = "EXAMPLE_REGISTRY_PASSWORD"
+
+# Services the lane calls.
+[[services]]
+name = "cluster-api"
+
+[[services]]
+name = "artifact-store"
