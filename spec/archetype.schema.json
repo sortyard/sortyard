@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/archetype.schema.json",
+  "title": "Archetype",
+  "description": "A versioned template bundle (§3.2): default workflows, roles, contracts, skill slots, eval suites, replica definition, definition-of-done. Shipped archetypes: saas-product, infrastructure; candidates: inception, opportunity-portfolio.",
+  "x-sortyard-design-ref": "§3.2",
+  "x-sortyard-store": "definition",
+  "type": "object",
+  "allOf": [{"$ref": "common.schema.json#/$defs/definition_base"}],
+  "required": ["name", "status", "workflows", "roles", "definition_of_done"],
+  "properties": {
+    "name": {"type": "string", "minLength": 1},
+    "status": {"enum": ["shipped", "candidate"]},
+    "workflows": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/versioned_ref"}},
+    "roles": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/versioned_ref"}},
+    "contracts": {"type": "array", "items": {"type": "string"}},
+    "skill_slots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "required"],
+        "properties": {
+          "name": {"type": "string"},
+          "required": {"type": "boolean"},
+          "default_skill": {"$ref": "common.schema.json#/$defs/versioned_ref"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "eval_suites": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/versioned_ref"}},
+    "replica_definition": {
+      "description": "Definition of the replica used for build-stage adversary review (§3.6 replica_required).",
+      "type": "object",
+      "properties": {
+        "image": {"type": "string"},
+        "description": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "definition_of_done": {"type": "array", "items": {"type": "string"}, "minItems": 1}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "arch-saas-product", "workspace_id": "ws-noncelogic", "version": "1.0.0", "source": "git",
+    "name": "saas-product", "status": "shipped",
+    "workflows": [{"id": "wf-feature", "version": "1.0.0"}],
+    "roles": [{"id": "role-implementer", "version": "1.0.0"}],
+    "definition_of_done": ["merged on green required checks", "deployed head verified"]
+  }]
+}

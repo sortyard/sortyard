@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/conductor-config.schema.json",
+  "title": "ConductorConfig",
+  "description": "The Conductor is the deterministic scheduler service, not an object; its configuration is (§3.4): pickup policy ref, poll interval, claim lease duration, stall thresholds. Also carries the stacked admission caps of §3.7b that sit above individual lanes (see NOTES.md).",
+  "x-sortyard-design-ref": "§3.4, §3.7b",
+  "x-sortyard-store": "config",
+  "type": "object",
+  "allOf": [{"$ref": "common.schema.json#/$defs/object_base"}],
+  "required": ["pickup_policy_ref", "poll_interval_seconds", "claim_lease_duration_seconds", "stall_thresholds"],
+  "properties": {
+    "pickup_policy_ref": {"description": "PrioritizationPolicy used for the claim sequence.", "$ref": "common.schema.json#/$defs/ref"},
+    "sequencing_policy_ref": {"$ref": "common.schema.json#/$defs/ref"},
+    "poll_interval_seconds": {"type": "integer", "minimum": 1},
+    "claim_lease_duration_seconds": {"type": "integer", "minimum": 1},
+    "stall_thresholds": {
+      "type": "object",
+      "properties": {
+        "stage_dwell_seconds": {"$ref": "common.schema.json#/$defs/duration_seconds"},
+        "merging_dwell_seconds": {"$ref": "common.schema.json#/$defs/duration_seconds"},
+        "revision_round_cap": {"type": "integer", "minimum": 0, "default": 4}
+      },
+      "additionalProperties": {"$ref": "common.schema.json#/$defs/duration_seconds"}
+    },
+    "admission": {
+      "type": "object",
+      "properties": {
+        "cluster_heavy_cap": {"type": "integer", "minimum": 0},
+        "reserved_rush_slot": {"description": "Rush is admitted first but never preempts a running job.", "type": "boolean"},
+        "per_project_heavy_caps": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}}
+      },
+      "additionalProperties": false
+    },
+    "pickup_preview_length": {"type": "integer", "minimum": 1, "default": 10},
+    "version": {"$ref": "common.schema.json#/$defs/version"}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "conductor-default", "workspace_id": "ws-noncelogic", "pickup_policy_ref": "prio-global",
+    "sequencing_policy_ref": "seqp-default", "poll_interval_seconds": 60, "claim_lease_duration_seconds": 3600,
+    "stall_thresholds": {"merging_dwell_seconds": 7200, "revision_round_cap": 4},
+    "admission": {"cluster_heavy_cap": 2, "reserved_rush_slot": true, "per_project_heavy_caps": {"proj-rove": 1}}
+  }]
+}

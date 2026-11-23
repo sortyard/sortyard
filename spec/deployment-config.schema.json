@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/deployment-config.schema.json",
+  "title": "DeploymentConfig",
+  "description": "The Helm values reflected into the UI as the Admin console (§3.9): namespaces, pools, ingress, retention; plus the definitions mode of §5.1 (git mode default for teams, DB-only for small installs) and the secrets backend. Installation-wide, so not workspace-scoped.",
+  "x-sortyard-design-ref": "§3.9, §5.1",
+  "x-sortyard-store": "config",
+  "type": "object",
+  "required": ["id", "installation_id", "namespaces", "pools", "ingress", "retention", "definitions"],
+  "properties": {
+    "id": {"$ref": "common.schema.json#/$defs/id"},
+    "installation_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "chart_version": {"type": "string"},
+    "namespaces": {"type": "object", "additionalProperties": {"type": "string"}, "minProperties": 1},
+    "pools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {"type": "string"},
+          "node_selector": {"type": "object", "additionalProperties": {"type": "string"}},
+          "cluster": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "required": ["host"],
+      "properties": {"host": {"type": "string"}, "tls": {"type": "boolean"}, "class_name": {"type": "string"}},
+      "additionalProperties": false
+    },
+    "retention": {
+      "type": "object",
+      "properties": {
+        "events_days": {"type": "integer", "minimum": 0},
+        "stage_run_artifacts_days": {"type": "integer", "minimum": 0},
+        "audit_log_days": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "definitions": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": {"enum": ["git", "db-only"], "default": "git"},
+        "repo": {"type": "string"},
+        "branch": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "secrets_backend": {"enum": ["openbao", "external-secrets", "sealed-secrets", "kubernetes-secret"]},
+    "otel": {
+      "type": "object",
+      "properties": {"endpoint": {"$ref": "common.schema.json#/$defs/uri"}, "enabled": {"type": "boolean"}},
+      "additionalProperties": false
+    },
+    "control_plane_protection": {
+      "description": "PriorityClass + reserved requests for the control plane and a worker LimitRange (§3.7b honesty correction).",
+      "type": "object",
+      "properties": {
+        "priority_class": {"type": "string"},
+        "worker_limit_range": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "examples": [{
+    "id": "deploy-noncelogic", "installation_id": "inst-noncelogic", "chart_version": "0.1.0",
+    "namespaces": {"control_plane": "sortyard", "workers": "sortyard-jobs"},
+    "pools": [{"name": "default", "cluster": "k3s-azure-01"}],
+    "ingress": {"host": "sortyard.example.com", "tls": true},
+    "retention": {"events_days": 365},
+    "definitions": {"mode": "git", "repo": "github.com/noncelogic/meta-harness", "branch": "main"},
+    "secrets_backend": "openbao", "otel": {"enabled": true, "endpoint": "http://otel-collector:4318"}
+  }]
+}

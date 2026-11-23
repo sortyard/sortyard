@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/throughput-window.schema.json",
+  "title": "ThroughputWindow",
+  "description": "A retrospective read model over the Event Ledger (§3.8): per hour/day/week and per project/lane/workflow — claims, completions, merges, deploy verdicts, lead and dwell time, lane utilisation, hand-back and stall counts. Recomputable at will; stores nothing authoritative and gates nothing.",
+  "x-sortyard-design-ref": "§3.8, §0.1",
+  "x-sortyard-store": "read-model",
+  "type": "object",
+  "allOf": [{"$ref": "common.schema.json#/$defs/object_base"}],
+  "required": ["granularity", "subject", "window_start", "window_end", "metrics", "computed_at"],
+  "properties": {
+    "granularity": {"enum": ["hour", "day", "week"]},
+    "subject": {
+      "type": "object",
+      "required": ["kind", "ref"],
+      "properties": {
+        "kind": {"enum": ["project", "lane", "workflow"]},
+        "ref": {"$ref": "common.schema.json#/$defs/ref"}
+      },
+      "additionalProperties": false
+    },
+    "window_start": {"$ref": "common.schema.json#/$defs/timestamp"},
+    "window_end": {"$ref": "common.schema.json#/$defs/timestamp"},
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "claims": {"type": "integer", "minimum": 0},
+        "completions": {"type": "integer", "minimum": 0},
+        "merges": {"type": "integer", "minimum": 0},
+        "deploy_verdicts": {
+          "type": "object",
+          "properties": {"green": {"type": "integer", "minimum": 0}, "red": {"type": "integer", "minimum": 0}},
+          "additionalProperties": false
+        },
+        "lead_time_seconds": {"$ref": "#/$defs/distribution"},
+        "dwell_seconds_by_state": {"type": "object", "additionalProperties": {"$ref": "#/$defs/distribution"}},
+        "lane_utilisation": {"type": "number", "minimum": 0, "maximum": 1},
+        "handbacks": {"type": "integer", "minimum": 0},
+        "stalls": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "source_event_range": {
+      "type": "object",
+      "properties": {"from_seq": {"type": "integer"}, "to_seq": {"type": "integer"}},
+      "additionalProperties": false
+    },
+    "computed_at": {"$ref": "common.schema.json#/$defs/timestamp"}
+  },
+  "unevaluatedProperties": false,
+  "$defs": {
+    "distribution": {
+      "type": "object",
+      "properties": {
+        "count": {"type": "integer", "minimum": 0},
+        "p50": {"type": "number", "minimum": 0},
+        "p90": {"type": "number", "minimum": 0},
+        "max": {"type": "number", "minimum": 0}
+      },
+      "additionalProperties": false
+    }
+  },
+  "examples": [{
+    "id": "tw-rove-2026-11-07", "workspace_id": "ws-noncelogic", "granularity": "day",
+    "subject": {"kind": "project", "ref": "proj-rove"},
+    "window_start": "2026-11-07T00:00:00Z", "window_end": "2026-11-08T00:00:00Z",
+    "metrics": {"claims": 9, "completions": 7, "merges": 7, "handbacks": 1, "stalls": 0, "lane_utilisation": 0.8,
+                "lead_time_seconds": {"count": 7, "p50": 14400, "p90": 43200}},
+    "computed_at": "2026-11-08T00:05:00Z"
+  }]
+}

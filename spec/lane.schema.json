@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/lane.schema.json",
+  "title": "Lane",
+  "description": "A concurrency + routing construct (§3.4): max concurrent chains, eligible projects/workflows, host/cluster pool, heavy-job cap. Both of today's cap systems (conductor slots and dispatcher lanes) are Lanes with an explicit scope, because they govern different loops. Tuned live from the Admin console; read at decision time.",
+  "x-sortyard-design-ref": "§3.4, §3.7b",
+  "x-sortyard-store": "config",
+  "type": "object",
+  "allOf": [{"$ref": "common.schema.json#/$defs/object_base"}],
+  "required": ["name", "scope", "max_concurrent_chains"],
+  "properties": {
+    "name": {"type": "string", "minLength": 1},
+    "scope": {"description": "Which loop the cap governs. See NOTES.md (Lane scope values).", "enum": ["conductor", "dispatcher"]},
+    "max_concurrent_chains": {"type": "integer", "minimum": 0},
+    "eligible_projects": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/ref"}, "uniqueItems": true},
+    "eligible_workflows": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/ref"}, "uniqueItems": true},
+    "pool": {
+      "type": "object",
+      "properties": {
+        "cluster": {"type": "string"},
+        "namespace": {"type": "string"},
+        "host_pool": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "heavy_job_cap": {"type": "integer", "minimum": 0},
+    "sequencing_policy_ref": {"$ref": "common.schema.json#/$defs/ref"},
+    "version": {"$ref": "common.schema.json#/$defs/version"}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "lane-conductor-harness", "workspace_id": "ws-noncelogic", "name": "harness",
+    "scope": "conductor", "max_concurrent_chains": 2, "eligible_projects": ["proj-harness"],
+    "pool": {"cluster": "k3s-azure-01", "namespace": "sortyard-jobs"}, "heavy_job_cap": 1
+  }]
+}

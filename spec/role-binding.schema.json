@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/role-binding.schema.json",
+  "title": "RoleBinding",
+  "description": "Grants a console/API role to an operator or agent service account (§3.9): admin, operator, viewer, agent-service-account. Distinct from workflow Roles (§3.4).",
+  "x-sortyard-design-ref": "§3.9",
+  "x-sortyard-store": "config",
+  "type": "object",
+  "allOf": [
+    {"$ref": "common.schema.json#/$defs/object_base"},
+    {"if": {"properties": {"role": {"const": "agent-service-account"}}, "required": ["role"]},
+     "then": {"properties": {"principal": {"properties": {"kind": {"const": "agent"}}}}},
+     "else": {"properties": {"principal": {"properties": {"kind": {"const": "operator"}}}}}}
+  ],
+  "required": ["principal", "role", "scope"],
+  "properties": {
+    "principal": {"$ref": "common.schema.json#/$defs/actor"},
+    "role": {"enum": ["admin", "operator", "viewer", "agent-service-account"]},
+    "scope": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {"enum": ["workspace", "project"]},
+        "ref": {"$ref": "common.schema.json#/$defs/ref"}
+      },
+      "additionalProperties": false
+    },
+    "granted_by": {"$ref": "common.schema.json#/$defs/actor"}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "rb-joe-admin", "workspace_id": "ws-noncelogic", "principal": {"kind": "operator", "id": "op-joe"},
+    "role": "admin", "scope": {"kind": "workspace"}
+  }]
+}

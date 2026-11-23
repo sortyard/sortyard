@@ -1,0 +1,83 @@
+# The repo's own checks, on every pull request to main and every push to main (design draft §9:
+# the harness's own releases go through CI like everything else).
+#
+# One job, `test`, and it is the one required status check on main: strict, up to date with
+# main (policies/placement-defaults.yaml#gates). main runs no other job, so everything main
+# runs is proven on the pull request first. Keep it one job: a second job here would run on
+# main without gating. The slow suite (the kind replica boot) runs outside the gate, in
+# slow.yml.
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    # The migration + ledger tests (tests/test_migrations.py) need a real Postgres; they are
+    # required here, never skipped.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      SORTYARD_REQUIRE_HELM: "1"
+      SORTYARD_REQUIRE_POSTGRES: "1"
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.3
+      - name: Install
+        run: |
+          pip install -e '.[dev]'
+          command -v psql || (sudo apt-get update && sudo apt-get install -y postgresql-client)
+      - name: Generated models match the schemas
+        run: python -m sortyard.models.codegen --check
+      - name: Lint
+        run: |
+          ruff check .
+          ruff format --check .
+      - name: Typecheck
+        run: mypy
+      - name: Test
+        run: pytest tests
+      # The seeded Phase 0 spec tests (spec/test_*.py).
+      - name: Spec (Phase 0 schemas + OpenAPI)
+        run: pytest spec
+      - name: Helm chart lint
+        run: helm lint --strict charts/sortyard
+      - name: Helm chart render
+        run: helm template sortyard charts/sortyard > /dev/null
+      - name: Container image build
+        run: docker build -t ghcr.io/sortyard/sortyard:ci .
+      - name: Container image smoke
+        run: |
+          docker run --rm ghcr.io/sortyard/sortyard:ci sortyard-conductor --once
+          docker run --rm ghcr.io/sortyard/sortyard:ci sortyard-api --help

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/escalation.schema.json",
+  "title": "Escalation",
+  "description": "An explicit chain stall (§3.3): plain-language reason, stall class, repair attempts. Self-repair gets at most two attempts per distinct defect (class + phase); a repair concluding 'not dispatcher-side' ends after one attempt; redeploy failure and repaired code not running within 15 minutes are terminal.",
+  "x-sortyard-design-ref": "§3.3",
+  "x-sortyard-store": "state",
+  "type": "object",
+  "allOf": [{"$ref": "common.schema.json#/$defs/object_base"}],
+  "required": ["chain_id", "reason", "stall_class", "phase", "state", "repair_attempts"],
+  "properties": {
+    "chain_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "task_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "reason": {"description": "Plain language.", "type": "string", "minLength": 1},
+    "stall_class": {
+      "description": "Names derived from the draft's prose; see NOTES.md (stall classes).",
+      "enum": ["repeated_blocker_no_change", "infrastructure_failed_twice", "declared_checks_failed",
+               "illegal_dispatch", "revision_cap_reached", "redeploy_failed", "repaired_code_not_running"]
+    },
+    "phase": {"description": "Stage/phase the defect occurred in; class + phase identifies a distinct defect.", "type": "string", "minLength": 1},
+    "state": {"enum": ["open", "repairing", "resolved", "terminal"]},
+    "repair_attempts": {
+      "type": "array",
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["attempt", "outcome"],
+        "properties": {
+          "attempt": {"type": "integer", "minimum": 1, "maximum": 2},
+          "outcome": {"enum": ["repaired", "failed", "not_dispatcher_side"]},
+          "summary": {"type": "string"},
+          "at": {"$ref": "common.schema.json#/$defs/timestamp"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "terminal_reason": {"type": "string"}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "esc-12", "workspace_id": "ws-noncelogic", "chain_id": "chain-287-1",
+    "reason": "Build failed the declared whitespace check twice with no change in the record.",
+    "stall_class": "declared_checks_failed", "phase": "build", "state": "repairing",
+    "repair_attempts": [{"attempt": 1, "outcome": "failed", "summary": "re-dispatch did not change output"}]
+  }]
+}

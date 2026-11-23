@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/audit-log.schema.json",
+  "title": "AuditLogEntry",
+  "description": "One entry of the AuditLog (§3.9): every UI/API mutation — who, what, when, before, after.",
+  "x-sortyard-design-ref": "§3.9",
+  "x-sortyard-store": "state",
+  "type": "object",
+  "allOf": [{"$ref": "common.schema.json#/$defs/object_base"}],
+  "required": ["ts", "actor", "channel", "action", "object", "before", "after"],
+  "properties": {
+    "ts": {"$ref": "common.schema.json#/$defs/timestamp"},
+    "actor": {"$ref": "common.schema.json#/$defs/actor"},
+    "channel": {"enum": ["ui", "api", "mcp", "system"]},
+    "action": {"enum": ["create", "update", "delete"]},
+    "object": {
+      "type": "object",
+      "required": ["kind", "id"],
+      "properties": {"kind": {"type": "string", "minLength": 1}, "id": {"$ref": "common.schema.json#/$defs/id"}},
+      "additionalProperties": false
+    },
+    "before": {"type": ["object", "null"]},
+    "after": {"type": ["object", "null"]},
+    "reason": {"type": "string"}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "audit-301", "workspace_id": "ws-noncelogic", "ts": "2026-11-08T09:00:00Z",
+    "actor": {"kind": "operator", "id": "op-joe"}, "channel": "ui", "action": "update",
+    "object": {"kind": "lane", "id": "lane-conductor-harness"},
+    "before": {"max_concurrent_chains": 1}, "after": {"max_concurrent_chains": 2}, "reason": "raise harness slots"
+  }]
+}

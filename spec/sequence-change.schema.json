@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/sequence-change.schema.json",
+  "title": "SequenceChange",
+  "description": "Sequence is not a container object; it is a property (`sequence`) of Tasks, Milestones, Workflows and Chains (§3.3, §3.3a). What is recorded as an object is the SequenceChange: an auditable event whenever a human (board drag) or grooming reorders a milestone or a task's sequence — the change, its author and its reason. The Pickup Preview re-derives immediately.",
+  "x-sortyard-design-ref": "§3.3a",
+  "x-sortyard-store": "state",
+  "type": "object",
+  "allOf": [{"$ref": "common.schema.json#/$defs/object_base"}],
+  "required": ["subject_kind", "subject_id", "order", "from", "to", "author", "reason", "at"],
+  "properties": {
+    "subject_kind": {"enum": ["task", "milestone"]},
+    "subject_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "order": {
+      "description": "Which of the five recorded orders changed.",
+      "enum": ["milestone_sequence", "dependency_order", "workflow_stage_sequence", "claim_sequence", "fairness"]
+    },
+    "from": {"type": ["integer", "null"]},
+    "to": {"type": ["integer", "null"]},
+    "author": {"$ref": "common.schema.json#/$defs/actor"},
+    "source": {"enum": ["board_drag", "grooming", "api"]},
+    "reason": {"type": "string", "minLength": 1},
+    "at": {"$ref": "common.schema.json#/$defs/timestamp"}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "seqc-1", "workspace_id": "ws-noncelogic", "subject_kind": "task", "subject_id": "task-harness-287",
+    "order": "milestone_sequence", "from": 3, "to": 2,
+    "author": {"kind": "operator", "id": "op-joe"}, "source": "board_drag",
+    "reason": "Schemas before the OpenAPI spec.", "at": "2026-11-07T09:00:00Z"
+  }]
+}

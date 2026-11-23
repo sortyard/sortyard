@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/installation.schema.json",
+  "title": "Installation",
+  "description": "One deployed harness instance (§3.1). Config: cluster, namespaces, storage, ingress, auth provider (OIDC). The root of tenancy, so it carries no workspace_id.",
+  "x-sortyard-design-ref": "§3.1",
+  "x-sortyard-store": "config",
+  "type": "object",
+  "required": ["id", "cluster", "namespaces", "storage", "ingress", "auth_provider"],
+  "properties": {
+    "id": {"$ref": "common.schema.json#/$defs/id"},
+    "name": {"type": "string"},
+    "cluster": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "context": {"type": "string"},
+        "api_server": {"$ref": "common.schema.json#/$defs/uri"}
+      },
+      "additionalProperties": false
+    },
+    "namespaces": {
+      "type": "object",
+      "required": ["control_plane", "workers"],
+      "properties": {
+        "control_plane": {"type": "string", "minLength": 1},
+        "workers": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": {"type": "string"}
+    },
+    "storage": {
+      "type": "object",
+      "required": ["storage_class"],
+      "properties": {
+        "storage_class": {"type": "string"},
+        "mirror_volume": {"type": "string"},
+        "credential_volume": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "ingress": {
+      "type": "object",
+      "required": ["host"],
+      "properties": {
+        "host": {"type": "string", "minLength": 1},
+        "tls": {"type": "boolean"},
+        "class_name": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "auth_provider": {
+      "type": "object",
+      "required": ["kind", "issuer", "client_id"],
+      "properties": {
+        "kind": {"const": "oidc"},
+        "issuer": {"$ref": "common.schema.json#/$defs/uri"},
+        "client_id": {"type": "string"},
+        "client_secret_ref": {"$ref": "common.schema.json#/$defs/secret_ref"}
+      },
+      "additionalProperties": false
+    },
+    "deployment_config_ref": {"$ref": "common.schema.json#/$defs/ref"},
+    "created_at": {"$ref": "common.schema.json#/$defs/timestamp"},
+    "updated_at": {"$ref": "common.schema.json#/$defs/timestamp"}
+  },
+  "additionalProperties": false,
+  "examples": [{
+    "id": "inst-noncelogic",
+    "name": "NonceLogic k3s-azure-01",
+    "cluster": {"name": "k3s-azure-01"},
+    "namespaces": {"control_plane": "sortyard", "workers": "sortyard-jobs"},
+    "storage": {"storage_class": "local-path", "mirror_volume": "mirrors", "credential_volume": "auth-broker"},
+    "ingress": {"host": "sortyard.example.com", "tls": true},
+    "auth_provider": {"kind": "oidc", "issuer": "https://auth.example.com/", "client_id": "sortyard-console", "client_secret_ref": "sec-oidc-client"}
+  }]
+}

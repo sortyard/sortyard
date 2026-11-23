@@ -1,0 +1,18 @@
+{
+  "captured_at": "2026-11-16T02:27:20.474777+00:00",
+  "core_all_passed": true,
+  "core_groups": 9,
+  "auth_all_passed": true,
+  "auth_groups": 3,
+  "owned_containers_remaining": 0,
+  "owned_networks_remaining": 0,
+  "owned_volumes_remaining": 0,
+  "private_synthetic_credentials_removed": true,
+  "synthetic_values_absent_from_retained_files": true,
+  "runners_sha256": {
+    "extra-proof.py": "3f230a66e32344ee0db54ec2cd111357b6c29a68b99b75e6f0f74656ed3c414c",
+    "proof.py": "501cf41529db04fc3ee6775e64a9d76241ea5e4e1928fec10c57d562e9d32ecd",
+    "auth-proof.py": "6d783bf657131d99d22fd5af355ec68d3bd05d33fe5fed003007ec734e9c6c6a",
+    "bootstrap.py": "bd0781a2e53ae2f93a6302d2c7b5e8177571c69a34f7e14933c15fad78a77c83"
+  }
+}

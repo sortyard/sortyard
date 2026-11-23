@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/workflow.schema.json",
+  "title": "Workflow",
+  "description": "A versioned, declarative stage graph (§3.4). Each stage has a role and an executor type of agent or deterministic; there is deliberately no human-gate executor — humans act through Decision objects. Stage order is the array order; parallelism exists only where a stage declares parallel_with (§3.3a.3). A Chain pins the version it started on.",
+  "x-sortyard-design-ref": "§3.4, §3.3a",
+  "x-sortyard-store": "definition",
+  "type": "object",
+  "allOf": [{"$ref": "common.schema.json#/$defs/definition_base"}],
+  "required": ["name", "stages"],
+  "properties": {
+    "name": {
+      "description": "Built-ins: feature, incident, release, support (saas-product); change, drift, incident (infrastructure); job; design-first.",
+      "type": "string", "minLength": 1
+    },
+    "archetype_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "requires_design_ref": {"type": "boolean", "default": false},
+    "stages": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/stage"}}
+  },
+  "unevaluatedProperties": false,
+  "$defs": {
+    "stage": {
+      "type": "object",
+      "required": ["name", "role", "executor"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "role": {"$ref": "common.schema.json#/$defs/versioned_ref"},
+        "executor": {"enum": ["agent", "deterministic"]},
+        "parallel_with": {
+          "description": "Stage names this stage is declared independent of and may run alongside.",
+          "type": "array", "items": {"type": "string"}, "uniqueItems": true
+        },
+        "heavy": {"description": "Heavy-capped stage (build/verify/proof class).", "type": "boolean", "default": false},
+        "skills": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/versioned_ref"}},
+        "context_recipe": {"$ref": "common.schema.json#/$defs/versioned_ref"},
+        "declared_checks": {"type": "array", "items": {"type": "string"}},
+        "branches_on_decision": {
+          "description": "Branch on a Decision outcome; maps resolution value -> next stage name.",
+          "type": "object", "additionalProperties": {"type": "string"}
+        },
+        "evals": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/versioned_ref"}}
+      },
+      "additionalProperties": false
+    }
+  },
+  "examples": [{
+    "id": "wf-feature", "workspace_id": "ws-noncelogic", "version": "1.0.0", "source": "git",
+    "name": "feature", "archetype_id": "arch-saas-product",
+    "stages": [
+      {"name": "frame", "role": {"id": "role-planner", "version": "1.0.0"}, "executor": "agent"},
+      {"name": "judge", "role": {"id": "role-reviewer", "version": "1.0.0"}, "executor": "agent"},
+      {"name": "shape", "role": {"id": "role-designer", "version": "1.0.0"}, "executor": "agent"},
+      {"name": "build", "role": {"id": "role-implementer", "version": "1.0.0"}, "executor": "agent", "heavy": true, "declared_checks": ["whitespace"]},
+      {"name": "verify", "role": {"id": "role-reviewer", "version": "1.0.0"}, "executor": "agent", "heavy": true}
+    ]
+  }]
+}

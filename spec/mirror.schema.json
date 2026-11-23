@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/mirror.schema.json",
+  "title": "Mirror",
+  "description": "A read-only repo mirror on a shared volume that workers clone from; jobs never fetch private remotes (§3.7). Source, last refresh and freshness are recorded; a stale mirror is a named failure mode.",
+  "x-sortyard-design-ref": "§3.7",
+  "x-sortyard-store": "state",
+  "type": "object",
+  "allOf": [{"$ref": "common.schema.json#/$defs/object_base"}],
+  "required": ["repo_id", "source", "path", "freshness"],
+  "properties": {
+    "repo_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "source": {"$ref": "common.schema.json#/$defs/uri"},
+    "path": {"type": "string", "minLength": 1},
+    "last_refresh_at": {"$ref": "common.schema.json#/$defs/timestamp"},
+    "freshness": {
+      "type": "object",
+      "required": ["state", "checked_at"],
+      "properties": {
+        "state": {"enum": ["fresh", "stale", "unknown"]},
+        "mirror_head": {"type": "string"},
+        "remote_head": {"type": "string"},
+        "checked_at": {"$ref": "common.schema.json#/$defs/timestamp"}
+      },
+      "additionalProperties": false
+    },
+    "refresh_runs": {"enum": ["operator-side", "in-cluster"]}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "mirror-rove", "workspace_id": "ws-noncelogic", "repo_id": "repo-rove",
+    "source": "https://github.com/noncelogic/rove", "path": "/mirrors/rove.git",
+    "last_refresh_at": "2026-11-08T11:50:00Z",
+    "freshness": {"state": "fresh", "checked_at": "2026-11-08T11:59:00Z"}, "refresh_runs": "operator-side"
+  }]
+}

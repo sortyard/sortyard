@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/decision-log.schema.json",
+  "title": "DecisionLogEntry",
+  "description": "One entry of the DecisionLog, a specialised event stream (§3.8): every conductor decision (claim / skip / hand-back / merge / stall) with the inputs it computed from — policy versions, queue snapshot hash, reason codes — so 'why wasn't X picked up?' is a query.",
+  "x-sortyard-design-ref": "§3.8, §3.5, §3.7b",
+  "x-sortyard-store": "state",
+  "type": "object",
+  "allOf": [{"$ref": "common.schema.json#/$defs/object_base"}],
+  "required": ["ts", "conductor_pass_id", "decision", "task_id", "reason_codes", "inputs"],
+  "properties": {
+    "ts": {"$ref": "common.schema.json#/$defs/timestamp"},
+    "conductor_pass_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "decision": {"enum": ["claim", "skip", "hand_back", "merge", "stall"]},
+    "task_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "reason_codes": {
+      "description": "Pickup-preview reason codes, e.g. 'slot held: merging', 'held: parent in backlog', 'throttled: heavy cap full', 'unbound: mirror stale'.",
+      "type": "array", "items": {"type": "string", "minLength": 1}
+    },
+    "inputs": {
+      "type": "object",
+      "required": ["policy_versions", "queue_snapshot_hash"],
+      "properties": {
+        "policy_versions": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/versioned_ref"}},
+        "queue_snapshot_hash": {"$ref": "common.schema.json#/$defs/content_hash"},
+        "execution_binding_id": {"$ref": "common.schema.json#/$defs/ref"},
+        "preview_position": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "event_id": {"$ref": "common.schema.json#/$defs/ref"}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "dl-5521", "workspace_id": "ws-noncelogic", "ts": "2026-11-08T12:00:00Z", "conductor_pass_id": "pass-8812",
+    "decision": "skip", "task_id": "task-rove-12", "reason_codes": ["unbound: skill skill-playwright@2.1.0 not installed"],
+    "inputs": {"policy_versions": [{"id": "prio-global", "version": "1.0.0"}],
+               "queue_snapshot_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"}
+  }]
+}

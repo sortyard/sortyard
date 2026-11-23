@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/grooming-pass.schema.json",
+  "title": "GroomingPass",
+  "description": "A scheduled/agent job (§3.5) that turns findings into tasks, fills depends/priority/placement, orders milestones and verifies pickup-eligibility, and files a defect when a project's eligible queue is empty while known work exists. Judgment work is frontier-model only; a non-frontier run stops and reports the mismatch (recorded as a Policy on the pass).",
+  "x-sortyard-design-ref": "§3.5",
+  "x-sortyard-store": "state",
+  "type": "object",
+  "allOf": [
+    {"$ref": "common.schema.json#/$defs/object_base"},
+    {"if": {"properties": {"model": {"properties": {"frontier": {"const": false}}}}},
+     "then": {"properties": {"state": {"enum": ["pending", "stopped_non_frontier"]}}}},
+    {"if": {"properties": {"state": {"const": "stopped_non_frontier"}}, "required": ["state"]},
+     "then": {"required": ["mismatch_report"]}}
+  ],
+  "required": ["project_id", "trigger", "state", "model", "frontier_policy_ref"],
+  "properties": {
+    "project_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "trigger": {"enum": ["scheduled", "agent", "on_demand"]},
+    "state": {"enum": ["pending", "running", "completed", "failed", "stopped_non_frontier"]},
+    "model": {
+      "type": "object",
+      "required": ["model", "frontier"],
+      "properties": {"model": {"type": "string"}, "frontier": {"type": "boolean"}},
+      "additionalProperties": false
+    },
+    "frontier_policy_ref": {"$ref": "common.schema.json#/$defs/ref"},
+    "tasks_created": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/ref"}},
+    "tasks_updated": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/ref"}},
+    "milestones_ordered": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/ref"}},
+    "sequence_changes": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/ref"}},
+    "eligibility_verified": {"type": "boolean"},
+    "empty_queue_defect_task_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "mismatch_report": {"type": "string"},
+    "started_at": {"$ref": "common.schema.json#/$defs/timestamp"},
+    "finished_at": {"$ref": "common.schema.json#/$defs/timestamp"}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "groom-rove-1", "workspace_id": "ws-noncelogic", "project_id": "proj-rove", "trigger": "scheduled",
+    "state": "completed", "model": {"model": "claude-opus-5-5", "frontier": true},
+    "frontier_policy_ref": "pol-grooming-frontier", "tasks_created": ["task-rove-13"], "eligibility_verified": true
+  }, {
+    "id": "groom-rove-2", "workspace_id": "ws-noncelogic", "project_id": "proj-rove", "trigger": "scheduled",
+    "state": "stopped_non_frontier", "model": {"model": "small-model", "frontier": false},
+    "frontier_policy_ref": "pol-grooming-frontier", "mismatch_report": "Pass dispatched on a non-frontier model; stopped."
+  }]
+}

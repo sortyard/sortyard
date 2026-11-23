@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/integrator.schema.json",
+  "title": "Integrator",
+  "description": "The fenced single writer (ship.py successor, §3.7a) that turns a proven delivery into a landed one: it requires a passed proof receipt for the exact (base, candidate) pair, verify approval of the exact head and a tree-identity assertion, then lands via the Git Data API recreating signed commits byte-exact, recording both heads in a register checkpoint. The reboot unifies both of today's integrators on this fenced model. Receives its credential through the installation's configured CredentialCustody.",
+  "x-sortyard-design-ref": "§3.7a",
+  "x-sortyard-store": "config",
+  "type": "object",
+  "allOf": [{"$ref": "common.schema.json#/$defs/object_base"}],
+  "required": ["fence", "landing", "credential_custody_ref", "runs"],
+  "properties": {
+    "name": {"type": "string"},
+    "fence": {
+      "type": "object",
+      "required": ["proof_receipt", "verify_approval", "tree_identity"],
+      "properties": {
+        "proof_receipt": {"const": "passed_for_exact_base_candidate_pair"},
+        "verify_approval": {"const": "exact_head"},
+        "tree_identity": {"const": "asserted"}
+      },
+      "additionalProperties": false
+    },
+    "landing": {
+      "type": "object",
+      "required": ["method", "signed_commits"],
+      "properties": {
+        "method": {"const": "git_data_api"},
+        "signed_commits": {"const": "recreated_byte_exact"},
+        "register_checkpoint": {"const": "both_heads", "default": "both_heads"}
+      },
+      "additionalProperties": false
+    },
+    "credential_custody_ref": {"$ref": "common.schema.json#/$defs/ref"},
+    "runs": {"description": "Where the component runs; operator-side by default (no GitHub credential in the cluster).", "enum": ["operator-side", "in-cluster"]}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "integrator-default", "workspace_id": "ws-noncelogic", "name": "fenced integrator",
+    "fence": {"proof_receipt": "passed_for_exact_base_candidate_pair", "verify_approval": "exact_head", "tree_identity": "asserted"},
+    "landing": {"method": "git_data_api", "signed_commits": "recreated_byte_exact", "register_checkpoint": "both_heads"},
+    "credential_custody_ref": "cust-github-write", "runs": "operator-side"
+  }]
+}

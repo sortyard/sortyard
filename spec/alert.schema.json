@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/alert.schema.json",
+  "title": "Alert",
+  "description": "Alert / Finding: monitoring output (§3.8) — stillness watch (oldest unowned work, oldest logjam, merges/day, owner-pointed-out count), deploy-down detection (a product with no green deploy on current head is DOWN, reported in those words), and drift detection (definitions vs live state, plan vs board vs done-vs-live).",
+  "x-sortyard-design-ref": "§3.8",
+  "x-sortyard-store": "state",
+  "type": "object",
+  "allOf": [
+    {"$ref": "common.schema.json#/$defs/object_base"},
+    {"if": {"properties": {"kind": {"const": "deploy_down"}}, "required": ["kind"]},
+     "then": {"properties": {"summary": {"pattern": "\\bDOWN\\b"}}}}
+  ],
+  "required": ["kind", "summary", "subject", "state", "detected_at"],
+  "properties": {
+    "kind": {"enum": ["stillness", "deploy_down", "drift", "eval_finding", "sensor_finding"]},
+    "metric": {
+      "description": "For stillness alerts.",
+      "enum": ["oldest_unowned_work", "oldest_logjam", "merges_per_day", "owner_pointed_out_count"]
+    },
+    "summary": {"type": "string", "minLength": 1},
+    "subject": {
+      "type": "object",
+      "required": ["kind", "ref"],
+      "properties": {"kind": {"type": "string"}, "ref": {"$ref": "common.schema.json#/$defs/ref"}},
+      "additionalProperties": false
+    },
+    "severity": {"enum": ["info", "warning", "critical"]},
+    "state": {"enum": ["open", "acknowledged", "resolved"]},
+    "task_id": {"description": "Task the finding was filed as, if any.", "$ref": "common.schema.json#/$defs/ref"},
+    "source": {"$ref": "common.schema.json#/$defs/actor"},
+    "detected_at": {"$ref": "common.schema.json#/$defs/timestamp"},
+    "resolved_at": {"$ref": "common.schema.json#/$defs/timestamp"}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "alert-77", "workspace_id": "ws-noncelogic", "kind": "deploy_down",
+    "summary": "Rove is DOWN: no green deploy on current head.", "subject": {"kind": "project", "ref": "proj-rove"},
+    "severity": "critical", "state": "open", "detected_at": "2026-11-08T12:00:00Z"
+  }]
+}

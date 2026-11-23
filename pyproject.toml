@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sortyard"
+version = "0.1.0"
+description = "Sortyard: an open-source delivery harness (conductor, control plane, task manager)."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+# psycopg: the services' Postgres driver (the shadow conductor writes the DecisionLog).
+# jsonschema: the API validates every document against its full §3 JSON Schema before storing.
+dependencies = ["jsonschema>=4.21", "psycopg[binary]>=3.1"]
+
+[project.optional-dependencies]
+dev = [
+    "mypy>=1.10",
+    "pytest>=8",
+    "pyyaml>=6",
+    "ruff>=0.5",
+    "types-PyYAML",
+]
+
+# The six §4 services, one entry point each (SY-DEC-001).
+[project.scripts]
+sortyard-api = "sortyard.services.api:main"
+sortyard-conductor = "sortyard.services.conductor:main"
+sortyard-context-assembler = "sortyard.services.context_assembler:main"
+sortyard-eval-runner = "sortyard.services.eval_runner:main"
+sortyard-sensor-runner = "sortyard.services.sensor_runner:main"
+sortyard-integrator = "sortyard.services.integrator:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+sortyard = ["py.typed", "models/schemas.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+# _generated.py is generator output: checked by mypy and by the drift test, not hand-styled.
+extend-exclude = ["spec", "src/sortyard/models/_generated.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+files = ["src", "tests", "replica"]

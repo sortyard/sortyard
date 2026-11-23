@@ -1,0 +1,2694 @@
+{
+  "source_draft_commit": "e5847f3007f2d92c5bb9489babee29de8975408b",
+  "legacy_count": 333,
+  "rows": [
+    {
+      "id": "TRK-001",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "TRK-002",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "TRK-003",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "TRK-004",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "TRK-005",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "TRK-006",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "TRK-007",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "TRK-008",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "TRK-009",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "TRK-010",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "TRK-011",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": "Retain project decision-task semantics and add exact-scope workspace action-plan approval Decisions required by operator agency.",
+      "milestone": "MS2"
+    },
+    {
+      "id": "TRK-012",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS1"
+    },
+    {
+      "id": "TRK-013",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "TRK-014",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "TRK-015",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS6"
+    },
+    {
+      "id": "TRK-016",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS6"
+    },
+    {
+      "id": "TRK-017",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "TRK-018",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "TRK-019",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "LATER"
+    },
+    {
+      "id": "RDY-001",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "RDY-002",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "RDY-003",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "RDY-004",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "RDY-005",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "RDY-006",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "RDY-007",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "RDY-008",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "RDY-009",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "RDY-010",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "RDY-011",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "RDY-012",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "RDY-013",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "RDY-014",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "RDY-015",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "GRM-001",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "GRM-002",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "GRM-003",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS2"
+    },
+    {
+      "id": "GRM-004",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "GRM-005",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "GRM-006",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "GRM-007",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS5"
+    },
+    {
+      "id": "GRM-008",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/02-work-tracking.md",
+      "reason": null,
+      "milestone": "LATER"
+    },
+    {
+      "id": "SCH-001",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/03-scheduling.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "SCH-002",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/03-scheduling.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "SCH-003",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/03-scheduling.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "SCH-004",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/03-scheduling.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "SCH-005",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/03-scheduling.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "SCH-006",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/03-scheduling.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "SCH-007",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/03-scheduling.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "SCH-008",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/03-scheduling.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "SCH-009",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/03-scheduling.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "SCH-010",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/03-scheduling.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "SCH-011",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/03-scheduling.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "SCH-012",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/03-scheduling.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "SCH-013",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/03-scheduling.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "SCH-014",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/03-scheduling.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "SCH-015",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/03-scheduling.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "SCH-016",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/03-scheduling.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "SCH-017",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/03-scheduling.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "SCH-018",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/03-scheduling.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "SCH-019",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/03-scheduling.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "EXE-001",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "EXE-002",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "EXE-003",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "EXE-004",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "EXE-005",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "EXE-006",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "EXE-007",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "EXE-008",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "EXE-009",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "EXE-010",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "EXE-011",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "EXE-012",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "EXE-013",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "EXE-014",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "EXE-015",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "EXE-016",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "EXE-017",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "EXE-018",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "EXE-019",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS6"
+    },
+    {
+      "id": "EXE-020",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "EXE-021",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "EXE-022",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "CRD-001",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "CRD-002",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "CRD-003",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "CRD-004",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "CRD-005",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "CRD-006",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "CRD-007",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "CRD-008",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "CRD-009",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "CRD-010",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/04-execution.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "FLW-001",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "FLW-002",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "FLW-003",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "FLW-004",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "FLW-005",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "FLW-006",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "FLW-007",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "FLW-008",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "FLW-009",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "FLW-010",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "FLW-011",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "FLW-012",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "FLW-013",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "FLW-014",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "FLW-015",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "FLW-016",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "FLW-017",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "LATER"
+    },
+    {
+      "id": "FLW-018",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "FLW-019",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "MRG-001",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "MRG-002",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "MRG-003",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "MRG-004",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS4"
+    },
+    {
+      "id": "MRG-005",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "MRG-006",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "MRG-007",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "MRG-008",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "MRG-009",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "MRG-010",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "MRG-011",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "MRG-012",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "MRG-013",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "CIH-001",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "CIH-002",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "CIH-003",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "CIH-004",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "CIH-005",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "CIH-006",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "CIH-007",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "CIH-008",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "CIH-009",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "CIH-010",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": "Latest owner scope, single-authority integration and existing testing/governance doctrine",
+      "milestone": "MS5"
+    },
+    {
+      "id": "CIH-011",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "CIH-012",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "CIH-013",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "DLV-001",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS2"
+    },
+    {
+      "id": "DLV-002",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS2"
+    },
+    {
+      "id": "DLV-003",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS4"
+    },
+    {
+      "id": "DLV-004",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/05-delivery.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS2"
+    },
+    {
+      "id": "REC-001",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "REC-002",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "REC-003",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "REC-004",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "REC-005",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "REC-006",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "REC-007",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "REC-008",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "REC-009",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "REC-010",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "REC-011",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "REC-012",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "REC-013",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS1"
+    },
+    {
+      "id": "REC-014",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "REC-015",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "REC-016",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "REC-017",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "REC-018",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "REC-019",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "REC-020",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "REC-021",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "REC-022",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "REC-023",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "REC-024",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "REC-025",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "REC-026",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/06-recovery.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "API-001",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "API-002",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "API-003",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "API-004",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "API-005",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS1"
+    },
+    {
+      "id": "API-006",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "API-007",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "API-008",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS1"
+    },
+    {
+      "id": "API-009",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "API-010",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS8"
+    },
+    {
+      "id": "API-011",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "API-012",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "API-013",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS8"
+    },
+    {
+      "id": "API-014",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS1"
+    },
+    {
+      "id": "API-015",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS1"
+    },
+    {
+      "id": "API-016",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "API-017",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS1"
+    },
+    {
+      "id": "API-018",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS1"
+    },
+    {
+      "id": "MCP-001",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "MCP-002",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS1"
+    },
+    {
+      "id": "MCP-003",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "MCP-004",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "MCP-005",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "CLI-001",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "CLI-002",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "CLI-003",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "CLI-004",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "CLI-005",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "IAM-001",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS1"
+    },
+    {
+      "id": "IAM-002",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS1"
+    },
+    {
+      "id": "IAM-003",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "IAM-004",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": "Latest owner scope, single-authority integration and existing testing/governance doctrine",
+      "milestone": "MS1"
+    },
+    {
+      "id": "IAM-005",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "IAM-006",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS1"
+    },
+    {
+      "id": "IAM-007",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "IAM-008",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS1"
+    },
+    {
+      "id": "IAM-009",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "IAM-010",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "IAM-011",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "IAM-012",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/07-interfaces.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS1"
+    },
+    {
+      "id": "UI-001",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "UI-002",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "UI-003",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "UI-004",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "UI-005",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "UI-006",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "UI-007",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "UI-008",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "UI-009",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "UI-010",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "UI-011",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "UI-012",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "UI-013",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "UI-014",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "UI-015",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS2"
+    },
+    {
+      "id": "UI-016",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "UI-017",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "UI-018",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "UI-019",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "UI-020",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "UI-021",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "UI-022",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "UI-023",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "UI-024",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "UI-025",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "UI-026",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/08-console.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "OBS-001",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/09-observability.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS1"
+    },
+    {
+      "id": "OBS-002",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/09-observability.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "OBS-003",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/09-observability.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "OBS-004",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/09-observability.md",
+      "reason": null,
+      "milestone": "MS6"
+    },
+    {
+      "id": "OBS-005",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/09-observability.md",
+      "reason": null,
+      "milestone": "MS6"
+    },
+    {
+      "id": "OBS-006",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/09-observability.md",
+      "reason": null,
+      "milestone": "MS6"
+    },
+    {
+      "id": "OBS-007",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/09-observability.md",
+      "reason": null,
+      "milestone": "MS6"
+    },
+    {
+      "id": "OBS-008",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/09-observability.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "OBS-009",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/09-observability.md",
+      "reason": null,
+      "milestone": "MS6"
+    },
+    {
+      "id": "OBS-010",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/09-observability.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "OBS-011",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/09-observability.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "OBS-012",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/09-observability.md",
+      "reason": null,
+      "milestone": "MS6"
+    },
+    {
+      "id": "OBS-013",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/09-observability.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "OBS-014",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/09-observability.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "OBS-015",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/09-observability.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "OBS-016",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/09-observability.md",
+      "reason": null,
+      "milestone": "MS6"
+    },
+    {
+      "id": "OBS-017",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/09-observability.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "OBS-018",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/09-observability.md",
+      "reason": null,
+      "milestone": "LATER"
+    },
+    {
+      "id": "DEF-001",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS2"
+    },
+    {
+      "id": "DEF-002",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS1"
+    },
+    {
+      "id": "DEF-003",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS2"
+    },
+    {
+      "id": "DEF-004",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS2"
+    },
+    {
+      "id": "DEF-005",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS2"
+    },
+    {
+      "id": "DEF-006",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "DEF-007",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "DEF-008",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "DEF-009",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS4"
+    },
+    {
+      "id": "EXT-001",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS2"
+    },
+    {
+      "id": "EXT-002",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS8"
+    },
+    {
+      "id": "EXT-003",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "EXT-004",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "EXT-005",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS8"
+    },
+    {
+      "id": "EXT-006",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "EXT-007",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS8"
+    },
+    {
+      "id": "DEP-001",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS1"
+    },
+    {
+      "id": "DEP-002",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "DEP-003",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS1"
+    },
+    {
+      "id": "DEP-004",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS0"
+    },
+    {
+      "id": "DEP-005",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "DEP-006",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": "Latest owner scope, single-authority integration and existing testing/governance doctrine",
+      "milestone": "MS1"
+    },
+    {
+      "id": "DEP-007",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS1"
+    },
+    {
+      "id": "DEP-008",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS8"
+    },
+    {
+      "id": "DEP-009",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "DEP-010",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "DEP-011",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS6"
+    },
+    {
+      "id": "DEP-012",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS1"
+    },
+    {
+      "id": "DEP-013",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS1"
+    },
+    {
+      "id": "DEP-014",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "DEP-015",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS8"
+    },
+    {
+      "id": "DEP-016",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "DEP-017",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS8"
+    },
+    {
+      "id": "DEP-018",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS0"
+    },
+    {
+      "id": "DEP-019",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS8"
+    },
+    {
+      "id": "DEP-020",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "DEP-021",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS8"
+    },
+    {
+      "id": "MIG-001",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS0"
+    },
+    {
+      "id": "MIG-002",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS0"
+    },
+    {
+      "id": "MIG-003",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "MIG-004",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "MIG-005",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "MIG-006",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS0"
+    },
+    {
+      "id": "MIG-007",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS7"
+    },
+    {
+      "id": "MIG-008",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS7"
+    },
+    {
+      "id": "MIG-009",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS7"
+    },
+    {
+      "id": "MIG-010",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS7"
+    },
+    {
+      "id": "MIG-011",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS7"
+    },
+    {
+      "id": "MIG-012",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS7"
+    },
+    {
+      "id": "MIG-013",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS7"
+    },
+    {
+      "id": "MIG-014",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS7"
+    },
+    {
+      "id": "MIG-015",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS0"
+    },
+    {
+      "id": "MIG-016",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": null,
+      "milestone": "MS0"
+    },
+    {
+      "id": "MIG-017",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/10-platform.md",
+      "reason": "Latest owner scope, single-authority integration and existing testing/governance doctrine",
+      "milestone": "MS0"
+    },
+    {
+      "id": "QLT-001",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS8"
+    },
+    {
+      "id": "QLT-002",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS0"
+    },
+    {
+      "id": "QLT-003",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS0"
+    },
+    {
+      "id": "QLT-004",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "QLT-005",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS0"
+    },
+    {
+      "id": "QLT-010",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS0"
+    },
+    {
+      "id": "QLT-011",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "QLT-012",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS0"
+    },
+    {
+      "id": "QLT-013",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS8"
+    },
+    {
+      "id": "QLT-014",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": "Latest owner scope, single-authority integration and existing testing/governance doctrine",
+      "milestone": "MS1"
+    },
+    {
+      "id": "QLT-015",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "QLT-016",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS6"
+    },
+    {
+      "id": "QLT-020",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS8"
+    },
+    {
+      "id": "QLT-021",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS8"
+    },
+    {
+      "id": "QLT-022",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "QLT-023",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS8"
+    },
+    {
+      "id": "QLT-024",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "QLT-025",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS0"
+    },
+    {
+      "id": "QLT-030",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "QLT-031",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "QLT-032",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS8"
+    },
+    {
+      "id": "QLT-040",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS8"
+    },
+    {
+      "id": "QLT-041",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS8"
+    },
+    {
+      "id": "QLT-042",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS8"
+    },
+    {
+      "id": "QLT-043",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS3"
+    },
+    {
+      "id": "QLT-050",
+      "disposition": "retained",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": null,
+      "milestone": "MS0"
+    },
+    {
+      "id": "QLT-051",
+      "disposition": "amended",
+      "baseline_ref": "history/2026-11-12/12-quality-bar.md",
+      "reason": "Reconciled with current owner direction and substrate/authority contracts",
+      "milestone": "MS0"
+    },
+    {
+      "id": "ECO-001",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "ECO-002",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "ECO-003",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "ECO-004",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "DOM-001",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "DOM-002",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "DOM-003",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "DOM-004",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "DOM-005",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "DOM-006",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS0"
+    },
+    {
+      "id": "AGT-001",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "AGT-002",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "AGT-003",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "AGT-004",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "AGT-005",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "AGT-006",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "AGT-007",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "AGT-008",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "INT-001",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "INT-002",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "INT-003",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "INT-004",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS7"
+    },
+    {
+      "id": "INT-005",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "INT-006",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "INT-007",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "INT-008",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "INT-009",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "INT-010",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS6"
+    },
+    {
+      "id": "GRF-001",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "GRF-002",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "GRF-003",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "OPS-001",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "OPS-002",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "OPS-003",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "OPS-004",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "IMP-001",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS6"
+    },
+    {
+      "id": "IMP-002",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS6"
+    },
+    {
+      "id": "IMP-003",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "IMP-004",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS6"
+    },
+    {
+      "id": "IMP-005",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "SUB-001",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS0"
+    },
+    {
+      "id": "SUB-002",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS0"
+    },
+    {
+      "id": "SUB-003",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "SUB-004",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS1"
+    },
+    {
+      "id": "INT-011",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "OPS-005",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "OPS-006",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "OPS-007",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "OPS-008",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS2"
+    },
+    {
+      "id": "OPS-009",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS5"
+    },
+    {
+      "id": "OPS-010",
+      "disposition": "new",
+      "baseline_ref": null,
+      "reason": null,
+      "milestone": "MS5"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/prioritization-policy.schema.json",
+  "title": "PrioritizationPolicy",
+  "description": "A strict lexicographic order (§3.5): an ordered list of keys (urgent_flag, milestone_sequence, priority_tier, age), tie-break roles only, per project or global. Weighted scoring / cost_of_delay is a proposed change (§10), not part of this contract. A slot stays occupied by any claimed item that is neither done nor blocked, including merging. Urgent bypasses lane caps and does not count against them.",
+  "x-sortyard-design-ref": "§3.5",
+  "x-sortyard-store": "definition",
+  "type": "object",
+  "allOf": [
+    {"$ref": "common.schema.json#/$defs/definition_base"},
+    {"if": {"properties": {"scope": {"const": "project"}}, "required": ["scope"]},
+     "then": {"required": ["project_id"]}}
+  ],
+  "required": ["scope", "keys"],
+  "properties": {
+    "scope": {"enum": ["global", "project"]},
+    "project_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "keys": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": {"enum": ["urgent_flag", "milestone_sequence", "priority_tier", "age"]}
+    },
+    "slot_release_states": {
+      "description": "Claimed items hold their slot until reaching one of these states.",
+      "type": "array", "items": {"enum": ["done", "blocked"]}, "default": ["done", "blocked"]
+    },
+    "urgent_bypasses_lane_caps": {"type": "boolean", "default": true}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "prio-global", "workspace_id": "ws-noncelogic", "version": "1.0.0", "scope": "global",
+    "keys": ["urgent_flag", "milestone_sequence", "priority_tier", "age"],
+    "slot_release_states": ["done", "blocked"], "urgent_bypasses_lane_caps": true
+  }]
+}

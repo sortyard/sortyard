@@ -1,0 +1,105 @@
+# Sortyard chart values — the one values file (design §4: values.yaml maps to the
+# DeploymentConfig object; that mapping fills in as DeploymentConfig fields gain machinery).
+
+image:
+  repository: ghcr.io/sortyard/sortyard
+  # Defaults to the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+api:
+  replicas: 1
+  port: 8080
+  service:
+    type: ClusterIP
+    port: 8080
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+postgres:
+  # true: the chart runs Postgres as a StatefulSet. false: point at an existing server
+  # with postgres.external.* and postgres.auth.existingSecret.
+  enabled: true
+  image:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+  database: sortyard
+  auth:
+    username: sortyard
+    # Leave empty to have the chart generate one (kept across upgrades).
+    password: ""
+    # Name of an existing Secret with key `password`; when set, no Secret is created.
+    existingSecret: ""
+  external:
+    host: ""
+    port: 5432
+  persistence:
+    size: 8Gi
+    # Empty: the cluster's default StorageClass.
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
+# The schema migration Job: applies charts/sortyard/migrations/ with the psql of the
+# postgres.image above (also when postgres.enabled=false) after every install and upgrade.
+migrations:
+  # How long the Job waits for Postgres to accept connections (a fresh install starts both
+  # together).
+  waitSeconds: 300
+  backoffLimit: 3
+  activeDeadlineSeconds: 900
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+
+# The shadow conductor (design §8 Phase 1): `sortyard-conductor --shadow` reads the production
+# conductor's input path READ-ONLY and records what it would claim/refuse in the DecisionLog.
+# Off by default; it needs the input path configured. Runbook: README "Shadow conductor".
+shadow:
+  enabled: false
+  # Seconds between passes; drive.py's cadence is ~5 minutes.
+  interval: 300
+  # Workspace the DecisionLog entries are scoped to (created if missing).
+  workspace: ws-shadow
+  # snapshot: a pass feed {"passes": [board view, ...]} retaining unread passes, a directory
+  #   of board views (one per pass), or a single board view (file or http(s) URL; see
+  #   sortyard.shadow.sources). Only a feed/directory records every production pass.
+  # plane: the board from Plane's REST API, joined with the lane registry below; every new
+  #   pass in the production pass log is replayed from the inputs it retained.
+  source: snapshot
+  snapshot: ""
+  # Optional task_ready gating output (file or http(s) URL).
+  gating: ""
+  plane:
+    url: ""
+    workspace: ""
+    # Plane project ids to read.
+    projects: []
+    # Name of a Secret with key `api-key`: a READ-ONLY Plane API key.
+    apiKeySecret: ""
+    # The production conductor's pass log (file or http(s) URL), retaining each pass's inputs:
+    # {"passes": [{"production_pass_id": ..., "inputs": {"issues": {<project id>: [...]}, "gating": {...}}}]}.
+    passes: ""
+  # The lane registry (the conductor's products.json), mounted read-only from a ConfigMap.
+  lanes:
+    configMap: ""
+    key: products.json
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      memory: 256Mi

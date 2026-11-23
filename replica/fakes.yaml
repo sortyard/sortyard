@@ -1,0 +1,98 @@
+# The outside third-party providers, faked (replica only; never part of the chart):
+# Plane's REST API and the production conductor's pass log, served by fakes/fake_plane.py,
+# plus the lane registry ConfigMap (production: products.json of conductor-config).
+#
+# replica.sh applies this after creating the sortyard-replica-fakes ConfigMap (fake_plane.py +
+# fixtures.json) and the sortyard-replica-plane-read Secret, substituting __IMAGE__ (the
+# Sortyard image: the fake needs only its Python) and __FAKES_SHA__ (restarts on change).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sortyard-replica-lanes
+  labels:
+    app.kubernetes.io/name: sortyard-replica
+    app.kubernetes.io/component: fake-providers
+data:
+  products.json: |
+    {"demo": {"lanes": 2, "identifier": "DEMO", "tasks": false}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sortyard-fake-providers
+  labels:
+    app.kubernetes.io/name: sortyard-replica
+    app.kubernetes.io/component: fake-providers
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+  selector:
+    app.kubernetes.io/name: sortyard-replica
+    app.kubernetes.io/component: fake-providers
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sortyard-fake-providers
+  labels:
+    app.kubernetes.io/name: sortyard-replica
+    app.kubernetes.io/component: fake-providers
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sortyard-replica
+      app.kubernetes.io/component: fake-providers
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sortyard-replica
+        app.kubernetes.io/component: fake-providers
+      annotations:
+        sortyard.ai/fakes-sha: "__FAKES_SHA__"
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: fake-providers
+          image: "__IMAGE__"
+          imagePullPolicy: IfNotPresent
+          command: ["python", "/fakes/fake_plane.py", "--fixtures", "/fakes/fixtures.json"]
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: FAKE_PLANE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: sortyard-replica-plane-read
+                  key: api-key
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          volumeMounts:
+            - name: fakes
+              mountPath: /fakes
+              readOnly: true
+      volumes:
+        - name: fakes
+          configMap:
+            name: sortyard-replica-fakes

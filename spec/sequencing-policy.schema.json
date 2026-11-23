@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/sequencing-policy.schema.json",
+  "title": "SequencingPolicy",
+  "description": "How claim sequences of multiple projects interleave on shared lane capacity (§3.3a.5): strict global order, per-project round-robin, or reserved slots per project. Recorded, applied mechanically, shown in the Pickup Preview.",
+  "x-sortyard-design-ref": "§3.3a",
+  "x-sortyard-store": "definition",
+  "type": "object",
+  "allOf": [
+    {"$ref": "common.schema.json#/$defs/definition_base"},
+    {"if": {"properties": {"mode": {"const": "reserved_slots"}}, "required": ["mode"]},
+     "then": {"required": ["reserved_slots"]}},
+    {"if": {"properties": {"scope": {"const": "lane"}}, "required": ["scope"]},
+     "then": {"required": ["lane_id"]}}
+  ],
+  "required": ["scope", "mode"],
+  "properties": {
+    "scope": {"enum": ["installation", "lane"]},
+    "lane_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "mode": {"enum": ["strict_global", "per_project_round_robin", "reserved_slots"]},
+    "reserved_slots": {
+      "type": "object",
+      "description": "Project id -> reserved slot count (today's de facto per-project lane caps).",
+      "additionalProperties": {"type": "integer", "minimum": 0}
+    }
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "seqp-default", "workspace_id": "ws-noncelogic", "version": "1.0.0",
+    "scope": "installation", "mode": "reserved_slots",
+    "reserved_slots": {"proj-rove": 2, "proj-loopmentum": 3}
+  }]
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/operator.schema.json",
+  "title": "Operator",
+  "description": "A human user of the console (§3.9), authenticated through the installation's OIDC provider. Operators are not workflow roles; their permissions come from RoleBindings.",
+  "x-sortyard-design-ref": "§3.9",
+  "x-sortyard-store": "state",
+  "type": "object",
+  "allOf": [{"$ref": "common.schema.json#/$defs/object_base"}],
+  "required": ["subject", "display_name", "state"],
+  "properties": {
+    "subject": {"description": "OIDC subject claim.", "type": "string", "minLength": 1},
+    "email": {"type": "string", "format": "email"},
+    "display_name": {"type": "string", "minLength": 1},
+    "state": {"enum": ["active", "disabled"]},
+    "last_seen_at": {"$ref": "common.schema.json#/$defs/timestamp"}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{"id": "op-joe", "workspace_id": "ws-noncelogic", "subject": "oidc|joe", "email": "joe@example.com", "display_name": "Joe", "state": "active"}]
+}

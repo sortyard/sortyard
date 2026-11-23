@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/self-heal.schema.json",
+  "title": "SelfHeal",
+  "description": "Hand-back's owning process (§3.8): a handed-back item loses conductor eligibility, gains a self-heal assignment, carries the worker's account of why, and awaits host-access work under the self-heal contract, with re-alerting at 24h dwell.",
+  "x-sortyard-design-ref": "§3.8",
+  "x-sortyard-store": "state",
+  "type": "object",
+  "allOf": [{"$ref": "common.schema.json#/$defs/object_base"}],
+  "required": ["task_id", "worker_account", "assignee", "state", "opened_at"],
+  "properties": {
+    "task_id": {"$ref": "common.schema.json#/$defs/ref"},
+    "worker_account": {"description": "The worker's account of why it handed back.", "type": "string", "minLength": 1},
+    "evidence": {"type": "array", "items": {"type": "string"}},
+    "assignee": {"$ref": "common.schema.json#/$defs/actor"},
+    "state": {"enum": ["open", "in_progress", "resolved", "abandoned"]},
+    "realert_dwell_seconds": {"type": "integer", "minimum": 0, "default": 86400},
+    "last_alerted_at": {"$ref": "common.schema.json#/$defs/timestamp"},
+    "resolution": {"type": "string"},
+    "opened_at": {"$ref": "common.schema.json#/$defs/timestamp"},
+    "resolved_at": {"$ref": "common.schema.json#/$defs/timestamp"}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "sh-4", "workspace_id": "ws-noncelogic", "task_id": "task-rove-12",
+    "worker_account": "CI log unreadable from the worker pod.", "assignee": {"kind": "agent", "id": "sa-self-heal"},
+    "state": "open", "opened_at": "2026-11-08T10:00:00Z"
+  }]
+}

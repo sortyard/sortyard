@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/agent.schema.json",
+  "title": "Agent",
+  "description": "Agent / Worker: an executor (§3.7) — harness type, model policy, credential pool ref, tool set. Workers run as Kubernetes Jobs, one stage per pod, with no GitHub/tracker access by default, and never push: they produce a branch/patch in a clone taken from a repo Mirror.",
+  "x-sortyard-design-ref": "§3.7",
+  "x-sortyard-store": "definition",
+  "type": "object",
+  "allOf": [{"$ref": "common.schema.json#/$defs/definition_base"}],
+  "required": ["name", "harness", "model_policy", "credential_pool_ref", "tools"],
+  "properties": {
+    "name": {"type": "string", "minLength": 1},
+    "harness": {"enum": ["claude-code", "codex", "hermes", "custom"]},
+    "image": {"type": "string"},
+    "model_policy": {
+      "type": "object",
+      "required": ["model"],
+      "properties": {
+        "model": {"type": "string"},
+        "effort": {"enum": ["low", "medium", "high", "xhigh", "max"]},
+        "fallback_chain": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "credential_pool_ref": {"$ref": "common.schema.json#/$defs/ref"},
+    "tools": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "runs_as": {"const": "kubernetes_job", "default": "kubernetes_job"},
+    "one_stage_per_pod": {"const": true, "default": true},
+    "github_access": {"type": "boolean", "default": false},
+    "tracker_access": {"type": "boolean", "default": false},
+    "may_push": {"const": false, "default": false},
+    "clone_source": {"const": "mirror", "default": "mirror"}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "agent-claude-build", "workspace_id": "ws-noncelogic", "version": "1.0.0",
+    "name": "claude build worker", "harness": "claude-code", "image": "ghcr.io/sortyard/worker:1",
+    "model_policy": {"model": "claude-opus-5-5", "effort": "high"},
+    "credential_pool_ref": "pool-claude", "tools": ["shell", "edit"], "may_push": false
+  }]
+}

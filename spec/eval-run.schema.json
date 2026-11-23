@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sortyard.ai/spec/eval-run.schema.json",
+  "title": "EvalRun",
+  "description": "One execution of an Eval (§3.8). Records a verdict on observed evidence only; when the eval could not run, the verdict is absent and the eval's absent-state behaviour is recorded.",
+  "x-sortyard-design-ref": "§3.8",
+  "x-sortyard-store": "state",
+  "type": "object",
+  "allOf": [
+    {"$ref": "common.schema.json#/$defs/object_base"},
+    {"if": {"properties": {"verdict": {"const": "absent"}}, "required": ["verdict"]},
+     "then": {"required": ["absent_reason"]},
+     "else": {"properties": {"evidence": {"minItems": 1}}}}
+  ],
+  "required": ["eval", "subject_ref", "verdict", "evidence", "ran_at"],
+  "properties": {
+    "eval": {"$ref": "common.schema.json#/$defs/versioned_ref"},
+    "subject_ref": {"description": "StageRun, Chain or Project evaluated.", "$ref": "common.schema.json#/$defs/ref"},
+    "verdict": {"enum": ["pass", "fail", "absent"]},
+    "score": {"type": "number"},
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "ref"],
+        "properties": {
+          "kind": {"enum": ["event", "artifact", "check", "log", "observation"]},
+          "ref": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    },
+    "absent_reason": {"type": "string"},
+    "host": {"type": "string"},
+    "ran_at": {"$ref": "common.schema.json#/$defs/timestamp"}
+  },
+  "unevaluatedProperties": false,
+  "examples": [{
+    "id": "er-1", "workspace_id": "ws-noncelogic", "eval": {"id": "eval-deploy-green", "version": "1.0.0"},
+    "subject_ref": "proj-rove", "verdict": "pass",
+    "evidence": [{"kind": "observation", "ref": "event:evt-991"}], "ran_at": "2026-11-08T12:00:00Z"
+  }]
+}
