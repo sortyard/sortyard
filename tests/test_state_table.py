@@ -11,7 +11,15 @@ from datetime import timedelta
 
 import pytest
 
-from sortyard.kernel.states import StateTableError, load, parse_duration, shipped, shipped_text
+from sortyard.kernel.states import (
+    StateTableError,
+    from_record,
+    load,
+    parse_duration,
+    shipped,
+    shipped_text,
+    to_record,
+)
 
 # The item states of HARNESS-V3 section 3.1 and the owner the design gives each.
 SECTION_3_1 = {
@@ -67,6 +75,13 @@ def test_loading_fails_for_a_state_without_owner_limit_default_or_reason(
         ("limit", '""', "limit must be"),
         ("limit", '"soon"', "not a duration"),
         ("limit", '"0m"', "not a duration"),
+        ("limit", '"99999999999d"', "not a duration"),
+        ("limit", '"99999d"', "longer than ten years"),
+        (
+            "limit",
+            '{ by = "repeat-finding", low = "1h" }',
+            "needs a default that moves the item on",
+        ),
         ("limit", '"none"', "only a queue state"),
         ("limit", '"same-pass"', "only a decision state"),
         ("limit", '{ by = "risk-tier" }', "a limit table is"),
@@ -122,7 +137,7 @@ next = { again = "parked" }
 decision = true
 owner = "decision-service"
 limit = "same-pass"
-default = { answer = "rebuild", reverse = "Decide again." }
+default = { answer = "rebuild", reverse = "Decide again.", on-repeat = "escalate" }
 reason = "decision-required"
 next = { rebuild = "building", escalate = "decision" }
 """
@@ -131,8 +146,28 @@ next = { rebuild = "building", escalate = "decision" }
 
     with pytest.raises(StateTableError, match="exactly one state must be initial"):
         load(without(shipped_text(), "admitted", "initial"))
+    answer = '{ answer = "resume", reverse = "%s", on-repeat = "%s" }'
     with pytest.raises(StateTableError, match="a default answer needs"):
-        load(replaced(shipped_text(), "decision", "default", '{ answer = "resume", reverse = "" }'))
+        load(replaced(shipped_text(), "decision", "default", answer % ("", "wait")))
+    # A decision that repeats must lead to a wait on a named need, which always has a limit.
+    with pytest.raises(StateTableError, match="on-repeat must lead to a wait on a named need"):
+        load(replaced(shipped_text(), "decision", "default", answer % ("Undo it.", "rebuild")))
+    with pytest.raises(StateTableError, match="on-repeat must lead to a wait on a named need"):
+        load(replaced(shipped_text(), "decision", "default", answer % ("Undo it.", "resume")))
+    with pytest.raises(StateTableError, match="on-repeat answer 'ask' is not one of its answers"):
+        load(replaced(shipped_text(), "decision", "default", answer % ("Undo it.", "ask")))
+
+    # A state nothing leads to is not part of the machine.
+    island = """
+[states.island]
+owner = "nobody"
+limit = "1h"
+default = { to = "decision" }
+reason = "queued"
+next = { rescued = "building" }
+"""
+    with pytest.raises(StateTableError, match="state 'island': cannot be reached"):
+        load(shipped_text() + island)
 
 
 def test_the_shipped_table_declares_every_section_3_1_state_and_no_blocked_state() -> None:
@@ -173,6 +208,7 @@ def test_the_shipped_table_declares_every_section_3_1_state_and_no_blocked_state
     building, fixing, waiting = (table.state(n).limit for n in ("building", "fixing", "waiting"))
     assert building is not None and set(building.by_tier) == {"low", "medium", "high"}
     assert fixing is not None and fixing.kind == "repeat-finding"
+    assert set(fixing.by_tier) == {"low", "medium", "high"}  # bounded by time as well
     assert waiting is not None and waiting.kind == "by-need"
 
     # The decision state answers in the same pass, and its own default says how to reverse it.
@@ -180,6 +216,23 @@ def test_the_shipped_table_declares_every_section_3_1_state_and_no_blocked_state
     assert decision.limit is not None and decision.limit.kind == "same-pass"
     assert decision.default is not None and decision.default.answer in decision.next
     assert decision.default.reverse
+    assert decision.default.on_repeat == "wait" and decision.next["wait"] == "waiting"
+    assert [state.kind for state in table.states.values()] == [
+        *["queue", "work", "work", "work", "work", "work", "work", "need", "decision"],
+        "terminal",
+    ]
+
+
+def test_a_table_survives_the_trip_into_a_workflow_and_back() -> None:
+    """An item keeps the table it was checked with: the record rebuilds it without the loader."""
+    table = shipped()
+    rebuilt = from_record(to_record(table))
+    assert rebuilt.states == table.states
+    assert (rebuilt.version, rebuilt.initial, rebuilt.reasons) == (
+        table.version,
+        table.initial,
+        table.reasons,
+    )
 
 
 def test_a_queue_state_has_no_limit_and_reports_its_age_instead() -> None:
@@ -196,6 +249,6 @@ def test_a_queue_state_has_no_limit_and_reports_its_age_instead() -> None:
 def test_durations() -> None:
     assert parse_duration("90s") == timedelta(seconds=90)
     assert parse_duration("7d") == timedelta(days=7)
-    for bad in ("", "10", "m", "1.5h", "-5m", "0s", "5 m"):
+    for bad in ("", "10", "m", "1.5h", "-5m", "0s", "5 m", "99999999999d", "3651d"):
         with pytest.raises(ValueError, match="not a duration"):
             parse_duration(bad)

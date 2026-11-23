@@ -18,9 +18,11 @@
 #   { by = "need", otherwise = ".." }
 #                                the named need the item waits on sets it; otherwise applies
 #                                when the need sets none
-#   "repeat-finding"             by progress, not time: the limit passes when the item enters the
-#                                state with a finding it has entered it with since its last
-#                                decision
+#   { by = "repeat-finding", low = "..", medium = "..", high = ".." }
+#                                by progress: the limit passes when the item enters the state
+#                                with a finding it has entered it with since its last decision;
+#                                and by time, by the item's risk tier, so a fix that is never
+#                                reported is bounded too
 #   "same-pass"                  decision only: the answer is given in the pass that asks
 #   "none"                       queue only: no limit, the item's age is reported instead
 #
@@ -28,15 +30,20 @@
 #   { to = "state" }                     move the item there
 #   { retry = 1, then = "state" }        dispatch the owner again that many times, then move
 #   { redispatch = true }                dispatch the owner again, with a fresh limit
-#   { answer = "..", reverse = ".." }    decision only: the answer when neither policy nor the
-#                                        item gives one, and how to reverse it
+#   { answer = "..", reverse = "..", on-repeat = ".." }
+#                                        decision only: the answer when neither policy nor the
+#                                        item gives one, and how to reverse it; and the answer
+#                                        given instead when the same question has just had the
+#                                        same answer, which must lead to a wait on a named need
 #   "none"                               queue only
 # and may carry action = "..", a word handed to the owner that is dispatched next.
 #
 # Where the numbers come from. checking 10m, reviewing 30m and merging 30m are the limits of
 # HARNESS-V3 section 3.1. That section gives preflight as "minutes" and building as "by risk
-# tier" without numbers, and waiting as "set by the need": the preflight and building durations
-# and the waiting "otherwise" below are provisional and carry no owner decision.
+# tier" without numbers, waiting as "set by the need" and fixing as "by progress" alone: the
+# preflight and building durations, the waiting "otherwise" and the time bound on fixing (the
+# building durations again, since the same executor does the work) are provisional and carry
+# no owner decision.
 
 version = 1
 
@@ -91,7 +98,7 @@ next = { approved = "merging", findings = "fixing" }
 
 [states.fixing]
 owner = "executor"
-limit = "repeat-finding"
+limit = { by = "repeat-finding", low = "30m", medium = "1h", high = "2h" }
 default = { to = "decision", action = "narrow-or-split" }
 reason = "fix-in-progress"
 next = { fixed = "checking" }
@@ -114,7 +121,7 @@ next = { closed = "preflight" }
 decision = true
 owner = "decision-service"
 limit = "same-pass"
-default = { answer = "resume", reverse = "Send the item a decision request with a different answer." }
+default = { answer = "resume", reverse = "Send the item a decision request with a different answer.", on-repeat = "wait" }
 reason = "decision-required"
 next = { resume = "@origin", rebuild = "building", wait = "waiting" }
 

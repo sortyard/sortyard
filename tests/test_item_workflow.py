@@ -19,7 +19,7 @@ import pytest
 
 from sortyard.engine import Engine, Recorded, Registry
 from sortyard.engine.testing import TestClock, time_skipping_engine
-from sortyard.kernel.item import register, send_outcome, start_item
+from sortyard.kernel.item import INPUT_SIGNAL, register, send_outcome, start_item
 from sortyard.kernel.states import StateTable, load, shipped, shipped_text
 
 DEADLINE = 60.0
@@ -152,13 +152,21 @@ def test_an_item_passes_admitted_to_merged_through_fake_owner_steps() -> None:
             # late one from an earlier dispatch of this state.
             await send_outcome(k.engine, identifier, state="checking", outcome="green")
             await send_outcome(
-                k.engine, identifier, state="building", outcome="no-change", attempt=7
+                k.engine, identifier, state="building", outcome="no-change", dispatch=1
             )
+            # Nor do inputs that say nothing the workflow understands, or an outcome the
+            # state does not have.
+            await k.engine.signal(
+                identifier, INPUT_SIGNAL, {"kind": "outcome", "state": "building"}
+            )
+            await k.engine.signal(identifier, INPUT_SIGNAL, ["not", "a", "mapping"])
+            await send_outcome(k.engine, identifier, state="building", outcome="exploded")
             late = await until(
                 lambda: k.engine.recorded(identifier),
-                lambda r: r.idle and len(r.signals) == 2,
-                "both stray outcomes read",
+                lambda r: r.idle and len(r.signals) == 5,
+                "the stray inputs read",
             )
+            assert late.defect is None
             one_timer(late, timedelta(hours=1))
             assert fakes.states()[-1] == "building"
             await send_outcome(k.engine, identifier, state="building", outcome="built")
@@ -192,6 +200,13 @@ def test_an_item_passes_admitted_to_merged_through_fake_owner_steps() -> None:
     assert [(call["state"], call["owner"], call["attempt"]) for call in fakes.calls] == [
         (name, table.state(name).owner, 1) for name in order[:-1]
     ]
+    # The owner is told which stay it is dispatched for: the transition's sequence.
+    assert [call["dispatch"] for call in fakes.calls] == [1, 2, 3, 4, 5, 6]
+    building = fakes.events[2]
+    assert (building["state_kind"], building["from_kind"]) == ("work", "work")
+    assert building["limit_seconds"] == 3600 and building["attempt"] == 1
+    assert building["deadline"] > building["entered_at"]
+    assert fakes.events[0]["limit_seconds"] is None and fakes.events[0]["deadline"] is None
     assert fakes.questions == []
 
 
@@ -325,7 +340,17 @@ def test_a_decision_state_returns_an_answer_in_the_same_pass_with_the_reversal_r
 def test_fixing_passes_its_limit_when_the_same_finding_comes_back() -> None:
     finding: Reply = {"outcome": "findings", "detail": {"finding": "F-1: missing null check"}}
     other: Reply = {"outcome": "findings", "detail": {"finding": "F-2: unbounded retry"}}
-    fakes = Fakes(script={"reviewing": [finding, other, finding]})
+    conflict: Reply = {"outcome": "conflict"}
+    red: Reply = {"outcome": "red"}
+    # After the three reviews: a merge conflict and two red checks, none naming a finding.
+    fakes = Fakes(
+        script={
+            "reviewing": [finding, other, finding],
+            "merging": [conflict],
+            "checking": [None, None, None, None, red, red],
+        }
+    )
+    fakes.script["checking"][:4] = [HAPPY["checking"]] * 4
 
     async def scenario() -> Any:
         async with kernel(fakes) as k:
@@ -335,7 +360,7 @@ def test_fixing_passes_its_limit_when_the_same_finding_comes_back() -> None:
     # F-1, then F-2 (a different finding: progress), then F-1 again: the limit passes, the
     # executor is not dispatched for it, and the decision gets the default's action.
     into_fixing = [e for e in fakes.events if e["from_state"] in ("reviewing", "fixing")]
-    assert [(e["from_state"], e["state"], e["cause"], e["action"]) for e in into_fixing] == [
+    assert [(e["from_state"], e["state"], e["cause"], e["action"]) for e in into_fixing[:8]] == [
         ("reviewing", "fixing", "outcome", None),
         ("fixing", "checking", "outcome", None),
         ("reviewing", "fixing", "outcome", None),
@@ -346,9 +371,43 @@ def test_fixing_passes_its_limit_when_the_same_finding_comes_back() -> None:
         ("reviewing", "merging", "outcome", None),
     ]
     # The decision (resume) starts progress over, so the executor is dispatched a third time.
-    assert [call["attempt"] for call in fakes.calls_for("fixing")] == [1, 2, 4]
+    assert [call["attempt"] for call in fakes.calls_for("fixing")][:3] == [1, 2, 4]
+    assert len(fakes.questions) == 1
     assert fakes.questions[0]["state"] == "fixing"
     assert fakes.questions[0]["action"] == "narrow-or-split"
+    # Entering fixing without a named finding is no evidence of repetition: the conflict and
+    # the two red checks each dispatch the executor, and F-1 from long before is not held
+    # against them.
+    assert [call["detail"] for call in fakes.calls_for("fixing")[3:]] == [{}, {}, {}]
+    assert [call["attempt"] for call in fakes.calls_for("fixing")] == [1, 2, 4, 5, 6, 7]
+
+
+def test_an_outcome_delivered_twice_is_not_applied_to_the_next_stay() -> None:
+    fakes = Fakes(script={"reviewing": [SILENT, SILENT]})
+    finding = {"finding": "F-1: missing null check"}
+
+    async def scenario() -> Any:
+        async with kernel(fakes) as k:
+            identifier = await k.start()
+            await k.idle_in(identifier, "reviewing")
+            # The reviewer's webhook fires twice.
+            for _ in range(2):
+                await send_outcome(
+                    k.engine, identifier, state="reviewing", outcome="findings", detail=finding
+                )
+
+            # The fix goes through and the item is back in review, waiting: the second copy
+            # was dropped, not taken as this review's verdict.
+            def second_review(recorded: Recorded) -> bool:
+                return recorded.idle and len(fakes.calls_for("reviewing")) == 2
+
+            await until(lambda: k.engine.recorded(identifier), second_review, "the second review")
+            assert fakes.states().count("fixing") == 1 and fakes.questions == []
+            await send_outcome(k.engine, identifier, state="reviewing", outcome="approved")
+            return await k.result(identifier)
+
+    assert asyncio.run(scenario())["state"] == "merged"
+    assert fakes.states().count("fixing") == 1 and fakes.questions == []
 
 
 def test_a_new_state_is_added_by_editing_only_the_data_file() -> None:
@@ -384,10 +443,11 @@ next = { linted = "checking" }
     )
 
 
-def test_a_wait_on_a_need_takes_the_needs_limit_and_an_unknown_outcome_gets_the_default() -> None:
+def test_a_wait_on_a_need_takes_the_needs_limit() -> None:
     gap: Reply = {"outcome": "gap", "detail": {"need": "secret:deploy-key", "limit": "2h"}}
     silent_gap: Reply = {"outcome": "gap", "detail": {"need": "runner:pool-a"}}
-    fakes = Fakes(script={"preflight": [gap, silent_gap], "merging": [{"outcome": "exploded"}]})
+    absurd: Reply = {"outcome": "gap", "detail": {"need": "x", "limit": "99999999999d"}}
+    fakes = Fakes(script={"preflight": [gap, silent_gap, absurd]})
 
     async def scenario() -> Any:
         async with kernel(fakes) as k:
@@ -404,24 +464,139 @@ def test_a_wait_on_a_need_takes_the_needs_limit_and_an_unknown_outcome_gets_the_
             )
             one_timer(await k.idle_in(identifier, "waiting"), timedelta(hours=24))
             await send_outcome(k.engine, identifier, state="waiting", outcome="closed")
+            # The third need set a limit no clock can hold: "otherwise" applies again.
+            one_timer(await k.idle_in(identifier, "waiting"), timedelta(hours=24))
+            await send_outcome(k.engine, identifier, state="waiting", outcome="closed")
             return await k.result(identifier)
 
     assert asyncio.run(scenario())["state"] == "merged"
-    assert [call["detail"] for call in fakes.calls_for("waiting")] == [
-        {"need": "secret:deploy-key", "limit": "2h"},
-        {"need": "runner:pool-a"},
-        {"need": "runner:pool-a"},
+    assert [call["detail"].get("need") for call in fakes.calls_for("waiting")] == [
+        "secret:deploy-key",
+        "runner:pool-a",
+        "runner:pool-a",
+        "x",
     ]
     assert fakes.questions[0]["state"] == "waiting" and fakes.questions[0]["cause"] == "limit"
-    # The merge adapter answered with an outcome the table does not know: the declared default
-    # (dispatch again, update the branch) is applied and the outcome is kept on the record.
-    unknown = next(event for event in fakes.events if event["cause"] == "unknown-outcome")
-    assert (unknown["from_state"], unknown["state"], unknown["outcome"], unknown["action"]) == (
-        "merging",
-        "merging",
-        "exploded",
-        "update-branch",
+    waits = [event for event in fakes.events if event["state"] == "waiting"]
+    assert [event["limit_seconds"] for event in waits] == [7200, 86400, 86400, 86400]
+    assert all(event["state_kind"] == "need" for event in waits)
+
+
+def test_an_outcome_the_state_does_not_know_waits_out_the_limit_then_gets_the_default() -> None:
+    # The merge adapter answers with an outcome the table does not have, every time.
+    exploded: Reply = {"outcome": "exploded"}
+    fakes = Fakes(script={"merging": [exploded, exploded]})
+    half_hour = timedelta(minutes=30)
+
+    async def scenario() -> Any:
+        async with kernel(fakes) as k:
+            identifier = await k.start()
+            # Not acted on at once: the item stays, inside its limit, dispatched once.
+            one_timer(await k.idle_in(identifier, "merging"), half_hour)
+            assert len(fakes.calls_for("merging")) == 1
+            await k.clock.advance(half_hour)
+            await until(
+                lambda: asyncio.sleep(0, fakes.calls_for("merging")),
+                lambda calls: len(calls) == 2,
+                "the merge adapter dispatched again",
+            )
+            one_timer(await k.idle_in(identifier, "merging"), half_hour)
+            # A real outcome inside the limit is still taken.
+            await send_outcome(k.engine, identifier, state="merging", outcome="merged")
+            return await k.result(identifier)
+
+    assert asyncio.run(scenario())["state"] == "merged"
+    unknown = [event for event in fakes.events if event["cause"] == "unknown-outcome"]
+    assert [(e["from_state"], e["state"], e["outcome"], e["action"]) for e in unknown] == [
+        ("merging", "merging", "exploded", "update-branch")
+    ]
+    assert len(fakes.calls_for("merging")) == 2  # once per limit, not in a loop
+
+
+def test_a_decision_that_repeats_waits_on_a_named_need_instead_of_going_round_again() -> None:
+    # The executor reports "no change" every time and no policy answers, so the table's default
+    # (resume) sends the item straight back to the same build.
+    no_change: Reply = {"outcome": "no-change"}
+    fakes = Fakes(script={"building": [no_change] * 4})
+
+    async def scenario() -> Any:
+        async with kernel(fakes) as k:
+            identifier = await k.start()
+            # Two builds, two decisions, and the item is waiting with a timer running.
+            waiting = await k.idle_in(identifier, "waiting")
+            one_timer(waiting, timedelta(hours=24))
+            assert len(fakes.calls_for("building")) == 2
+            assert len(fakes.questions) == 2
+            # Closing the need lets it try again: the same two rounds, then the wait again.
+            await send_outcome(k.engine, identifier, state="waiting", outcome="closed")
+            await until(
+                lambda: asyncio.sleep(0, fakes.calls_for("building")),
+                lambda calls: len(calls) == 4,
+                "the next two builds",
+            )
+            one_timer(await k.idle_in(identifier, "waiting"), timedelta(hours=24))
+            # The build now succeeds (the script is spent).
+            await send_outcome(k.engine, identifier, state="waiting", outcome="closed")
+            return await k.result(identifier)
+
+    assert asyncio.run(scenario())["state"] == "merged"
+    decided = [event["decision"] for event in fakes.events if event["cause"] == "decision"]
+    assert [(d["answer"], d["source"]) for d in decided] == [
+        ("resume", "table"),
+        ("wait", "repeat"),
+        ("resume", "table"),
+        ("wait", "repeat"),
+    ]
+    assert all(d["reverse"].strip() for d in decided)
+    need = fakes.calls_for("waiting")[0]["detail"]
+    assert need["need"] == "a-different-answer"
+    assert need["question"]["state"] == "building" and need["question"]["outcome"] == "no-change"
+    assert len(fakes.calls_for("building")) == 5
+
+
+def test_replies_that_are_not_understood_never_stop_an_item() -> None:
+    no_change: Reply = {"outcome": "no-change"}
+    # Owner replies that carry no outcome the workflow can read count as "will report later".
+    fakes = Fakes(
+        script={
+            "preflight": [{"outcome": 7}],
+            "building": [no_change, {"detail": "not a mapping"}],
+            "checking": [["green"]],  # type: ignore[list-item]
+        }
     )
+    # A decision answer that is not an answer falls through to the table's default.
+    fakes.decisions = [{"answer": ["rebuild"], "reverse": "x"}]
+
+    async def scenario() -> tuple[Any, Recorded]:
+        async with kernel(fakes) as k:
+            identifier = await k.start()
+            for state, outcome in (("preflight", "ready"), ("building", "built")):
+                await k.idle_in(identifier, state)
+                await send_outcome(k.engine, identifier, state=state, outcome=outcome)
+            await k.idle_in(identifier, "checking")
+            await send_outcome(k.engine, identifier, state="checking", outcome="green")
+            return await k.result(identifier), await k.engine.recorded(identifier)
+
+    result, recorded = asyncio.run(scenario())
+    assert result["state"] == "merged" and recorded.defect is None
+    decided = [event["decision"] for event in fakes.events if event["cause"] == "decision"]
+    assert [(d["answer"], d["source"]) for d in decided] == [("resume", "table")]
+
+
+def test_a_worker_or_an_item_that_cannot_run_the_table_is_refused_at_the_start() -> None:
+    fakes = Fakes()
+    owners = {state.owner: fakes.owner for state in shipped().states.values() if state.owner}
+    del owners["reviewer"]
+    with pytest.raises(ValueError, match=r"no owner registered for \['reviewer'\]"):
+        register(Registry(), owners=owners, decide=fakes.decide, record=fakes.record)
+
+    async def scenario() -> None:
+        async with kernel(fakes) as k:
+            for bad in ({"answer": ["rebuild"], "reverse": "x"}, {"answer": "rebuild"}, {}):
+                with pytest.raises(ValueError, match="decision_default must name an answer"):
+                    await k.start(decision_default=bad)
+
+    asyncio.run(scenario())
 
 
 def test_an_item_cannot_start_on_a_risk_tier_the_table_has_no_limit_for() -> None:

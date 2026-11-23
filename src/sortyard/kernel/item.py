@@ -14,6 +14,17 @@ replayed from history, so it holds no I/O and reads no clock but the engine's.
 An owner replies in one of two ways. It returns an outcome at once, or it returns none and the
 outcome arrives later as an input signal (`send_outcome`), which is how a webhook reports that
 a build, a check or a review finished. Either way the limit covers the whole stay.
+
+Nothing an owner, the decision service or a signal sends can stop the workflow: a reply that is
+not understood counts as no reply, and the limit and its default still apply. Two rules keep an
+item from spinning between rounds with no timer:
+
+- An outcome the state does not know is not acted on at once. The item stays until the limit
+  passes, then takes the default. So an owner that keeps answering nonsense is dispatched once
+  per limit, not in a loop.
+- A decision that repeats (the same question, straight after it got the same answer) does not
+  give that answer again. It gives the table's `on-repeat` answer, which leads to a wait on a
+  named need: "a different answer". That is a stop on evidence of repetition, not on a count.
 """
 
 from __future__ import annotations
@@ -23,7 +34,16 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from sortyard.engine import Context, Engine, LimitPassed, Registry, StepFailed
-from sortyard.kernel.states import ORIGIN, Default, State, StateTable, load, parse_duration, shipped
+from sortyard.kernel.states import (
+    ORIGIN,
+    Default,
+    State,
+    StateTable,
+    from_record,
+    parse_duration,
+    shipped,
+    to_record,
+)
 
 ITEM_WORKFLOW = "sortyard.item"
 OWNER_STEP = "sortyard.item.owner"
@@ -46,17 +66,33 @@ def workflow_id(tenant: str, item: str) -> str:
 
 
 def register(
-    registry: Registry, *, owners: Mapping[str, Owner], decide: Decide, record: Record
+    registry: Registry,
+    *,
+    owners: Mapping[str, Owner],
+    decide: Decide,
+    record: Record,
+    table: StateTable | None = None,
 ) -> None:
     """Put the item workflow and its three steps on a worker's registry.
 
     `owners` maps an owner name from the state table to the function that does that owner's
-    work. It gets the call (item, tenant, state, owner, attempt, cause, action, detail) and
-    returns `{"outcome": ..., "detail": {...}}`, or nothing when the outcome will arrive as an
-    input. `decide` gets the question and returns `{"answer": ..., "reverse": ...}` or nothing.
-    `record` gets every transition event and must persist it; the item does not move on until
-    it has.
+    work. It gets the call (item, tenant, state, owner, dispatch, attempt, cause, action,
+    detail) and returns `{"outcome": ..., "detail": {...}}`, or nothing when the outcome will
+    arrive as an input. `decide` gets the question and returns `{"answer": ..., "reverse":
+    ...}` or nothing. `record` gets every transition event and must persist it; the item does
+    not move on until it has. It may be called more than once for a transition; the item and
+    the event's sequence identify it.
+
+    Every owner `table` names (the shipped table unless given) must be in `owners`: a worker
+    that cannot do a state's work is refused here, not found out by an item waiting in it.
     """
+    table = table or shipped()
+    missing = sorted(
+        {state.owner for state in table.states.values() if state.owner and not state.decision}
+        - set(owners)
+    )
+    if missing:
+        raise ValueError(f"no owner registered for {missing}")
 
     def owner_step(call: Payload) -> Payload | None:
         owner = owners.get(call["owner"])
@@ -72,6 +108,20 @@ def register(
     registry.workflow(ITEM_WORKFLOW)(item_workflow)
 
 
+def _is_answer(candidate: Any, state: State) -> bool:
+    """A decision answer counts only if it names one of the state's answers and says how to
+    reverse it."""
+    if not isinstance(candidate, Mapping):
+        return False
+    answer, reverse = candidate.get("answer"), candidate.get("reverse")
+    return (
+        isinstance(answer, str)
+        and answer in state.next
+        and isinstance(reverse, str)
+        and bool(reverse.strip())
+    )
+
+
 async def start_item(
     engine: Engine,
     item: str,
@@ -83,18 +133,20 @@ async def start_item(
 ) -> str:
     """Start the workflow of one item and return its workflow id.
 
-    The item runs on `table` (the shipped one unless given) for its whole life.
-    `decision_default` is the item's own answer for decisions policy does not cover:
-    `{"answer": ..., "reverse": ...}`.
+    The item runs on `table` (the shipped one unless given) for its whole life, as checked
+    now. `decision_default` is the item's own answer for decisions policy does not cover:
+    `{"answer": ..., "reverse": ...}`; one that no decision state of the table could give is
+    refused here.
     """
     table = table or shipped()
     for state in table.states.values():
-        if (
-            state.limit
-            and state.limit.kind == "by-risk-tier"
-            and risk_tier not in state.limit.by_tier
-        ):
+        if state.limit and state.limit.by_tier and risk_tier not in state.limit.by_tier:
             raise ValueError(f"state {state.name!r} has no limit for risk tier {risk_tier!r}")
+    decisions = [state for state in table.states.values() if state.decision]
+    if decision_default is not None and not any(
+        _is_answer(decision_default, state) for state in decisions
+    ):
+        raise ValueError("decision_default must name an answer of the table and how to reverse it")
     identifier = workflow_id(tenant, item)
     await engine.start(
         ITEM_WORKFLOW,
@@ -103,7 +155,7 @@ async def start_item(
             "item": item,
             "tenant": tenant,
             "risk_tier": risk_tier,
-            "table": table.text,
+            "table": to_record(table),
             "decision_default": dict(decision_default) if decision_default else None,
         },
     )
@@ -117,12 +169,13 @@ async def send_outcome(
     state: str,
     outcome: str,
     detail: Payload | None = None,
-    attempt: int | None = None,
+    dispatch: int | None = None,
 ) -> None:
     """Report an owner's outcome for the state the item is in.
 
-    An outcome for another state is ignored. Pass the `attempt` the owner was called with to
-    have a late report from an earlier dispatch of the same state ignored too.
+    An outcome for another state is ignored, and so is one that arrived before the item
+    entered the state. Pass the `dispatch` number the owner was called with to have a late
+    report from an earlier stay in the same state ignored too.
     """
     await engine.signal(
         identifier,
@@ -130,7 +183,7 @@ async def send_outcome(
         {
             "kind": "outcome",
             "state": state,
-            "attempt": attempt,
+            "dispatch": dispatch,
             "outcome": outcome,
             "detail": dict(detail or {}),
         },
@@ -152,40 +205,35 @@ def _apply_default(state: State, default: Default, retries_used: dict[str, int])
 
 
 def _limit_for(state: State, tier: str, detail: Payload) -> timedelta | None:
+    """The time the item may stay in `state`: none only for a queue."""
     limit = state.limit
     assert limit is not None
-    if limit.kind == "by-risk-tier":
+    if limit.by_tier:  # by risk tier, and the time bound of repeat-finding
         return limit.by_tier.get(tier) or min(limit.by_tier.values())
     if limit.kind == "by-need":
         try:
             return parse_duration(str(detail.get("limit")))
         except ValueError:
             return limit.duration
-    return limit.duration  # a duration, or none for a queue and for repeat-finding
+    return limit.duration
 
 
-def _answer(state: State, policy: Any, item_default: Payload | None) -> tuple[str, Payload]:
-    """The decision's answer and where it came from: policy, else the item, else the table.
-
-    A candidate counts only if it names one of the state's answers and says how to reverse it.
-    """
-    assert state.default is not None
-    table_default = {"answer": state.default.answer, "reverse": state.default.reverse}
-    for source, candidate in (("policy", policy), ("item", item_default)):
-        if (
-            isinstance(candidate, Mapping)
-            and candidate.get("answer") in state.next
-            and isinstance(candidate.get("reverse"), str)
-            and candidate["reverse"].strip()
-        ):
-            return source, candidate
-    return "table", table_default  # the loader checked that this one qualifies
+def _outcome(reply: Any) -> tuple[str, dict[str, Any]] | None:
+    """The outcome and detail of an owner's reply or an outcome input, if it carries one."""
+    if not isinstance(reply, Mapping) or not isinstance(reply.get("outcome"), str):
+        return None
+    detail = reply.get("detail")
+    return reply["outcome"], dict(detail) if isinstance(detail, Mapping) else {}
 
 
 async def _outcome_input(
-    ctx: Context, state: str, attempt: int, deadline: datetime | None
-) -> Payload | None:
-    """The next outcome input for this dispatch of `state`, or nothing once the deadline passes."""
+    ctx: Context, state: State, dispatch: int, deadline: datetime | None
+) -> tuple[str, dict[str, Any]] | None:
+    """The next outcome input the state knows, for this stay; nothing once the deadline passes.
+
+    Inputs for another state or another stay, inputs that are not understood and outcomes the
+    state does not know are passed over: the item keeps waiting, inside its limit.
+    """
     while True:
         remaining = None if deadline is None else deadline - ctx.now()
         if remaining is not None and remaining <= timedelta(0):
@@ -197,16 +245,18 @@ async def _outcome_input(
         if (
             isinstance(received, Mapping)
             and received.get("kind") == "outcome"
-            and received.get("state") == state
-            and received.get("attempt") in (None, attempt)
+            and received.get("state") == state.name
+            and received.get("dispatch") in (None, dispatch)
         ):
-            return received
+            outcome = _outcome(received)
+            if outcome is not None and outcome[0] in state.next:
+                return outcome
 
 
 async def item_workflow(ctx: Context, arg: Any) -> dict[str, Any]:
-    table = load(arg["table"])
+    table = from_record(arg["table"])
     item, tenant, tier = arg["item"], arg["tenant"], arg["risk_tier"]
-    item_default: Payload | None = arg.get("decision_default")
+    item_default: Any = arg.get("decision_default")
 
     state = table.state(table.initial)
     origin: State | None = None
@@ -214,13 +264,21 @@ async def item_workflow(ctx: Context, arg: Any) -> dict[str, Any]:
     retries_used: dict[str, int] = {}
     findings: list[str] = []
     attempt: dict[str, int] = {}
+    # The last decision: what was asked and what was answered. Cleared when an owner's
+    # outcome moves the item on, so only a decision that comes straight back repeats.
+    last_decision: list[Any] | None = None
     # How the item came to enter `state`; written into the transition event.
-    move: dict[str, Any] = {"from_state": None, "cause": "start"}
+    move: dict[str, Any] = {"from_state": None, "from_kind": None, "cause": "start"}
     sequence = 0
 
     while True:
         entered = ctx.now()
         sequence += 1
+        attempt[state.name] = attempt.get(state.name, 0) + 1
+        limit = None if state.terminal or state.decision else _limit_for(state, tier, detail)
+        deadline = None if limit is None else entered + limit
+        # Whatever arrived before now answers an earlier stay, not this one.
+        ctx.drain_signals(INPUT_SIGNAL)
         await ctx.step(
             RECORD_STEP,
             {
@@ -228,9 +286,14 @@ async def item_workflow(ctx: Context, arg: Any) -> dict[str, Any]:
                 "tenant": tenant,
                 "sequence": sequence,
                 "state": state.name,
+                "state_kind": state.kind,
                 "owner": state.owner,
                 "limit": state.limit.text if state.limit else None,
+                "limit_seconds": None if limit is None else limit.total_seconds(),
+                "deadline": None if deadline is None else deadline.isoformat(),
                 "reason": state.reason,
+                "attempt": attempt[state.name],
+                "detail": detail,
                 "entered_at": entered.isoformat(),
                 "outcome": None,
                 "default": None,
@@ -243,7 +306,7 @@ async def item_workflow(ctx: Context, arg: Any) -> dict[str, Any]:
             return {"item": item, "tenant": tenant, "state": state.name, "transitions": sequence}
         declared_limit, default = state.limit, state.default
         assert declared_limit is not None and default is not None
-        attempt[state.name] = attempt.get(state.name, 0) + 1
+        here = {"from_state": state.name, "from_kind": state.kind}
 
         if state.decision:
             question = {
@@ -260,20 +323,36 @@ async def item_workflow(ctx: Context, arg: Any) -> dict[str, Any]:
                 reply = await ctx.step(DECIDE_STEP, question)
             except (StepFailed, LimitPassed):
                 reply = None
-            source, candidate = _answer(state, reply, item_default)
-            answer = candidate["answer"]
-            target = state.next[answer]
-            if isinstance(candidate.get("detail"), Mapping):
-                detail = dict(candidate["detail"])
+            candidates: list[tuple[str, Any]] = [
+                ("policy", reply),
+                ("item", item_default),
+                # The loader checked that the table's own default qualifies.
+                ("table", {"answer": default.answer, "reverse": default.reverse}),
+            ]
+            source, chosen = next(c for c in candidates if _is_answer(c[1], state))
+            answer: str = chosen["answer"]
+            reverse: str = chosen["reverse"]
+            asked = [question["state"], question["cause"], question["outcome"], detail]
+            if last_decision == [*asked, answer]:
+                # The same question, straight after the same answer: giving it again would
+                # go round again. Wait on a named need instead: a different answer.
+                assert default.on_repeat is not None
+                source, answer = "repeat", default.on_repeat
+                reverse = "Close the need, or send the item a decision with a different answer."
+                detail = {"need": "a-different-answer", "question": question}
+            elif isinstance(chosen.get("detail"), Mapping):
+                detail = dict(chosen["detail"])
+            last_decision = [*asked, answer]
             # A decision starts progress over: the findings seen before it no longer count.
             findings.clear()
+            target = state.next[answer]
             move = {
-                "from_state": state.name,
+                **here,
                 "cause": "decision",
                 "decision": {
                     "question": question,
                     "answer": answer,
-                    "reverse": candidate["reverse"],
+                    "reverse": reverse,
                     "source": source,
                 },
             }
@@ -281,61 +360,59 @@ async def item_workflow(ctx: Context, arg: Any) -> dict[str, Any]:
             state = resumed if target == ORIGIN else table.state(target)
             continue
 
-        passed = False
-        limit = _limit_for(state, tier, detail)
-        if declared_limit.kind == "repeat-finding":
-            finding = str(detail.get("finding", ""))
-            passed = finding in findings
-            findings.append(finding)
-        outcome: str | None = None
-        cause = "limit"
-        if not passed:
+        # Evidence of repetition: the item enters with a finding it entered with before.
+        repeated = False
+        if declared_limit.kind == "repeat-finding" and isinstance(detail.get("finding"), str):
+            repeated = detail["finding"] in findings
+            findings.append(detail["finding"])
+
+        outcome: tuple[str, dict[str, Any]] | None = None
+        cause, unknown = "limit", None
+        if not repeated:
             call = {
                 "item": item,
                 "tenant": tenant,
                 "state": state.name,
                 "owner": state.owner,
+                "dispatch": sequence,
                 "attempt": attempt[state.name],
                 "cause": move["cause"],
                 "action": move.get("action"),
                 "detail": detail,
             }
+            answered = True
             reply = None
             try:
-                reply = await ctx.step(OWNER_STEP, call, limit=limit)
+                reply = await ctx.step(
+                    OWNER_STEP, call, limit=None if deadline is None else deadline - ctx.now()
+                )
             except LimitPassed:
-                passed = True
+                answered = False
             except StepFailed:
-                passed, cause = True, "owner-failed"
-            if not passed:
-                if not (isinstance(reply, Mapping) and reply.get("outcome") is not None):
-                    reply = await _outcome_input(
-                        ctx,
-                        state.name,
-                        attempt[state.name],
-                        None if limit is None else entered + limit,
-                    )
-                if reply is None:
-                    passed = True
-                else:
-                    outcome = str(reply["outcome"])
-                    if isinstance(reply.get("detail"), Mapping):
-                        detail = dict(reply["detail"])
-                    if outcome not in state.next:
-                        passed, cause = True, "unknown-outcome"
+                answered, cause = False, "owner-failed"
+            if answered:
+                outcome = _outcome(reply)
+                if outcome is not None and outcome[0] not in state.next:
+                    # Not an outcome this state has. Keep it for the record and wait out the
+                    # limit for one that is.
+                    cause, unknown, outcome = "unknown-outcome", outcome[0], None
+                if outcome is None:
+                    outcome = await _outcome_input(ctx, state, sequence, deadline)
 
         origin = state
-        if passed:
+        if outcome is None:
             move = {
-                "from_state": state.name,
+                **here,
                 "cause": cause,
-                "outcome": outcome,
+                "outcome": unknown,
                 "default": default.text,
                 "action": default.action,
             }
             state = table.state(_apply_default(state, default, retries_used))
         else:
-            assert outcome is not None
             retries_used.pop(state.name, None)
-            move = {"from_state": state.name, "cause": "outcome", "outcome": outcome}
-            state = table.state(state.next[outcome])
+            move = {**here, "cause": "outcome", "outcome": outcome[0]}
+            detail = outcome[1]
+            state = table.state(state.next[outcome[0]])
+            if not state.decision:
+                last_decision = None
