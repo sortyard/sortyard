@@ -1,0 +1,191 @@
+"""Shared pieces of the worker tests: local git remotes, a scripted agent, and the lane.
+
+Nothing here reaches a network. A remote is a bare repository on disk, cloned over `file://`.
+The agent is a small Python script that writes down what it was given (its environment, its
+standard input, its working directory, the clone's git configuration) and then does what its
+first argument says, so a test can assert on what the real entry point handed it.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import pathlib
+import subprocess
+import sys
+from typing import Any
+
+from sortyard.kernel.capabilities import Lane, load
+
+TOKEN = "ghs_per0job1token2for3the4worker5tests"
+DIGEST = "sha256:" + "c3" * 32
+LANE: Lane = load(
+    f"""
+version = 1
+lane = "walwarden"
+resolver = "platform"
+runner-pool = "walwarden-runners"
+
+[images]
+worker = "registry.test/walwarden/worker@{DIGEST}"
+ci = "registry.test/walwarden/ci@{DIGEST}"
+
+[[repositories]]
+name = "walwarden/app"
+
+[[repositories]]
+name = "walwarden/infra"
+workflow-files = true
+
+[[secrets]]
+name = "DEPLOY_TOKEN"
+
+[[secrets]]
+name = "MODEL_API_KEY"
+
+[[services]]
+name = "cluster-api"
+"""
+)
+
+AGENT = r"""
+import json, os, pathlib, subprocess, sys
+
+seen, action = pathlib.Path(sys.argv[1]), sys.argv[2]
+
+
+def git(*args):
+    return subprocess.run(["git", *args], check=True, capture_output=True, text=True).stdout
+
+
+seen.write_text(json.dumps({
+    "env": dict(os.environ),
+    "stdin": sys.stdin.read(),
+    "cwd": os.getcwd(),
+    "config": pathlib.Path(".git/config").read_text(),
+    "remotes": git("remote", "-v"),
+    "branch": git("rev-parse", "--abbrev-ref", "HEAD").strip(),
+    "head": git("rev-parse", "HEAD").strip(),
+    "files": sorted(p.name for p in pathlib.Path(".").iterdir() if p.name != ".git"),
+}))
+
+
+def commit(name):
+    pathlib.Path(name).write_text("made by the agent\n")
+    git("add", name)
+    git("commit", "-q", "-m", "add " + name)
+
+
+if action.startswith("commit:"):
+    commit(action.split(":", 1)[1])
+elif action == "hook":
+    hook = pathlib.Path(".git/hooks/pre-push")
+    hook.write_text("#!/bin/sh\nenv > " + str(seen) + ".hook\n")
+    hook.chmod(0o755)
+    commit("hooked.txt")
+elif action == "review":
+    # Approves once the fix is in, as a reviewer reading the branch would.
+    print("I read the change.")
+    if pathlib.Path("fix.txt").exists():
+        print(json.dumps({"verdict": "approve"}))
+    else:
+        print(json.dumps({"verdict": "findings", "findings": [
+            {"key": "Missing fix.txt", "text": "The change does not add fix.txt."},
+            {"key": "style", "text": "Second finding."}]}))
+elif action.startswith("say:"):
+    print(action.split(":", 1)[1])
+elif action == "fail":
+    sys.exit(3)
+"""
+
+
+def git(*args: str, cwd: pathlib.Path) -> str:
+    """git as the tests run it: no host configuration, a fixed identity."""
+    env = {
+        **os.environ,
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_SYSTEM": os.devnull,
+        "GIT_AUTHOR_NAME": "seed",
+        "GIT_AUTHOR_EMAIL": "seed@example.invalid",
+        "GIT_COMMITTER_NAME": "seed",
+        "GIT_COMMITTER_EMAIL": "seed@example.invalid",
+    }
+    done = subprocess.run(
+        ["git", *args], cwd=cwd, env=env, check=True, capture_output=True, text=True
+    )
+    return done.stdout.strip()
+
+
+def make_remote(root: pathlib.Path, repository: str = "walwarden/app") -> pathlib.Path:
+    """A bare repository at root/<repository>.git with one commit on main."""
+    bare = root / f"{repository}.git"
+    bare.mkdir(parents=True)
+    git("init", "--quiet", "--bare", "--initial-branch=main", ".", cwd=bare)
+    seed = root / "seed"
+    seed.mkdir(exist_ok=True)
+    git("init", "--quiet", "--initial-branch=main", ".", cwd=seed)
+    (seed / "README.md").write_text("seed\n")
+    git("add", "README.md", cwd=seed)
+    git("commit", "--quiet", "-m", "seed", cwd=seed)
+    git("push", "--quiet", bare.as_uri(), "main", cwd=seed)
+    return bare
+
+
+def remote_head(bare: pathlib.Path, branch: str) -> str | None:
+    """The head of a branch on the remote, or nothing when the remote has no such branch."""
+    done = subprocess.run(
+        ["git", "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}"],
+        cwd=bare,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return done.stdout.strip() or None
+
+
+def agent_command(root: pathlib.Path, action: str, name: str = "seen") -> list[str]:
+    """The argv of the scripted agent; what it saw lands in root/<name>.json."""
+    script = root / "agent.py"
+    script.write_text(AGENT)
+    return [sys.executable, str(script), str(root / f"{name}.json"), action]
+
+
+def seen(root: pathlib.Path, name: str = "seen") -> dict[str, Any]:
+    loaded: dict[str, Any] = json.loads((root / f"{name}.json").read_text())
+    return loaded
+
+
+def run_worker(
+    root: pathlib.Path, brief: dict[str, Any], token: str = TOKEN, *, token_in: str = "file"
+) -> tuple[int, str]:
+    """Run the real entry point as a Job would: brief and token from files, the result in a
+    file. Returns its exit status and the result text (the termination message)."""
+    root.mkdir(parents=True, exist_ok=True)
+    work = root / "work"
+    work.mkdir(exist_ok=True)
+    (root / "brief.json").write_text(json.dumps(brief))
+    env = {
+        **{k: v for k, v in os.environ.items() if not k.startswith("SORTYARD_")},
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_SYSTEM": os.devnull,
+        "SORTYARD_BRIEF": str(root / "brief.json"),
+        "SORTYARD_WORKDIR": str(work),
+        "SORTYARD_RESULT": str(root / "result.json"),
+        # A lane secret the agent is meant to have: only the GitHub token is withheld.
+        "MODEL_API_KEY": "model-key-for-the-agent",
+    }
+    if token_in == "file":
+        (root / "token").write_text(token + "\n")
+        env["SORTYARD_GITHUB_TOKEN_FILE"] = str(root / "token")
+    else:
+        env["SORTYARD_GITHUB_TOKEN"] = token
+    done = subprocess.run(
+        [sys.executable, "-m", "sortyard.services.worker"],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    assert token not in done.stdout + done.stderr, "the worker printed the token"
+    return done.returncode, (root / "result.json").read_text()
