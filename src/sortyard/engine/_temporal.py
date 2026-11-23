@@ -104,6 +104,13 @@ class Context(Protocol):
         """
         ...
 
+    def drain_signals(self, name: str) -> list[Any]:
+        """Take every signal `name` that has arrived and not been read, in arrival order.
+
+        It does not wait. Use it to drop what arrived before the workflow began to expect it.
+        """
+        ...
+
 
 WorkflowFunction = Callable[[Context, Any], Awaitable[Any]]
 StepFunction = Callable[[Any], Any]
@@ -237,6 +244,12 @@ class _WorkflowContext:
         except TimeoutError:
             raise TimeoutError(f"no signal {name!r} within {timeout}") from None
         return queue.popleft()
+
+    def drain_signals(self, name: str) -> list[Any]:
+        queue = self._signals.setdefault(name, deque())
+        drained = list(queue)
+        queue.clear()
+        return drained
 
 
 # The registry each task queue's worker serves in this process. The generic workflow and step
