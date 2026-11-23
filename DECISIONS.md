@@ -107,3 +107,17 @@ provenance; where they conflict, the amendment wins.
   before adoption/activation. They introduce no live policy writes, actor grants or direct
   cluster repair path. Independent review PASS is in the product evidence.
 - **Contract:** [governed operating processes](docs/requirements/operating-processes.md).
+
+## SY-DEC-007 — Durable workflow engine (2026-11-23)
+
+- **Owner direction:** company/HARNESS-V3.md section 3.1 and decision 2, accepted by the owner
+  on 2026-11-23 ("agree with all with caveats"): Temporal on Postgres behind one module, DBOS
+  as the fallback, with the failure tests run before any kernel code depends on the engine.
+- **Decision:** Temporal, behind `src/sortyard/engine/`, the only package that imports the SDK.
+  The Temporal Python SDK 1.36.1 passed all four failure tests: a worker killed mid-step, a
+  restart on changed step code, a seven-day timer, a signal sent while no worker runs. The
+  fallback is not needed.
+- **Not yet verified:** Temporal's server storing to our Postgres. The tests run the engine's
+  development server (in-memory store) and its time-skipping test server; no server is deployed.
+- **Options, results, what the tests showed and how to reverse:**
+  [workflow engine record](docs/decisions/workflow-engine.md).
