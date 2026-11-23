@@ -1,4 +1,11 @@
-# Dependency-ordered delivery plan
+# Dependency-ordered delivery plan (reference)
+
+> **Deferral note — this is not the current build order.** [SY-DEC-005](../../DECISIONS.md#sy-dec-005)
+> (2026-11-23 amendment) makes Sortyard the workflow kernel plus the tracker view, stored to
+> Postgres only; SY-DEC-004 (Appwrite) no longer applies to the core, and a durable workflow
+> engine is used behind one module. Increments MS1, MS2 and MS6 are deferred until the kernel
+> runs one lane. The increments, the first tranche and the Appwrite items below are kept as
+> reference for requirement IDs and provenance; they cancel or move no board item.
 
 [plan.json](plan.json) assigns every current requirement to a milestone and area package. Packages
 are scope groups, not estimated one-PR tasks. The board holds state/order/blocked-by. There are

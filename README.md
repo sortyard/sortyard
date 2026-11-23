@@ -1,5 +1,10 @@
 # Sortyard
 
+> **Governing scope: [SY-DEC-005](DECISIONS.md#sy-dec-005) (2026-11-23 amendment).** Sortyard is
+> the workflow kernel plus the tracker view of company/HARNESS-V3.md, stored to Postgres only
+> (SY-DEC-004 no longer applies to the core), with a durable workflow engine behind one module.
+> Delivery-plan increments MS1, MS2 and MS6 are deferred until the kernel runs one lane.
+
 Sortyard is an open-source delivery harness — conductor, control plane and task manager —
 deployed with one Helm chart, with a UI for everything for the operator and APIs for everything
 for agents. The design record is [`DESIGN.md`](DESIGN.md) (architecture: §4); the stack is
@@ -10,13 +15,13 @@ This repository is at **Phase 1**: the six services exist as entry points, the A
 serves the Phase 1 REST surface of the OpenAPI spec behind service-account tokens and the §7
 permission matrix (below), the chart installs the API plus Postgres with the §3 domain schema
 and the event ledger migrated in, and the conductor can run in shadow mode (below) — observing
-the production conductor's input path and logging what it would claim. See the [ecosystem requirements baseline](docs/requirements/README.md) for the current delivery sequence.
+the production conductor's input path and logging what it would claim.
 
 Contributors and agents: start with [`AGENTS.md`](AGENTS.md), the repo brief (architecture
 map, build loop, conventions, known gaps).
 
-The current planning authority is the [ecosystem requirements baseline](docs/requirements/README.md). It formalizes meta-harness
-resources, policy and partner API ownership, and equal operator UI/agent API actions.
+The [ecosystem requirements baseline](docs/requirements/README.md) is kept as reference: it
+holds requirement IDs, acceptance and provenance, not the build order, which SY-DEC-005 sets.
 Its contracts describe planned capabilities; the code and runbooks below describe the
 existing Postgres implementation.
 

@@ -1,23 +1,23 @@
 # AGENTS.md — Sortyard repo brief
 
+> **Governing scope: [SY-DEC-005](DECISIONS.md#sy-dec-005) (2026-11-23 amendment).** Sortyard is
+> the workflow kernel plus the tracker view of company/HARNESS-V3.md. The core stores to
+> Postgres only; SY-DEC-004 (Appwrite) no longer applies to it. A durable workflow engine is
+> used behind one module, not hand-written. Delivery-plan increments MS1, MS2 and MS6 are
+> deferred until the kernel runs one lane. Read that record before any kernel task.
+
 Read this file first. It is meant to be enough, together with the code it points at, for an
 agent or a new contributor to make a first change without anyone briefing them. If something
 here is wrong or missing, that is a bug: fix it in the same change, or file it (see
 [Known gaps](#known-gaps)).
 
-## Current requirements authority
+## Requirements reference
 
-Read the [ecosystem baseline](docs/requirements/README.md) before new feature planning.
-It supersedes the historical draft and corpus where they conflict. Planned contracts under
-`docs/requirements/contracts/` are distinct from the implemented `spec/` contract.
-The baseline preserves single service ownership and equal operator/agent public actions.
-
-## Substrate planning amendment
-
-[SY-DEC-004](docs/decisions/appwrite-substrate.md) selects Appwrite as the preferred future
-persistence/auth substrate. This brief's Postgres commands and architecture describe the
-current code and replica; they remain valid until a reviewed migration implements the new
-backend. Preserve transaction, history and authorization guarantees during that work.
+The [ecosystem requirements baseline](docs/requirements/README.md), its catalog and its
+delivery plan are reference: they keep requirement IDs, acceptance and provenance, but they do
+not set the build order, and where they conflict with SY-DEC-005 the decision record wins.
+Planned contracts under `docs/requirements/contracts/` are distinct from the implemented
+`spec/` contract.
 
 ## What this is
 
