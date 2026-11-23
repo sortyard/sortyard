@@ -37,6 +37,8 @@ sortyard-context-assembler = "sortyard.services.context_assembler:main"
 sortyard-eval-runner = "sortyard.services.eval_runner:main"
 sortyard-sensor-runner = "sortyard.services.sensor_runner:main"
 sortyard-integrator = "sortyard.services.integrator:main"
+# What a worker Job runs (SY-V3-WORKER-LAUNCHER); not one of the six services.
+sortyard-worker = "sortyard.services.worker:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
