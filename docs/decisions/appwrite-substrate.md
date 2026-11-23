@@ -1,5 +1,9 @@
 # SY-DEC-004 — Appwrite as the persistence and identity substrate
 
+> **No longer applies to the Sortyard core** (2026-11-23): the
+> [SY-DEC-005 amendment](../../DECISIONS.md#sy-dec-005) makes the core Postgres only. This
+> assessment is kept as provenance; products may still use Appwrite for their auth.
+
 Date: 2026-11-15. Owner direction: prefer the existing Appwrite substrate unless a concrete
 requirement prevents it. Status: approved planning design. Independent technical review: appwrite_auth, 2026-11-15, PASS.
 

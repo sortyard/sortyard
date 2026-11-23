@@ -1,4 +1,6 @@
-# Current requirements catalog
+# Requirements catalog (reference)
+
+Reference, not the current build order: [SY-DEC-005](../../DECISIONS.md#sy-dec-005) (2026-11-23 amendment) governs.
 
 Generated from requirements-source.json; historical draft is provenance only.
 384 requirements; 333 original IDs preserved; 46 explicit amendments.

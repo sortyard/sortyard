@@ -1,7 +1,12 @@
-# Sortyard ecosystem requirements baseline
+# Sortyard ecosystem requirements baseline (reference)
+
+> **Reference, not the current build order.** [SY-DEC-005](../../DECISIONS.md#sy-dec-005)
+> (2026-11-23 amendment) makes Sortyard the workflow kernel plus the tracker view, stored to
+> Postgres only, and defers increments MS1, MS2 and MS6 until the kernel runs one lane. This
+> baseline, its catalog and its plan stay unchanged in content as requirement reference.
 
 Status: approved. The [operating-process extension review](evidence/operating-process-review.md)
-and [prior baseline review](evidence/technical-review.md) are preserved. This is the current consolidated planning baseline. It replaces
+and [prior baseline review](evidence/technical-review.md) are preserved. It was the consolidated planning baseline until SY-DEC-005's amendment. It replaced
 PR7's November12 draft assumptions and incorporates the owner's November15 operator/agent,
 meta-harness domain and Appwrite directions, plus the current company ownership map (source date
 November16). The existing product is still the Phase1 implementation; this baseline declares
@@ -49,7 +54,8 @@ running revision advertise callable operations. The current aspirational194-oper
 
 ## Governing changes
 
-- Appwrite persistence, Auth and Teams are the default per [SY-DEC-004](../decisions/appwrite-substrate.md).
+- Appwrite persistence, Auth and Teams were the default per [SY-DEC-004](../decisions/appwrite-substrate.md);
+  that no longer applies to the core, which is Postgres only per SY-DEC-005.
 - Archetypes, roles/personas, skills, recipes, contracts, requirements, guidance and extension
   registrations are first-class resources with source ownership and versioned adoption.
 - UI, REST, MCP and CLI are equal clients of the same public domain operations. Delegation
