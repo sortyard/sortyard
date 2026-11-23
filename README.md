@@ -214,13 +214,12 @@ build, in one job, `test`: the one required status check on `main` (strict, up t
 
 ## Project charter
 
-Sortyard is the human and agent control plane for the ecosystem around the delivery harness.
-It brings project work, governed definitions, policy, execution, triage and improvement into
-one authorized resource graph. Both the operator console and agents use its public domain API.
-[The requirements baseline](docs/requirements/README.md) defines scope, service ownership,
-contracts and the dependency-ordered delivery plan. [Decision records](DECISIONS.md) explain
-the stack and Appwrite substrate direction. Existing implementation and local runbooks above
-remain Postgres-backed until the migration is implemented and accepted.
+Sortyard is the workflow kernel plus the tracker view described in company/HARNESS-V3.md, as
+[SY-DEC-005](DECISIONS.md#sy-dec-005) (2026-11-23 amendment) records; the ecosystem control
+surface is deferred. The core stores to Postgres only. [The requirements baseline](docs/requirements/README.md)
+is kept as reference for requirement IDs, service ownership and contracts; its
+dependency-ordered delivery plan is not the current build order. [Decision records](DECISIONS.md)
+explain the stack and its amendments.
 
 ### Tracking
 
