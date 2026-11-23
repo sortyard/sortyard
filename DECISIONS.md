@@ -4,8 +4,8 @@ Decisions live here as records, not as prose inside other documents (premise pol
 
 ## SY-DEC-001 — Tech stack (2026-11-07, decided by Joe)
 
-The persistence portion is amended for future implementation by SY-DEC-004 below.
-The current code and deployed release still use the original Postgres backend.
+Postgres-only persistence stands for the core: the 2026-11-23 amendment to
+[SY-DEC-005](#sy-dec-005) records that SY-DEC-004's Appwrite amendment no longer applies to it.
 
 - **Question:** implementation language(s) for the Sortyard backend.
 - **Decision:** Python backend (one codebase; the six services as separate entry points; all-in-one single-pod profile for small installs, split services for larger ones). Console in TypeScript + React (Vite SPA, static files served by the API service). Postgres is the only database (state, event ledger, work queue — no Redis, no message broker). Data models generated from the Phase 0 JSON Schemas, so schema and implementation cannot drift. Strict typing enforced. Helm chart deployment; workers are language-agnostic Kubernetes Jobs.
@@ -13,6 +13,10 @@ The current code and deployed release still use the original Postgres backend.
 - **Source:** Sortyard design draft v6 §4a (~/workspace/harness-reboot/HARNESS-REBOOT-DRAFT-v6.md).
 
 ## SY-DEC-004 — Appwrite substrate (2026-11-15)
+
+**No longer applies to the Sortyard core** (2026-11-23, [SY-DEC-005](#sy-dec-005) amendment):
+the core stores to Postgres only. The record below is kept as provenance; products may still
+use Appwrite for their auth.
 
 - **Owner direction:** use the existing Appwrite substrate for persistence and auth unless a
   concrete requirement prevents it.
@@ -29,7 +33,42 @@ The current code and deployed release still use the original Postgres backend.
   this decision provisions no credentials, changes no live data and does not adopt Cloud-only
   OAuth-server features.
 
-## SY-DEC-005 — Composed ecosystem control plane (2026-11-15)
+<a id="sy-dec-005"></a>
+
+## SY-DEC-005 — Composed ecosystem control plane (2026-11-15), amended to the kernel scope (2026-11-23)
+
+The 2026-11-23 amendment below governs. The November 15 decision that follows it is kept as
+provenance; where they conflict, the amendment wins.
+
+### Amendment — workflow kernel plus tracker view, Postgres only (2026-11-23)
+
+- **Owner direction:** owner, 2026-11-23, on company/HARNESS-V3.md
+  ([section 3.7 and the Decisions section](https://github.com/noncelogic/meta-harness/blob/main/company/HARNESS-V3.md)):
+  "agree with all with caveats". That document's decision table applies the answer: Sortyard
+  is re-scoped to the kernel plus the tracker view, and Appwrite is not part of the core. The
+  owner's words on Appwrite, verbatim: "AppWrite was just a core foundation tech i had in mind
+  to "speed up" saas development, it already handles auth, the idea was to minimize our decision
+  space for common things any saas product needed. Not sure we needed appwrite for our harness,
+  maybe it was just convenient at the time".
+- **Decision:** this amendment supersedes the November 15 scope of SY-DEC-005. Sortyard is the
+  workflow kernel plus the tracker view described in company/HARNESS-V3.md. The ecosystem
+  control surface (the composed control plane over partner services below) is deferred.
+- **Persistence:** the core stores to Postgres only. SY-DEC-004 no longer applies to the core;
+  SY-DEC-001's Postgres-only rule stands. Products may still use Appwrite for their auth.
+- **Engine:** a durable workflow engine is used behind one module instead of a hand-written
+  one; the rest of the code reaches it only through that module.
+- **Delivery:** delivery-plan increments MS1, MS2 and MS6 are deferred until the kernel runs one
+  lane. The [delivery plan](docs/requirements/delivery-plan.md) and the
+  [requirement catalog](docs/requirements/catalog.md) stay in the repository as reference,
+  with no requirement or plan row changed; they are not the current build order.
+- **Options considered:** keep the November 15 ecosystem scope with Appwrite (the superseded
+  plan: execution only at MS3, after the resource kernel and connected project control);
+  hand-write the workflow engine (owns durability and replay bugs the kernel does not need to
+  own); the chosen kernel-first scope on Postgres with an engine behind one module.
+- **How to reverse:** a later dated amendment to this record by the owner; the November 15 text
+  and SY-DEC-004 remain below as the prior state. This record cancels and moves no board item.
+
+### Original decision (2026-11-15, superseded by the amendment above)
 
 - **Owner direction:** one control plane for the harness ecosystem, with both an operator
   UI and public APIs through which agents act on the operator's behalf.

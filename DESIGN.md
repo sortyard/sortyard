@@ -1,14 +1,18 @@
 # Sortyard — First-Principles Design Draft v6 (tech stack decided)
 
-> Historical architecture/planning record. The current requirements and dependency order
-> are in the [ecosystem requirements baseline](docs/requirements/README.md). Read this record for provenance;
-> it does not override the consolidated baseline or current Plane execution state.
+> Historical architecture/planning record. The governing scope is
+> [SY-DEC-005](DECISIONS.md#sy-dec-005) (2026-11-23 amendment): the workflow kernel plus the
+> tracker view, Postgres only. The [ecosystem requirements baseline](docs/requirements/README.md)
+> is reference. Read this record for provenance; it does not override either or current Plane
+> execution state.
 **Name: DECIDED — Sortyard (Joe, 2026-11-06). Domain `sortyard.ai` registered by Joe the same day.**
 **Date:** 2026-11-06 · **Author:** Juno (draft for Joe) · **Status:** DRAFT v6 — v5 plus the tech-stack decision (§4a, decided by Joe 2026-11-07). v3 corrected by the second frontier cross-check (`NAME-AND-V3-CHECK.md`): one §5.2 rewrite, two softened claims, “lease” terminology killed, §11 made honest about what the design does not yet have. Name ranking in §10a — **Sortyard** leads, pending Joe's pick and a formal trademark/domain check.
 
-## Current planning amendment — Appwrite substrate (2026-11-15)
+## Planning amendment — Appwrite substrate (2026-11-15, no longer applies to the core)
 
-[SY-DEC-004](docs/decisions/appwrite-substrate.md) amends this historical draft's
+The [SY-DEC-005](DECISIONS.md#sy-dec-005) amendment (2026-11-23) keeps the core on Postgres
+only; the 2026-11-15 text below is provenance.
+[SY-DEC-004](docs/decisions/appwrite-substrate.md) amended this historical draft's
 Postgres-only persistence and generic identity-provider assumptions. The preferred target is
 self-hosted Appwrite persistence, Auth and Teams, with native transaction/history/authorization
 proofs before migration. The current implementation remains Postgres-backed. The original

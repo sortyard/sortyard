@@ -1,14 +1,13 @@
 # Sortyard — Milestone Map
 
-> Historical architecture/planning record. The current requirements and dependency order
-> are in the [ecosystem requirements baseline](docs/requirements/README.md). Read this record for provenance;
-> it does not override the consolidated baseline or current Plane execution state.
+> Historical architecture/planning record. The governing scope is
+> [SY-DEC-005](DECISIONS.md#sy-dec-005) (2026-11-23 amendment): the workflow kernel plus the
+> tracker view, Postgres only. The [ecosystem requirements baseline](docs/requirements/README.md)
+> is reference. Read this record for provenance; it does not override either or current Plane
+> execution state.
 
-Current substrate planning: [SY-DEC-004](docs/decisions/appwrite-substrate.md) selects
-Appwrite persistence and human auth as the preferred target. Qualify transactions and immutable
-history, implement the native adapter/schema, integrate Auth/Teams, then rehearse a one-writer
-migration. Read-only console work can proceed alongside qualification. Existing SQL code and
-deployments remain current until that implementation ships. Work state is read from Plane;
+Substrate: the core stores to Postgres only per SY-DEC-005; the Appwrite plan of
+[SY-DEC-004](docs/decisions/appwrite-substrate.md) no longer applies to it. Work state is read from Plane;
 phase descriptions below are historical planning, not current task-state evidence.
 
 The corpus of groomed work, by milestone. The full task corpus is `CORPUS.md` in this folder (frontier design pass, 2026-11-07); this map is its phase-level view. Tracking is on the Sortyard Plane project (identifier `SORTYARD`,

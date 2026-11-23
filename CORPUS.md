@@ -1,8 +1,10 @@
 # Sortyard — Milestone Corpus (planning record)
 
-> Historical architecture/planning record. The current requirements and dependency order
-> are in the [ecosystem requirements baseline](docs/requirements/README.md). Read this record for provenance;
-> it does not override the consolidated baseline or current Plane execution state.
+> Historical architecture/planning record. The governing scope is
+> [SY-DEC-005](DECISIONS.md#sy-dec-005) (2026-11-23 amendment): the workflow kernel plus the
+> tracker view, Postgres only. The [ecosystem requirements baseline](docs/requirements/README.md)
+> is reference. Read this record for provenance; it does not override either or current Plane
+> execution state.
 
 - **Source:** frontier-model design pass, 2026-11-07 — devised against the Sortyard design draft v6 (DESIGN.md in this folder) and the filed Phase 0 / Phase 1 items. Working copy: ~/workspace/harness-reboot/MILESTONE-CORPUS-FRONTIER.md.
 - **Status:** planning record — filings reconcile to this; later phases are groomed here and filed in milestone tranches, not dumped.
