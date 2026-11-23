@@ -65,6 +65,10 @@ spec:
                 secretKeyRef:
                   name: {{ include "sortyard.postgres.secretName" . }}
                   key: password
+            {{- if .Values.engine.enabled }}
+            - name: SORTYARD_ENGINE_TARGET
+              value: {{ include "sortyard.engine.target" . | quote }}
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /readyz

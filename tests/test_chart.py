@@ -235,3 +235,327 @@ def test_shadow_conductor_refuses_to_render_without_an_input_path() -> None:
     )
     assert proc.returncode != 0
     assert "shadow.snapshot is required" in proc.stderr
+
+
+# --- the workflow engine server (SY-V3-CHART-ENGINE) -------------------------------------------
+
+ENGINE = ("--set", "engine.enabled=true")
+EXTERNAL_ENGINE_DATABASE = (
+    *ENGINE,
+    "--set",
+    "engine.database.host=pg.example",
+    "--set",
+    "engine.database.username=engine",
+    "--set",
+    "engine.database.existingSecret=engine-db",
+)
+# Every setting name the server image reads for a store that is not Postgres.
+OTHER_STORES = ("CASSANDRA", "KEYSPACE", "MYSQL", "SQLITE", "ENABLE_ES", "ES_")
+
+
+def component(docs: list[dict[str, Any]], kind: str, name: str) -> dict[str, Any]:
+    (doc,) = [
+        d
+        for d in by_kind(docs, kind)
+        if d["metadata"]["labels"]["app.kubernetes.io/component"] == name
+    ]
+    return doc
+
+
+def containers(workload: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    pod = workload["spec"]["template"]["spec"]
+    return {c["name"]: c for c in pod.get("initContainers", []) + pod["containers"]}
+
+
+def env_of(container: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {e["name"]: e for e in container["env"]}
+
+
+def render_fails(*args: str) -> str:
+    assert HELM is not None
+    proc = subprocess.run(
+        [HELM, "template", "sy", str(CHART), *args], capture_output=True, text=True
+    )
+    assert proc.returncode != 0, "rendered"
+    return proc.stderr
+
+
+def test_engine_enabled_renders_the_server_on_postgres_its_schema_job_and_its_service_and_points_the_api_at_it() -> (  # noqa: E501
+    None
+):
+    """engine.enabled renders the server on Postgres, its schema Job and its Service, and
+    points the API at it."""
+    values = yaml.safe_load((CHART / "values.yaml").read_text())["engine"]
+    docs = render(*ENGINE)
+
+    # The server: the pinned upstream image, storing to the chart's Postgres and nothing else.
+    server = containers(component(docs, "Deployment", "engine"))
+    engine = server["engine"]
+    assert engine["image"] == (
+        f"temporalio/server:{values['image']['tag']}@{values['image']['digest']}"
+    )
+    env = env_of(engine)
+    assert env["DB"]["value"] == "postgres12"
+    assert env["POSTGRES_SEEDS"]["value"] == "sy-sortyard-postgres"
+    assert env["DB_PORT"]["value"] == "5432"
+    assert env["POSTGRES_USER"]["value"] == "sortyard"
+    assert env["POSTGRES_PWD"]["valueFrom"]["secretKeyRef"] == {
+        "name": "sy-sortyard-postgres",
+        "key": "password",
+    }
+    assert env["DBNAME"]["value"] != env["VISIBILITY_DBNAME"]["value"]
+    assert engine["securityContext"]["readOnlyRootFilesystem"] is True
+
+    # One Service, in front of the server, and the API pointed at it.
+    (service,) = [s for s in by_kind(docs, "Service") if "engine" in s["metadata"]["name"]]
+    assert service["metadata"]["name"] == "sy-sortyard-engine"
+    (port,) = service["spec"]["ports"]
+    assert port["port"] == 7233
+    assert port["targetPort"] in [p["name"] for p in engine["ports"] if p["containerPort"] == 7233]
+    pod_labels = component(docs, "Deployment", "engine")["spec"]["template"]["metadata"]["labels"]
+    assert service["spec"]["selector"].items() <= pod_labels.items()
+    api = env_of(containers(component(docs, "Deployment", "api"))["api"])
+    assert api["SORTYARD_ENGINE_TARGET"]["value"] == "sy-sortyard-engine:7233"
+
+    # The schema Job: the upstream schema tool of the same version, against the same databases.
+    job = component(docs, "Job", "engine-schema")
+    steps = containers(job)
+    schema = steps["schema"]
+    assert schema["image"] == (
+        f"temporalio/admin-tools:{values['toolsImage']['tag']}@{values['toolsImage']['digest']}"
+    )
+    assert values["toolsImage"]["tag"] == values["image"]["tag"]
+    assert schema["command"] == ["sh", "/engine/setup.sh", "schema"]
+    schema_env = env_of(schema)
+    assert schema_env["SQL_HOST"]["value"] == env["POSTGRES_SEEDS"]["value"]
+    assert schema_env["SQL_PASSWORD"]["valueFrom"] == env["POSTGRES_PWD"]["valueFrom"]
+    assert schema_env["SORTYARD_ENGINE_DATABASE"]["value"] == env["DBNAME"]["value"]
+    assert (
+        schema_env["SORTYARD_ENGINE_VISIBILITY_DATABASE"]["value"]
+        == env["VISIBILITY_DBNAME"]["value"]
+    )
+    # The script the Job runs is the chart's file, byte for byte.
+    config = component(docs, "ConfigMap", "engine")
+    assert config["data"]["setup.sh"] == (CHART / "engine" / "setup.sh").read_text()
+    (volume,) = [v for v in job["spec"]["template"]["spec"]["volumes"] if "configMap" in v]
+    assert volume["configMap"]["name"] == config["metadata"]["name"]
+
+
+def test_the_engine_stores_to_postgres_only() -> None:
+    """must_catch: an engine store other than Postgres rendered."""
+    for args in (ENGINE, EXTERNAL_ENGINE_DATABASE):
+        docs = render(*args)
+        workloads = [
+            component(docs, "Deployment", "engine"),
+            component(docs, "Job", "engine-schema"),
+        ]
+        for workload in workloads:
+            for container in containers(workload).values():
+                names = set(env_of(container))
+                assert not [n for n in names if n.startswith(OTHER_STORES)], names
+                assert not names & {"VISIBILITY_POSTGRES_SEEDS", "VISIBILITY_DB_PORT"}
+        env = env_of(containers(component(docs, "Deployment", "engine"))["engine"])
+        # One plugin serves both stores: persistence and visibility are the same Postgres.
+        assert env["DB"]["value"] == "postgres12"
+    script = (CHART / "engine" / "setup.sh").read_text()
+    assert "--plugin postgres12" in script
+    assert "cassandra" not in script and "elasticsearch" not in script
+
+
+def test_the_engine_server_waits_for_the_schema_job_of_its_own_version() -> None:
+    """must_catch: the server rendered without its schema Job, or the Job not safe to run
+    twice (that it is safe on a real Postgres is the slow workflow's to show)."""
+    docs = render(*ENGINE, "--set", "engine.image.tag=9.9.9", "--set", "engine.image.digest=")
+    assert component(docs, "Job", "engine-schema")["metadata"]["name"].startswith(
+        "sy-sortyard-engine-schema-"
+    )
+    server = containers(component(docs, "Deployment", "engine"))
+    assert server["engine"]["image"] == "temporalio/server:9.9.9"
+    # The server's pod starts with a wait for the record the Job writes for this version.
+    assert list(server) == ["wait-schema", "engine"]
+    wait = server["wait-schema"]
+    assert wait["command"] == ["sh", "/engine/setup.sh", "wait-schema"]
+    job = component(docs, "Job", "engine-schema")
+    schema = containers(job)["schema"]
+    assert (
+        env_of(wait)["SORTYARD_ENGINE_SERVER_VERSION"]["value"]
+        == env_of(schema)["SORTYARD_ENGINE_SERVER_VERSION"]["value"]
+        == "9.9.9"
+    )
+    assert (
+        env_of(wait)["PGDATABASE"]["value"] == env_of(schema)["SORTYARD_ENGINE_DATABASE"]["value"]
+    )
+    assert "'9.9.9'" in component(docs, "ConfigMap", "engine")["data"]["mark.sql"]
+    # An ordinary Job, not a hook: `helm upgrade --wait` waits for the server, which waits for
+    # the Job, so a hook that runs after the wait would never start.
+    assert "helm.sh/hook" not in job["metadata"].get("annotations", {})
+    assert job["spec"]["template"]["spec"]["restartPolicy"] == "Never"
+    # Named by what it does: a new server version is a new Job (a Job cannot be changed in
+    # place), and an upgrade that changes nothing of the engine's leaves it alone.
+    name = job["metadata"]["name"]
+    no_digest = ("--set", "engine.image.digest=")
+    same = render(*ENGINE, "--set", "engine.image.tag=9.9.9", *no_digest, "--set", "api.replicas=2")
+    newer = render(*ENGINE, "--set", "engine.image.tag=9.9.10", *no_digest)
+    assert component(same, "Job", "engine-schema")["metadata"]["name"] == name
+    assert component(newer, "Job", "engine-schema")["metadata"]["name"] != name
+    # Nothing in the script drops or overwrites what is there.
+    script = (CHART / "engine" / "setup.sh").read_text()
+    assert "--overwrite" not in script and "drop" not in script.replace("drops", "")
+
+
+def test_no_database_password_is_rendered_outside_the_secret() -> None:
+    """must_catch: a database password rendered into a manifest instead of a Secret reference."""
+    assert HELM is not None
+    password = "pw-3f9a7c51d2"
+    out = subprocess.run(
+        [
+            HELM,
+            "template",
+            "sy",
+            str(CHART),
+            *ENGINE,
+            "--set",
+            f"postgres.auth.password={password}",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    docs = [doc for doc in yaml.safe_load_all(out) if doc]
+    (secret,) = by_kind(docs, "Secret")
+    others = yaml.safe_dump_all([d for d in docs if d["kind"] != "Secret"])
+    assert password not in others and secret["data"]["password"] not in others
+    # Every password setting of an engine container is a reference, never a value.
+    for workload in (
+        component(docs, "Deployment", "engine"),
+        component(docs, "Job", "engine-schema"),
+    ):
+        for container in containers(workload).values():
+            for name, entry in env_of(container).items():
+                if "PASSWORD" in name or "PWD" in name:
+                    assert set(entry["valueFrom"]) == {"secretKeyRef"}, name
+
+
+def test_the_engine_takes_an_external_postgres_by_secret_reference() -> None:
+    """must_allow: an external Postgres such as an operator-managed cluster."""
+    docs = render(*EXTERNAL_ENGINE_DATABASE, "--set", "engine.database.create=false")
+    server = containers(component(docs, "Deployment", "engine"))
+    job = containers(component(docs, "Job", "engine-schema"))
+    env = env_of(server["engine"])
+    assert env["POSTGRES_SEEDS"]["value"] == "pg.example"
+    assert env["POSTGRES_USER"]["value"] == "engine"
+    for container, name in (
+        (server["engine"], "POSTGRES_PWD"),
+        (server["wait-schema"], "PGPASSWORD"),
+        (job["schema"], "SQL_PASSWORD"),
+    ):
+        assert env_of(container)[name]["valueFrom"]["secretKeyRef"] == {
+            "name": "engine-db",
+            "key": "password",
+        }
+    assert env_of(job["schema"])["SQL_HOST"]["value"] == "pg.example"
+    # An operator-managed cluster hands out databases; the Job is told not to create them.
+    assert env_of(job["schema"])["SORTYARD_ENGINE_CREATE_DATABASES"]["value"] == "false"
+    # The API keeps the chart's own Postgres.
+    api = env_of(containers(component(docs, "Deployment", "api"))["api"])
+    assert api["SORTYARD_DATABASE_HOST"]["value"] == "sy-sortyard-postgres"
+
+    # The other external shape: the whole chart on one external server.
+    shared = render(
+        *ENGINE,
+        "--set",
+        "postgres.enabled=false",
+        "--set",
+        "postgres.external.host=db.example",
+        "--set",
+        "postgres.auth.existingSecret=pg",
+    )
+    env = env_of(containers(component(shared, "Deployment", "engine"))["engine"])
+    assert env["POSTGRES_SEEDS"]["value"] == "db.example"
+    assert env["POSTGRES_PWD"]["valueFrom"]["secretKeyRef"]["name"] == "pg"
+    assert by_kind(shared, "Secret") == []
+
+
+def test_rendering_fails_when_the_external_database_secret_reference_is_missing() -> None:
+    """Rendering fails when the external database Secret reference is missing."""
+    own = ("--set", "engine.database.host=pg.example", "--set", "engine.database.username=engine")
+    assert "engine.database.existingSecret is required" in render_fails(*ENGINE, *own)
+    shared = ("--set", "postgres.enabled=false", "--set", "postgres.external.host=db.example")
+    assert "postgres.auth.existingSecret is required" in render_fails(*ENGINE, *shared)
+    # The same values render once the reference is there, and with the engine off.
+    render(*ENGINE, *own, "--set", "engine.database.existingSecret=engine-db")
+    render(*ENGINE, *shared, "--set", "postgres.auth.existingSecret=pg")
+    render(*shared)
+
+
+def test_an_engine_image_must_be_pinned_to_a_version() -> None:
+    for image in ("image", "toolsImage"):
+        assert "pinned" in render_fails(*ENGINE, "--set", f"engine.{image}.tag=latest")
+        assert "pinned" in render_fails(*ENGINE, "--set", f"engine.{image}.tag=")
+    values = yaml.safe_load((CHART / "values.yaml").read_text())["engine"]
+    for image in ("image", "toolsImage"):
+        assert values[image]["digest"].startswith("sha256:") and len(values[image]["digest"]) == 71
+
+
+def test_engine_enabled_false_renders_the_same_manifests_as_before() -> None:
+    """engine.enabled false renders the same manifests as before."""
+    assert HELM is not None
+
+    def text(*args: str) -> str:
+        return subprocess.run(
+            [HELM, "template", "sy", str(CHART), "--set", "postgres.auth.password=x", *args],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+
+    default = text()
+    assert yaml.safe_load((CHART / "values.yaml").read_text())["engine"]["enabled"] is False
+    # With the engine off no engine setting reaches a manifest: the render is the same text
+    # whatever they are, so it is what the chart rendered before it had an engine.
+    inert = text(
+        "--set",
+        "engine.enabled=false",
+        "--set",
+        "engine.image.tag=9.9.9",
+        "--set",
+        "engine.database.host=pg.example",
+        "--set",
+        "engine.namespace.retention=1d",
+        "--set",
+        "engine.service.port=1",
+    )
+    assert inert == default
+    # And that render is the manifests the chart had before the engine, with nothing of the
+    # engine's in them: the same objects, the same API settings.
+    docs = [doc for doc in yaml.safe_load_all(default) if doc]
+    assert sorted((d["kind"], d["metadata"]["name"]) for d in docs) == [
+        ("ConfigMap", "sy-sortyard-migrations"),
+        ("Deployment", "sy-sortyard-api"),
+        ("Job", "sy-sortyard-migrate"),
+        ("Secret", "sy-sortyard-postgres"),
+        ("Service", "sy-sortyard-api"),
+        ("Service", "sy-sortyard-postgres"),
+        ("StatefulSet", "sy-sortyard-postgres"),
+    ]
+    (api,) = by_kind(docs, "Deployment")
+    assert [e["name"] for e in api["spec"]["template"]["spec"]["containers"][0]["env"]] == [
+        "SORTYARD_API_PORT",
+        "SORTYARD_DATABASE_HOST",
+        "SORTYARD_DATABASE_PORT",
+        "SORTYARD_DATABASE_NAME",
+        "SORTYARD_DATABASE_USER",
+        "SORTYARD_DATABASE_PASSWORD",
+    ]
+    without_migrations = yaml.safe_dump_all([d for d in docs if d["kind"] != "ConfigMap"])
+    assert "engine" not in without_migrations.lower()
+    assert "temporal" not in without_migrations.lower()
+    # Every object the engine adds is its own; switching it on changes one existing object,
+    # the API Deployment, by the one setting that points it at the engine.
+    on = {
+        (d["kind"], d["metadata"]["name"]): d
+        for d in yaml.safe_load_all(text("--set", "engine.enabled=true"))
+        if d
+    }
+    off = {(d["kind"], d["metadata"]["name"]): d for d in docs}
+    assert [key for key in off if on[key] != off[key]] == [("Deployment", "sy-sortyard-api")]

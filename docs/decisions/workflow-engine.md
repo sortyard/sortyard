@@ -110,14 +110,145 @@ These are properties the kernel has to design for. Each was observed in the runs
   directory. No Python package ships them. A build environment that blocks that host cannot run
   the engine tests; that is a declared need of the lane (HARNESS-V3 section 3.3), and the tests
   fail there, they do not skip.
-- **"Temporal on our Postgres" is not verified.** The development server keeps its state in
-  memory and nothing was deployed. Temporal storing to Postgres is from its documentation, not
-  from a test in this repository. The first deployment of a Temporal server (four services, per
-  HARNESS-V3 section 3.1) has to prove it, with the same four tests pointed at that server.
+- **"Temporal on our Postgres" was not verified by SORTYARD-158.** The development server keeps
+  its state in memory and nothing was deployed. SORTYARD-183 closed this: see
+  [The engine server on Postgres](#the-engine-server-on-postgres) below.
+
+## The engine server on Postgres
+
+Date: 2026-11-23. Item: SY-V3-CHART-ENGINE (SORTYARD-183; HARNESS-V3 sections 3.1 and 6). This
+is where the engine first runs as a server on Postgres instead of the SDK's test servers.
+
+### What the chart installs
+
+With `engine.enabled=true`, `charts/sortyard/templates/engine.yaml` renders:
+
+| Object | What it is |
+| --- | --- |
+| Deployment `<release>-engine` | The upstream server image `temporalio/server:1.32.2`, pinned by digest (`sha256:7bf69188a6232fea14869b9cef3d94aa82a1601d99517f7e86c71f22da4e0670`). One process runs all four services (frontend, history, matching, worker). An init container waits for the schema Job's record before the server starts. |
+| Service `<release>-engine` | The one address, port 7233. The API's `SORTYARD_ENGINE_TARGET` is set to it. |
+| Job `<release>-engine-schema-<hash>` | `temporalio/admin-tools:1.32.2` (digest `sha256:4a95866efba29d7e17ab012df5232795e8b0ad0f7d5f9d1ec4df321f7792a754`): the upstream schema tool `temporal-sql-tool`, then the `temporal` CLI. |
+| ConfigMap `<release>-engine` | `charts/sortyard/engine/setup.sh` (the Job's and the init container's commands), the SQL of the schema record, and the server's dynamic configuration file. |
+
+1.32.2 is the server version the development server of the SORTYARD-158 tests reports, so the
+four failure tests now run against the same server version in memory and on Postgres.
+
+**Store: Postgres only.** Two databases, `temporal` (workflow state) and `temporal_visibility`
+(visibility), both through the server's `postgres12` plugin. No Cassandra and no Elasticsearch:
+the templates set no setting of either, and `tests/test_chart.py` refuses one. The databases
+are on the chart's Postgres, or on the external server the chart is pointed at
+(`postgres.enabled=false`), or on an external server of the engine's own
+(`engine.database.host`). The password is always a Secret reference; with an external database
+rendering fails unless the Secret is named.
+
+**Settings.** The server image has no configuration file. It builds its configuration from
+environment variables through a template compiled into the server binary
+(`common/config/config_template_embedded.yaml` in temporalio/temporal at v1.32.2), so the
+Deployment sets `DB=postgres12`, `POSTGRES_SEEDS`, `DB_PORT`, `POSTGRES_USER`, `POSTGRES_PWD`
+(from the Secret), `DBNAME`, `VISIBILITY_DBNAME`, `NUM_HISTORY_SHARDS` and `BIND_ON_IP`. Two
+things found by running the image, not from its documentation:
+
+- The server exits at start unless a dynamic configuration file exists at
+  `DYNAMIC_CONFIG_FILE_PATH`; the image ships none. The ConfigMap provides one
+  (`engine.dynamicConfig`, empty by default).
+- Without an authorizer the server warns that a future version will refuse to start unless
+  `--allow-no-auth` is given. The Deployment sets `TEMPORAL_ALLOW_NO_AUTH=true` (see the gaps).
+
+**Schema.** The deprecated `auto-setup` image is not used. The Job's `schema` step runs, for
+each database, `temporal-sql-tool create-database` (unless `engine.database.create=false`),
+`setup-schema --version 0.0` and `update-schema --schema-dir` with the versioned schema the
+admin-tools image ships, then records in the table `sortyard_engine_schema` of the engine
+database that the schema is ready for server 1.32.2. The server's init container waits for that
+row, so the server never starts on a missing or older schema, on install or on upgrade. The
+Job's last step waits for the server and creates the `default` namespace (the one
+`sortyard.engine` connects to) with the configured retention, or updates the retention of the
+one that exists. Run a second time against the same Postgres, every step skipped what was
+there (the tool reported "found zero updates from current version 1.19") and exited 0.
+
+The Job is an ordinary Job, not a Helm hook, and its name ends in a hash of what it does.
+A post-install hook would deadlock `helm upgrade --wait`: Helm would wait for the server, which
+waits for the Job, which a hook only starts after the wait. A pre-install hook (what the
+upstream chart uses) cannot reach a Postgres that the same release installs. The hash makes a
+new server version a new Job, since a Job cannot be changed in place.
+
+### Rendered from our own templates, not the upstream chart
+
+| Option | Weighed on 2026-11-23 |
+| --- | --- |
+| Our own templates (one Deployment, one Service, one Job, one ConfigMap; about 300 template lines and a 100-line script) | **Chosen.** One values file and one release stay true (a test refuses a second values file). Every credential is a Secret reference by construction. Postgres is the only store the templates can express. The schema Job can use the chart's own Postgres. Cost: we follow upstream's image changes ourselves; the two found above (embedded configuration, required dynamic configuration file) are the kind of change to expect at a version bump, and the slow workflow is what catches them. |
+| The upstream chart as a dependency (`temporal` 1.8.0, appVersion 1.32.2, from go.temporal.io/helm-charts) | Not chosen. Rendered with its PostgreSQL example values it produces 6 Deployments, 6 Services, 2 ConfigMaps, 2 Secrets, a test Pod and a schema Job that is a pre-install/pre-upgrade hook, from about 700 lines of values that also cover Cassandra, MySQL, Elasticsearch, a web UI and an admin-tools Deployment. Its schema hook runs before the release's own objects exist, so it cannot use the chart's Postgres. Its datastore `password` is a plain value unless `existingSecret` is set, so the "Secret reference only" and "Postgres only" rules would be ours to enforce from outside, on a values surface we do not own. It is the better choice once the engine needs its services scaled apart; moving to it changes only these templates. |
+
+One process for the four services is the size this kernel needs today (item counts, not
+request volume). `engine.replicas` can be raised: each replica runs all four services and they
+find each other through the membership table in Postgres. That was not tested with more than
+one replica.
+
+`engine.historyShards` is 16, and is fixed at the first start: the server refuses a database
+made with another count. 16 is a judgement for a small single-server estate (the server's own
+default is 4, the upstream chart's example 512), not a measured number.
+
+### The four failure tests against the server on Postgres
+
+`tests/test_engine_server.py` runs the four failure tests through `sortyard.engine` against a
+server on a real Postgres. `replica/engine_server.py up` starts it with docker **from the
+rendered chart**: it runs the Postgres StatefulSet's container, the schema Job's containers and
+the server Deployment's containers with the image, command, environment, user and read-only
+root filesystem of their manifests, so the server tested is the chart's (same server image,
+same schema tool and script, same settings), short of the cluster. The tests are skipped unless
+`SORTYARD_ENGINE_SERVER_TARGET` names a server; the slow workflow (`.github/workflows/slow.yml`,
+job `engine-server`) sets it, runs them, runs the schema Job a second time, runs them again and
+then counts the workflows in both Postgres databases. The merge gate does not start the server.
+
+Run on a workstation on 2026-11-23 (Python 3.12.3, Linux x86-64, Postgres 16, server 1.32.2),
+five times in a row against one server, then once more after a second run of the schema Job:
+
+| Test | Result on the server on Postgres |
+| --- | --- |
+| A workflow finishes after its worker is killed mid-step and finished steps do not run again | **Pass.** The same test function as on the development server. |
+| A waiting workflow keeps its position across a worker restart on changed step code | **Pass.** The same test function. |
+| A long timer | **Pass, as a different test.** See below. |
+| A signal sent with no worker running is delivered when a worker starts | **Pass.** The same test function. |
+
+Afterwards the `default` namespace had its workflows in `temporal.executions` and in
+`temporal_visibility.executions_visibility` (4 and 4 after one run of the four tests). The
+server used about 130 MiB of memory after the tests; the four tests take about 54 seconds.
+
+Differences from the SORTYARD-158 run, all in the tests and none in `src/sortyard/engine`:
+
+- **The timer test is not the seven-day test.** A real server has no test clock to move, so the
+  seven-day timer cannot be skipped through. The server test starts a real 8-second timer, kills
+  the worker, waits until the engine records the timer as fired **with no worker running**, and
+  then starts a new worker, which finishes the workflow. That shows what the test clock cannot:
+  the timer is the server's, kept in Postgres, and does not need a worker to fire. A timer of
+  days on this server is covered by the seven-day test only through the test server's clock.
+- **Each test has its own task queue and workflow-id prefix.** The server outlives a test run,
+  and a workflow id can be used once. The worker process reads its task queue from
+  `SORTYARD_ENGINE_TASK_QUEUE`.
+
+### Gaps and what is not yet shown
+
+- **Nothing authenticates callers of the engine.** The server runs without an authorizer and
+  without TLS; the Service is cluster-internal (ClusterIP). Anything in the cluster that can
+  reach the Service can start and signal workflows. Closing that (network policy, or mTLS with
+  an authorizer) is its own item.
+- **TLS to an external Postgres is not wired.** The server image and the schema tool both take
+  TLS settings, but the chart sets none, so an external server must accept password
+  authentication without TLS from the cluster.
+- **A server restart is checked by hand, not by a standing test.** The tests kill workers, not
+  the server. Once, on the workstation run above: a workflow waiting for a signal was read
+  back unchanged after the server container was restarted (finished step kept, still waiting),
+  then took its signal and finished on a new worker. The server keeps nothing outside Postgres
+  in this deployment (read-only root filesystem, no volume).
+- **The cluster path.** The kind replica (`replica/replica.sh`, slow workflow job `replica`)
+  enables the engine and checks that the server rolls out behind its schema Job and answers
+  the API pod through `sortyard.engine`. The failure tests themselves run against the docker
+  form above, not inside kind. Nothing has been deployed to the estate.
 
 ## How to reverse
 
 Replace `src/sortyard/engine/_temporal.py` and `testing.py` with another engine's
-implementation of the same names, and run the same tests. Nothing outside the package imports
+implementation of the same names, and run the same tests. The server side is
+`charts/sortyard/templates/engine.yaml`, `charts/sortyard/engine/setup.sh` and the `engine`
+values: replace those with the other engine's deployment. Nothing outside the package imports
 the SDK or handles a Temporal type, and the boundary test fails if that changes. Workflows in
 flight do not move between engines: finish or restart them.

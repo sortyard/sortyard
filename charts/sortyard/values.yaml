@@ -65,6 +65,75 @@ migrations:
     limits:
       memory: 128Mi
 
+# The workflow engine server (Temporal; docs/decisions/workflow-engine.md): one Deployment
+# running the upstream server image, one Service, and a schema Job. It stores to Postgres only:
+# two databases (workflow state, and visibility) on the Postgres server above (the chart's, or
+# postgres.external), or on its own external server (engine.database.host). With it enabled the
+# API's SORTYARD_ENGINE_TARGET points at the Service.
+engine:
+  enabled: false
+  # The server, pinned by version and digest. The tag is also the version the schema Job
+  # records the schema as ready for; the server waits for that record.
+  image:
+    repository: temporalio/server
+    tag: "1.32.2"
+    digest: sha256:7bf69188a6232fea14869b9cef3d94aa82a1601d99517f7e86c71f22da4e0670
+    pullPolicy: IfNotPresent
+  # The upstream schema tool (temporal-sql-tool) and CLI the schema Job runs. Keep it at the
+  # server's version: it carries the schema that version needs.
+  toolsImage:
+    repository: temporalio/admin-tools
+    tag: "1.32.2"
+    digest: sha256:4a95866efba29d7e17ab012df5232795e8b0ad0f7d5f9d1ec4df321f7792a754
+    pullPolicy: IfNotPresent
+  replicas: 1
+  service:
+    port: 7233
+  # History shards. Fixed at the first start: the server refuses a database made with another
+  # count, so changing it means a new pair of databases.
+  historyShards: 16
+  logLevel: info
+  database:
+    # Empty: the Postgres server above, with its user and its password Secret (when
+    # postgres.enabled=false that Secret must be named in postgres.auth.existingSecret).
+    # Set: an external server for the engine alone; username and existingSecret are then
+    # required.
+    host: ""
+    port: 5432
+    username: ""
+    # Name of an existing Secret with key `password`.
+    existingSecret: ""
+    name: temporal
+    visibilityName: temporal_visibility
+    # true: the schema Job creates the two databases when they are missing (the user needs
+    # CREATEDB). false: they exist already and the user owns them.
+    create: true
+  namespace:
+    # How long the engine keeps a workflow's history after it ends. The item rows and the
+    # event ledger are the lasting record, not the engine.
+    retention: 7d
+  # The server's dynamic configuration (key: [{value: ...}]); empty means its defaults.
+  dynamicConfig: {}
+  # The schema Job: creates and upgrades the engine databases with the upstream schema tool,
+  # then creates the namespace. Safe to run again; it reruns whenever its inputs change.
+  schema:
+    # How long each step waits for Postgres, then for the server, to answer.
+    waitSeconds: 300
+    backoffLimit: 3
+    activeDeadlineSeconds: 900
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        memory: 256Mi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
 # The shadow conductor (design §8 Phase 1): `sortyard-conductor --shadow` reads the production
 # conductor's input path READ-ONLY and records what it would claim/refuse in the DecisionLog.
 # Off by default; it needs the input path configured. Runbook: README "Shadow conductor".

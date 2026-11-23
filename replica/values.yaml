@@ -9,6 +9,10 @@ postgres:
   persistence:
     size: 1Gi
 
+# The workflow engine server on the chart's Postgres, as the chart renders it.
+engine:
+  enabled: true
+
 # The shadow conductor, configured the way production runs it (source: plane) but pointed at
 # the fake providers in replica/fakes.yaml instead of the real Plane and production conductor.
 shadow:

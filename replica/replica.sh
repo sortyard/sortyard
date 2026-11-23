@@ -171,6 +171,11 @@ deploy_chart() {
     k rollout status "statefulset/$RELEASE-postgres" --timeout="${TIMEOUT}s"
     k rollout status "deployment/$RELEASE-api" --timeout="${TIMEOUT}s"
     k rollout status "deployment/$RELEASE-shadow-conductor" --timeout="${TIMEOUT}s"
+    # The engine server starts once its schema Job has made the databases ready; the Job ends
+    # once the server answers and the namespace exists.
+    k rollout status "deployment/$RELEASE-engine" --timeout="${TIMEOUT}s"
+    k wait --for=condition=complete job \
+        --selector app.kubernetes.io/component=engine-schema --timeout="${TIMEOUT}s"
 }
 
 psql_value() {
@@ -223,6 +228,31 @@ smoke() {
     migrations=$(psql_value "SELECT count(*) FROM sortyard.schema_migration")
     ((migrations > 0)) || die "no migrations recorded in sortyard.schema_migration"
     echo "    $migrations migration(s) recorded"
+
+    say "smoke: the workflow engine server answers the API pod, on the schema its Job made"
+    local schema_for engine
+    schema_for=$(k exec "statefulset/$RELEASE-postgres" -- \
+        psql -X -q -tA -U sortyard temporal -c "SELECT server_version FROM sortyard_engine_schema")
+    [[ -n $schema_for ]] || die "the engine schema Job recorded no schema version"
+    # From the API's own pod, through sortyard.engine, at the address the chart gave it: an
+    # unknown workflow is refused by name only by a server that has its namespace and its store.
+    engine=$(k exec -i "deployment/$RELEASE-api" -- python - <<'PY'
+import asyncio, os
+from sortyard.engine import Engine, WorkflowNotFound
+
+async def main() -> None:
+    target = os.environ["SORTYARD_ENGINE_TARGET"]
+    engine = await Engine.connect(target)
+    try:
+        await engine.recorded("replica-smoke-no-such-workflow")
+    except WorkflowNotFound:
+        print(f"engine at {target} answered")
+
+asyncio.run(main())
+PY
+    ) || die "the API pod could not reach the engine server"
+    [[ $engine == *answered ]] || die "the engine server did not answer as expected: $engine"
+    echo "    $engine; schema ready for server $schema_for"
 
     say "smoke: the shadow conductor records every pass of the (fake) production pass log"
     # replica/fakes/fixtures.json's pass log holds two passes: one replayed from its retained
