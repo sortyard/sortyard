@@ -27,7 +27,18 @@ _DURATION = re.compile(r"^(\d{1,9})([smhd])$")
 LONGEST = timedelta(days=3650)
 _UNITS = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days"}
 _STATE_KEYS = frozenset(
-    {"owner", "limit", "default", "reason", "next", "initial", "queue", "decision", "terminal"}
+    {
+        "owner",
+        "limit",
+        "default",
+        "reason",
+        "next",
+        "initial",
+        "queue",
+        "decision",
+        "terminal",
+        "lifecycle",
+    }
 )
 _DEFAULT_KEYS = frozenset(
     {"to", "retry", "then", "redispatch", "answer", "reverse", "on-repeat", "action"}
@@ -96,6 +107,8 @@ class State:
     queue: bool = False
     decision: bool = False
     terminal: bool = False
+    #: The lifecycle kind recorded when an item enters the state, when the table names one.
+    lifecycle: str | None = None
 
     @property
     def kind(self) -> str:
@@ -221,6 +234,9 @@ def _state(name: str, raw: Any, reasons: Mapping[str, str]) -> State:
     ):
         raise _fail(name, "next must map outcomes to state names")
     transitions = dict(next_raw)
+    lifecycle = raw.get("lifecycle")
+    if lifecycle is not None and (not isinstance(lifecycle, str) or not lifecycle):
+        raise _fail(name, "lifecycle names the lifecycle kind of entering the state")
 
     if flags["terminal"]:
         extra = sorted(set(raw) & {"owner", "limit", "default", "next", "initial", "queue"})
@@ -228,7 +244,7 @@ def _state(name: str, raw: Any, reasons: Mapping[str, str]) -> State:
             raise _fail(
                 name, f"a terminal state ends the item and declares no {extra or 'decision'}"
             )
-        return State(name, reason, terminal=True)
+        return State(name, reason, terminal=True, lifecycle=lifecycle)
 
     for required in ("owner", "limit", "default"):
         if required not in raw:
@@ -271,6 +287,7 @@ def _state(name: str, raw: Any, reasons: Mapping[str, str]) -> State:
         initial=flags["initial"],
         queue=flags["queue"],
         decision=flags["decision"],
+        lifecycle=lifecycle,
     )
 
 
@@ -368,6 +385,7 @@ def to_record(table: StateTable) -> dict[str, Any]:
             "queue": state.queue,
             "decision": state.decision,
             "terminal": state.terminal,
+            "lifecycle": state.lifecycle,
             "limit": limit
             and {
                 "kind": limit.kind,
@@ -423,6 +441,7 @@ def from_record(record: Mapping[str, Any]) -> StateTable:
             queue=raw["queue"],
             decision=raw["decision"],
             terminal=raw["terminal"],
+            lifecycle=raw.get("lifecycle"),
         )
     return StateTable(record["version"], record["reasons"], states, record["initial"], "")
 

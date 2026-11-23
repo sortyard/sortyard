@@ -33,6 +33,7 @@ class BlockingEngine:
         self._lock = threading.Lock()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._engine: Engine | None = None
+        self._connecting: asyncio.Lock | None = None
 
     def _run(self, call: Coroutine[Any, Any, T]) -> T:
         with self._lock:
@@ -47,14 +48,24 @@ class BlockingEngine:
         ).result()
 
     async def _connected(self) -> Engine:
-        if self._engine is None:
-            self._engine = await Engine.connect(
-                self._target, namespace=self._namespace, task_queue=self._task_queue
-            )
-        return self._engine
+        # Runs on the one loop thread. The lock keeps two first calls from both connecting; a
+        # failed connect leaves nothing behind, so the next call tries again.
+        if self._connecting is None:
+            self._connecting = asyncio.Lock()
+        async with self._connecting:
+            if self._engine is None:
+                self._engine = await Engine.connect(
+                    self._target, namespace=self._namespace, task_queue=self._task_queue
+                )
+            return self._engine
 
     def signal(self, workflow_id: str, name: str, payload: Any = None) -> None:
-        """Deliver a signal to a workflow; raises what `Engine.signal` raises, or TimeoutError."""
+        """Deliver a signal to a workflow.
+
+        Raises what `Engine.signal` raises, `EngineUnavailable` when the engine cannot be
+        reached, or `TimeoutError` when it does not answer in time (the signal may or may not
+        have been delivered).
+        """
 
         async def send() -> None:
             await (await self._connected()).signal(workflow_id, name, payload)
@@ -63,6 +74,6 @@ class BlockingEngine:
 
     def close(self) -> None:
         with self._lock:
-            loop, self._loop, self._engine = self._loop, None, None
+            loop, self._loop, self._engine, self._connecting = self._loop, None, None, None
         if loop is not None:
             loop.call_soon_threadsafe(loop.stop)

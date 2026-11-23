@@ -26,7 +26,7 @@ from referencing.jsonschema import DRAFT202012
 from sortyard.engine import Registry as StepRegistry
 from sortyard.engine.testing import time_skipping_engine
 from sortyard.kernel import ledger
-from sortyard.kernel.item import register, send_outcome, start_item
+from sortyard.kernel.item import register, send_outcome, start_item, workflow_id
 from sortyard.kernel.ledger import LIFECYCLE_KINDS, Ledger, LinkRefused, event_for, lifecycle_kind
 from sortyard.kernel.states import shipped
 from tests.api_harness import INSTALLATION, OTHER_WS, WS
@@ -66,6 +66,7 @@ def transition(sequence: int, state: str, **fields: Any) -> dict[str, Any]:
         "sequence": sequence,
         "state": state,
         "state_kind": declared.kind,
+        "lifecycle": declared.lifecycle,
         "owner": declared.owner,
         "limit": declared.limit.text if declared.limit else None,
         "reason": declared.reason,
@@ -114,8 +115,9 @@ def test_a_transition_writes_the_item_row_and_its_event_in_one_transaction(conne
         events = conn.execute(
             "SELECT id, workspace_id, object_kind, object_id, xmin::text FROM sortyard.event"
         ).fetchall()
-    assert [row[:4] for row in run] == [("admitted", "start", None, f"item:{WS}:ITEM-1:1")]
-    assert [row[:4] for row in events] == [(f"item:{WS}:ITEM-1:1", WS, "item", "ITEM-1")]
+    event_id = event_for(transition(1, "admitted"))["id"]
+    assert [row[:4] for row in run] == [("admitted", "start", None, event_id)]
+    assert [row[:4] for row in events] == [(event_id, WS, "item", "ITEM-1")]
     # One transaction wrote all three rows.
     assert item_tx == run[0][4] == events[0][4]
 
@@ -187,6 +189,26 @@ def test_a_failed_event_write_leaves_the_item_row_unchanged(connect: Any) -> Non
         books.record({**transition(1, "admitted"), "item": "NO-SUCH-ITEM"})
     with pytest.raises(psycopg.Error, match="no item ITEM-1 in workspace"):
         books.record({**transition(1, "admitted"), "tenant": OTHER_WS})
+    # Nor can a caller slip an event in beside a row that does not change: a sequence below
+    # 1, a second event for a transition already recorded, an event about something else.
+    for sequence in (0, -5):
+        with pytest.raises(psycopg.Error, match="sequence starts at 1"):
+            books.record(transition(sequence, "merged"))
+    forged = transition(1, "merged")
+    with connect() as conn, pytest.raises(psycopg.Error, match="already recorded as event"):
+        conn.execute(
+            "SELECT sortyard.record_item_transition(%s, %s)",
+            [Jsonb(forged), Jsonb({**event_for(forged), "id": "evt-forged"})],
+        )
+    elsewhere = {**event_for(moving), "id": "evt-elsewhere", "object": {"kind": "task", "id": "t"}}
+    with connect() as conn, pytest.raises(psycopg.Error, match="is about that item"):
+        conn.execute(
+            "SELECT sortyard.record_item_transition(%s, %s)", [Jsonb(moving), Jsonb(elsewhere)]
+        )
+    # A transition recorded once cannot be recorded again as something else (a workflow that
+    # was reset and took another path is refused, loudly, on every attempt).
+    with pytest.raises(psycopg.Error, match="already appended with different content"):
+        books.record(transition(1, "admitted", entered_at="2026-11-24T00:00:00+00:00"))
     assert item_row(connect) == before
     assert counts(connect) == (1, 2)
 
@@ -203,6 +225,16 @@ def test_item_state_is_written_by_the_workflows_transition_and_nothing_else(conn
         "INSERT INTO sortyard.item (workspace_id, id, project_id, title, risk_tier, state)"
         f" VALUES ('{WS}', 'ITEM-2', 'proj-a', 'Forged', 'low', 'merged')",
         "DELETE FROM sortyard.item_run",
+        "UPDATE sortyard.item_run SET state = 'merged', owner = 'me'",
+        "INSERT INTO sortyard.item_run (workspace_id, item_id, sequence, state, state_kind,"
+        f" reason, cause, entered_at, event_id) VALUES ('{WS}', 'ITEM-1', 2, 'merged',"
+        " 'terminal', 'done', 'outcome', now(), 'evt-x')",
+        # An item cannot be born looking finished (it would be hidden from the queue), and it
+        # cannot be moved to another project, out of a project-confined token's reach.
+        "INSERT INTO sortyard.item (workspace_id, id, project_id, title, risk_tier, state_kind,"
+        f" owner, reason) VALUES ('{WS}', 'ITEM-3', 'proj-a', 'Hidden', 'low', 'terminal',"
+        " 'nobody', 'done')",
+        "UPDATE sortyard.item SET project_id = 'proj-b'",
     ):
         with pytest.raises(psycopg.errors.FeatureNotSupported), connect() as conn:
             conn.execute(statement)
@@ -245,6 +277,20 @@ def test_every_row_carries_a_tenant_identifier(connect: Any) -> None:
     books.create_item(tenant=OTHER_WS, item="ITEM-1", project="proj-a", title="Theirs")
     assert item_row(connect, tenant=OTHER_WS)[:5] == (None, None, None, None, 0)
     assert item_row(connect)[0] == "admitted"
+
+    # Two tenants whose ids run together the same way stay apart: "a:b" + "c" and "a" + "b:c"
+    # are different items with different events and different workflows.
+    with connect() as conn:
+        for tenant in ("a:b", "a"):
+            doc = {"id": tenant, "installation_id": INSTALLATION["id"], "name": tenant}
+            conn.execute("INSERT INTO sortyard.workspace (doc) VALUES (%s)", [Jsonb(doc)])
+    books.create_item(tenant="a:b", item="c", project="p", title="Theirs")
+    books.create_item(tenant="a", item="b:c", project="p", title="Ours")
+    books.record({**transition(1, "admitted"), "tenant": "a:b", "item": "c"})
+    books.record({**transition(1, "admitted"), "tenant": "a", "item": "b:c"})
+    assert item_row(connect, "c", "a:b")[0] == item_row(connect, "b:c", "a")[0] == "admitted"
+    assert workflow_id("a:b", "c") != workflow_id("a", "b:c")
+    assert workflow_id("ws", "item:1") != workflow_id("ws:item", "1")
 
     # A link cannot make an item wait on itself, directly or round a loop.
     for blocked_by in ("ITEM-2", "ITEM-1"):
@@ -323,6 +369,15 @@ def test_each_event_maps_to_a_harness_lifecycle_v1_kind_with_owner_limit_and_rea
         assert lifecycle["record_type"] == "harness.lifecycle.v1"
         assert lifecycle["kind"] is None or lifecycle["kind"] in LIFECYCLE_KINDS
         moves.append((move["from"], move["to"], lifecycle["kind"]))
+    # The kinds the measure job scores a lane by are all there: released to merged, the
+    # hand-back, the hold and its clearing.
+    assert {kind for _, _, kind in moves} - {None} == {
+        "released",
+        "merged",
+        "handback",
+        "readiness_hold",
+        "readiness_cleared",
+    }
     assert moves == [
         (None, "admitted", None),
         ("admitted", "preflight", "released"),
@@ -350,7 +405,14 @@ def test_the_lifecycle_mapping_covers_every_move_of_the_shipped_table() -> None:
         for target in targets - {None, "@origin"}:
             assert target is not None
             entered = table.state(target)
-            kind = lifecycle_kind({"state_kind": entered.kind, "from_kind": state.kind})
+            kind = lifecycle_kind(
+                {
+                    "state_kind": entered.kind,
+                    "from_kind": state.kind,
+                    "lifecycle": entered.lifecycle,
+                    "cause": "outcome",
+                }
+            )
             assert kind is None or kind in LIFECYCLE_KINDS
             seen[(state.kind, entered.kind)] = kind
     assert seen == {
@@ -364,3 +426,12 @@ def test_the_lifecycle_mapping_covers_every_move_of_the_shipped_table() -> None:
         ("decision", "work"): None,
         ("decision", "need"): "readiness_hold",
     }
+    # A person's request is put to the decision too; it is not work handed back.
+    asked = {"state_kind": "decision", "from_kind": "work", "lifecycle": None, "cause": "request"}
+    assert lifecycle_kind(asked) is None
+    assert lifecycle_kind({**asked, "cause": "limit"}) == "handback"
+    # Only a state the table marks as merged counts as merged: a terminal state added for a
+    # cancelled item would not.
+    cancelled = {"state_kind": "terminal", "from_kind": "decision", "lifecycle": None}
+    assert lifecycle_kind(cancelled) is None
+    assert shipped().state("merged").lifecycle == "merged"

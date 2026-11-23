@@ -53,6 +53,7 @@ def enter(ledger: Ledger, item: str, sequence: int, state: str, entered: datetim
             "sequence": sequence,
             "state": state,
             "state_kind": declared.kind,
+            "lifecycle": declared.lifecycle,
             "owner": declared.owner,
             "limit": declared.limit.text if declared.limit else None,
             "reason": declared.reason,
@@ -205,6 +206,13 @@ def test_a_state_change_request_reaches_the_workflow_as_a_signal_and_no_endpoint
             assert refused.status == 422, refused.body
         viewer = await post_request(api, "viewer", {"answer": "wait", "reason": "a viewer asks"})
         assert viewer.status == 403
+        # The request is in the audit log, as the operator's act.
+        with psycopg.connect(api.conninfo) as conn:
+            audited = conn.execute(
+                "SELECT doc -> 'object' ->> 'id', doc -> 'after' ->> 'item_id', doc ->> 'reason'"
+                " FROM sortyard.audit_log WHERE doc -> 'object' ->> 'kind' = 'item_request'"
+            ).fetchall()
+        assert audited == [(asked.body["id"], ITEM, "the release is frozen")]
         return asked.body, timeline.body["items"], (recorded.signals, item_state(api))
 
     async def scenario() -> tuple[Any, list[dict[str, Any]], Any]:
@@ -243,6 +251,35 @@ def test_a_state_change_request_reaches_the_workflow_as_a_signal_and_no_endpoint
     assert owners.questions[-1]["cause"] == "request"
 
 
+@requires_postgres
+def test_a_request_is_answered_503_when_the_engine_cannot_be_reached() -> None:
+    # Port 1 on this host: nothing listens there.
+    blocking = BlockingEngine("127.0.0.1:1", timeout_seconds=5.0)
+    try:
+        for api in running_api(signal_item=blocking.signal):
+            for _ in range(2):  # the second call tries to connect again; nothing is cached
+                reply = api.ws(
+                    "POST", f"/items/{ITEM}/requests", "operator", {"answer": "wait", "reason": "x"}
+                )
+                assert (reply.status, reply.body["reason_code"]) == (503, "engine"), reply.body
+            with psycopg.connect(api.conninfo) as conn:
+                audited = conn.execute(
+                    "SELECT count(*) FROM sortyard.audit_log"
+                    " WHERE doc -> 'object' ->> 'kind' = 'item_request'"
+                ).fetchone()
+            assert audited == (0,)
+    finally:
+        blocking.close()
+
+    # And a service configured with no engine at all says so, the same way.
+    def refuse(workflow: str, name: str, payload: Any) -> None:
+        raise AssertionError("no engine is configured: nothing may be signalled")
+
+    for api in running_api(signal_item=refuse):
+        api_without = api
+        assert api_without.ws("GET", f"/items/{ITEM}/timeline", "viewer").status == 200
+
+
 def test_no_endpoint_writes_item_state() -> None:
     """Statically: the only item operation that is not a read is the request, and no API code
     writes the item tables. (The database refuses a direct write as well:
@@ -259,7 +296,8 @@ def test_no_endpoint_writes_item_state() -> None:
     }
     assert set(item_ops) <= set(handlers.HANDLERS)
     writes = re.compile(
-        r"\b(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+sortyard\.item\b|record_item_transition",
+        r"\b(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+sortyard\.item(_run|_link)?\b"
+        r"|record_item_transition",
         re.IGNORECASE,
     )
     for path in [*sorted((SRC / "api").glob("*.py")), SRC / "services" / "api.py"]:

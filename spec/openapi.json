@@ -15525,7 +15525,7 @@
         "tags": [
           "Work"
         ],
-        "description": "The tracker view of the workflow kernel (HARNESS-V3 section 3.2): a read of the projection the item workflow writes. An item comes after every item it is blocked by; items no link orders keep their creation order. Each item carries its state, owner, limit, reason and age.",
+        "description": "The tracker view of the workflow kernel (HARNESS-V3 section 3.2): a read of the projection the item workflow writes. An item comes after every item it is blocked by; items no link orders keep their creation order. Each item carries its state, owner, limit, reason and age. A project with no items, or one that does not exist, has an empty queue.",
         "responses": {
           "200": {
             "description": "OK",
@@ -15633,9 +15633,6 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
           }
         },
         "security": [
@@ -15695,7 +15692,7 @@
         "tags": [
           "Work"
         ],
-        "description": "Every transition of the item's workflow as a ledger Event: the state left, the state entered, the owner, the limit, the typed reason, and the harness.lifecycle.v1 kind it maps to.",
+        "description": "Every transition of the item's workflow as a ledger Event: the state left, the state entered, the owner, the limit and the typed reason. `facts.lifecycle.kind` is the harness.lifecycle.v1 kind of the transition, or null where that format has none.",
         "responses": {
           "200": {
             "description": "OK",
@@ -15786,7 +15783,7 @@
         "tags": [
           "Work"
         ],
-        "description": "Nothing writes an item's state but its workflow. This sends the workflow a request, as a signal; the workflow puts it to the decision service, and the request, the answer and its source appear on the item's timeline. Accepted means the engine has the signal, not that the answer was the one asked for.",
+        "description": "Nothing writes an item's state but its workflow. This sends the workflow a request, as a signal; the workflow puts it to the decision service, and the request, the answer and its source appear on the item's timeline. Accepted means the engine has the signal, not that the answer was the one asked for: an answer the item's decision state does not have is not granted, and a request that arrives as the item finishes is not acted on. The request is written to the audit log.",
         "requestBody": {
           "required": true,
           "content": {
@@ -15801,7 +15798,7 @@
                 "properties": {
                   "answer": {
                     "x-sortyard-api-defined": true,
-                    "description": "The decision asked for: one of the answers of the state table's decision state.",
+                    "description": "The decision asked for. It is granted only if it is one of the answers of the decision state of the item's state table.",
                     "type": "string",
                     "minLength": 1
                   },

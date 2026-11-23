@@ -77,6 +77,11 @@ CREATE INDEX ON sortyard.item_link (workspace_id, blocked_by);
 CREATE FUNCTION sortyard.item_state_guard() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
+    IF (NEW.workspace_id, NEW.id, NEW.project_id) IS DISTINCT FROM
+       (OLD.workspace_id, OLD.id, OLD.project_id) THEN
+        RAISE EXCEPTION 'sortyard.item: an item keeps its workspace, id and project'
+            USING ERRCODE = 'feature_not_supported';
+    END IF;
     IF current_setting('sortyard.recording_transition', true) IS DISTINCT FROM 'on' AND (
         (NEW.state, NEW.state_kind, NEW.owner, NEW.limit_text, NEW.reason, NEW.entered_at,
          NEW.sequence)
@@ -96,7 +101,9 @@ CREATE TRIGGER state_guard BEFORE UPDATE ON sortyard.item
 CREATE FUNCTION sortyard.item_starts_stateless() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
-    IF NEW.state IS NOT NULL OR NEW.sequence <> 0 OR NEW.entered_at IS NOT NULL THEN
+    IF NEW.sequence <> 0 OR (NEW.state, NEW.state_kind, NEW.owner, NEW.limit_text, NEW.reason,
+                             NEW.entered_at) IS DISTINCT FROM (NULL, NULL, NULL, NULL, NULL, NULL)
+    THEN
         RAISE EXCEPTION 'sortyard.item: a new item has no state; the item workflow records its first transition'
             USING ERRCODE = 'feature_not_supported';
     END IF;
@@ -109,6 +116,21 @@ CREATE TRIGGER starts_stateless BEFORE INSERT ON sortyard.item
 CREATE TRIGGER append_only BEFORE DELETE OR TRUNCATE ON sortyard.item_run
     FOR EACH STATEMENT EXECUTE FUNCTION sortyard.refuse('rows are history');
 
+-- Run rows are written by record_item_transition and by nothing else: it inserts one and
+-- stamps left_at on the one before.
+CREATE FUNCTION sortyard.item_run_guard() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF current_setting('sortyard.recording_transition', true) IS DISTINCT FROM 'on' THEN
+        RAISE EXCEPTION 'sortyard.item_run: runs are written by the item workflow only'
+            USING ERRCODE = 'feature_not_supported';
+    END IF;
+    RETURN NEW;
+END
+$$;
+CREATE TRIGGER run_guard BEFORE INSERT OR UPDATE ON sortyard.item_run
+    FOR EACH ROW EXECUTE FUNCTION sortyard.item_run_guard();
+
 -- Record one transition: the item row, its run rows and the ledger Event, together.
 --
 --   transition  {item, sequence, state, state_kind, owner, limit, reason, from_state, cause,
@@ -117,7 +139,9 @@ CREATE TRIGGER append_only BEFORE DELETE OR TRUNCATE ON sortyard.item_run
 --
 -- Returns the Event's ledger position. The call is idempotent: the workflow's record step may
 -- be delivered more than once, and a transition already recorded returns its position and
--- writes nothing. A transition that skips a sequence number is refused.
+-- writes nothing. Anything else is refused and writes nothing: a sequence below 1, one that
+-- skips a number, an Event that is not about this item, and a second, different Event for a
+-- transition already recorded.
 CREATE FUNCTION sortyard.record_item_transition(transition jsonb, event jsonb) RETURNS bigint
 LANGUAGE plpgsql AS $$
 DECLARE
@@ -126,6 +150,7 @@ DECLARE
     next_sequence integer := (transition ->> 'sequence')::integer;
     entered timestamptz := (transition ->> 'entered_at')::timestamptz;
     existing sortyard.item%ROWTYPE;
+    recorded_event text;
     ledger_seq bigint;
 BEGIN
     IF tenant IS NULL OR the_item IS NULL OR next_sequence IS NULL OR entered IS NULL THEN
@@ -138,9 +163,25 @@ BEGIN
         RAISE EXCEPTION 'sortyard.item: no item % in workspace %', the_item, tenant
             USING ERRCODE = 'foreign_key_violation';
     END IF;
+    IF next_sequence < 1 THEN
+        RAISE EXCEPTION 'sortyard.item: a transition''s sequence starts at 1, not %', next_sequence
+            USING ERRCODE = 'invalid_parameter_value';
+    END IF;
+    IF event -> 'object' ->> 'kind' IS DISTINCT FROM 'item'
+       OR event -> 'object' ->> 'id' IS DISTINCT FROM the_item THEN
+        RAISE EXCEPTION 'sortyard.item: the event of a transition of % is about that item', the_item
+            USING ERRCODE = 'invalid_parameter_value';
+    END IF;
     IF next_sequence <= existing.sequence THEN
-        -- Already recorded. append_event returns the original position, and refuses if the
-        -- event differs from the one recorded under the same id.
+        -- Already recorded: it must be the same Event again. append_event then returns the
+        -- original position, and refuses an Event whose content differs.
+        SELECT r.event_id INTO recorded_event FROM sortyard.item_run AS r
+            WHERE r.workspace_id = tenant AND r.item_id = the_item AND r.sequence = next_sequence;
+        IF recorded_event IS DISTINCT FROM event ->> 'id' THEN
+            RAISE EXCEPTION 'sortyard.item: transition % of % is already recorded as event %',
+                next_sequence, the_item, recorded_event
+                USING ERRCODE = 'unique_violation';
+        END IF;
         RETURN sortyard.append_event(event);
     END IF;
     IF next_sequence <> existing.sequence + 1 THEN
@@ -150,6 +191,7 @@ BEGIN
     END IF;
 
     ledger_seq := sortyard.append_event(event);
+    PERFORM set_config('sortyard.recording_transition', 'on', true);
     UPDATE sortyard.item_run AS r SET left_at = entered
         WHERE r.workspace_id = tenant AND r.item_id = the_item
           AND r.sequence = existing.sequence;
@@ -161,7 +203,6 @@ BEGIN
          transition ->> 'owner',
          transition ->> 'limit', transition ->> 'reason', transition ->> 'from_state',
          transition ->> 'cause', entered, event ->> 'id');
-    PERFORM set_config('sortyard.recording_transition', 'on', true);
     UPDATE sortyard.item AS i SET
         state = transition ->> 'state',
         state_kind = transition ->> 'state_kind',

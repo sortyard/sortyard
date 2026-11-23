@@ -15,6 +15,7 @@ job that scores the legacy conductor can score this kernel from the same kinds.
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from typing import Any
@@ -53,26 +54,29 @@ class LinkRefused(ValueError):
 
 
 def lifecycle_kind(transition: Mapping[str, Any]) -> str | None:
-    """The harness.lifecycle.v1 kind of a transition, from the kinds of state it joins.
+    """The harness.lifecycle.v1 kind of a transition.
 
-    State kinds come from the state table (terminal, decision, queue, need, work), so a state
-    added to the table is classified without a change here.
-
-    - into a terminal state: `merged`
-    - into a decision: `handback` (the work came back without finishing)
+    - into a state the table marks with a lifecycle kind (`lifecycle = "merged"` on the
+      shipped table's merged state): that kind. A terminal state the table does not mark,
+      such as a cancelled one added later, is not counted as merged.
+    - into a decision because the work came back without finishing (an outcome, a passed
+      limit): `handback`. A person's request is put to the decision too, and is not a handback.
     - into a wait on a named need: `readiness_hold`; out of one, back to work:
-      `readiness_cleared`
+      `readiness_cleared`. A wait that ends at its limit goes to a decision (`handback`); no
+      `readiness_cleared` is written for it, because nothing cleared.
     - out of the queue into work: `released`
 
     harness.lifecycle.v1 has no kind for a move between two work states (building to checking,
     say), for entering the queue, or for a decision's answer. Those return None: the ledger
-    keeps the Event, and it has no lifecycle kind to be scored under.
+    keeps the Event, and it has no lifecycle kind to be scored under. `completion` (verified or
+    reported-only) is never returned: the kernel has no verifier yet.
     """
     entered, left = transition.get("state_kind"), transition.get("from_kind")
-    if entered == "terminal":
-        return "merged"
+    declared = transition.get("lifecycle")
+    if isinstance(declared, str):
+        return declared
     if entered == "decision":
-        return "handback"
+        return None if transition.get("cause") == "request" else "handback"
     if entered == "need":
         return "readiness_hold"
     if left == "need" and entered == "work":
@@ -80,6 +84,11 @@ def lifecycle_kind(transition: Mapping[str, Any]) -> str | None:
     if left == "queue" and entered == "work":
         return "released"
     return None
+
+
+def _digest(tenant: str, item: str) -> str:
+    """One item of one tenant, as 32 hex characters."""
+    return hashlib.sha256(f"{len(tenant)}:{tenant}{item}".encode()).hexdigest()[:32]
 
 
 def _timestamp(value: str) -> str:
@@ -93,8 +102,9 @@ def event_for(transition: Mapping[str, Any]) -> dict[str, Any]:
     """The ledger Event (spec/event.schema.json, less the seq the ledger assigns) of a transition.
 
     It carries the state left, the state entered, the owner, the limit and the typed reason.
-    Its id is fixed by the item and the transition's sequence, so recording a transition twice
-    appends one Event.
+    Its id is fixed by the tenant, the item and the transition's sequence, so recording a
+    transition twice appends one Event. The tenant and the item go into the id as a digest: both
+    may contain every character an id allows, so no separator could keep two tenants' ids apart.
     """
     tenant, item, sequence = transition["tenant"], transition["item"], transition["sequence"]
     facts = {
@@ -111,7 +121,7 @@ def event_for(transition: Mapping[str, Any]) -> dict[str, Any]:
         "lifecycle": {"record_type": LIFECYCLE_RECORD_TYPE, "kind": lifecycle_kind(transition)},
     }
     return {
-        "id": f"item:{tenant}:{item}:{sequence}",
+        "id": f"item-{_digest(tenant, item)}-{sequence}",
         "workspace_id": tenant,
         "ts": _timestamp(transition["entered_at"]),
         "actor": ACTOR,

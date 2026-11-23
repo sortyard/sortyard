@@ -119,9 +119,16 @@ class Server(ThreadingHTTPServer):
         self.config = config
         self.connect: Connect = connect or (lambda: psycopg.connect(config.conninfo()))
         self.signal_item = signal_item
+        self._engine: BlockingEngine | None = None
         if signal_item is None and config.engine_target:
-            self.signal_item = BlockingEngine(config.engine_target).signal
+            self._engine = BlockingEngine(config.engine_target)
+            self.signal_item = self._engine.signal
         super().__init__((config.host, config.port), Handler)
+
+    def server_close(self) -> None:
+        super().server_close()
+        if self._engine is not None:
+            self._engine.close()
 
 
 class Handler(BaseHTTPRequestHandler):

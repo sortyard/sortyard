@@ -1203,4 +1203,17 @@ def request_item_change(req: Request) -> Reply:
         raise ApiError(
             503, "Service Unavailable", "the workflow engine did not answer", "engine"
         ) from None
+    # The request is an operator's act: it is in the audit log whether or not the workflow
+    # grants it. What the workflow did with it is on the item's timeline.
+    store.audit(
+        req.conn,
+        req.workspace_id,
+        req.actor,
+        "create",
+        "item_request",
+        request_id,
+        None,
+        {"item_id": item_id, "answer": answer},
+        reason,
+    )
     return Reply(202, {"id": request_id, "item_id": item_id, "answer": answer, "reason": reason})
