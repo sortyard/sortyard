@@ -16,8 +16,9 @@ else:
   bounded by a durable timer (`limit`), which raises `LimitPassed` in the workflow.
 
 The engine is Temporal (docs/decisions/workflow-engine.md records why, the versions tested and
-the failure-test results). Replacing it changes only this package: nothing here that the kernel
-can reach is a Temporal type.
+the failure-test results). Replacing it changes only this package: the kernel handles no
+Temporal type and catches no Temporal exception. Failures cross the boundary as `StepFailed`,
+`LimitPassed`, `WorkflowFailed`, `WorkflowNotFound` and `EngineUnavailable`.
 
 Rules for workflow functions. A workflow function is replayed from its recorded history when a
 worker restarts, so it must be deterministic: every side effect goes in a step, every wait in
@@ -32,12 +33,15 @@ from sortyard.engine._temporal import (
     ENGINE,
     Context,
     Engine,
+    EngineUnavailable,
     LimitPassed,
     Recorded,
     Registry,
+    StepFailed,
     StepFunction,
     WorkflowFailed,
     WorkflowFunction,
+    WorkflowNotFound,
     engine_version,
 )
 
@@ -45,11 +49,14 @@ __all__ = [
     "ENGINE",
     "Context",
     "Engine",
+    "EngineUnavailable",
     "LimitPassed",
     "Recorded",
     "Registry",
+    "StepFailed",
     "StepFunction",
     "WorkflowFailed",
     "WorkflowFunction",
+    "WorkflowNotFound",
     "engine_version",
 ]

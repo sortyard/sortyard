@@ -7,7 +7,9 @@ section 3.1, phase 0). Status: decided under the owner's accepted plan; reversib
 
 The kernel's durable workflow engine is **Temporal**, reached only through `src/sortyard/engine/`.
 That package is the only code that imports the SDK (`tests/test_engine_boundary.py`). It gives
-the kernel four things and exposes no Temporal type:
+the kernel four things. The kernel handles no Temporal type and catches no Temporal exception:
+failures cross the boundary as the package's own `StepFailed`, `LimitPassed`, `WorkflowFailed`,
+`WorkflowNotFound` and `EngineUnavailable`.
 
 | The kernel asks for | `sortyard.engine` | On Temporal |
 | --- | --- | --- |
@@ -17,7 +19,8 @@ the kernel four things and exposes no Temporal type:
 | a step that is retried and recorded | `Context.step`, a function registered with `Registry.step` | one generic dynamic activity with a retry policy |
 
 `Engine.recorded` reads where a workflow stands (finished steps, pending timers, accepted
-signals, whether it is idle) from the engine's history, never from a worker.
+signals, whether it is idle, and the error of a workflow-code defect the engine is retrying)
+from the engine's records, never from a worker.
 
 The hand-written transition, schedule, lease and queue code planned in the native-execution
 design (closed pull request 13) is not written.
@@ -41,9 +44,9 @@ is that verification for Temporal. It opens no new question.
 
 Command: `pytest tests/test_engine_failure.py tests/test_engine_boundary.py`. Run on a
 workstation (Python 3.12.3, Linux x86-64) and by the `test` job of the pull request that added
-this record (Python 3.11). Versions: **temporalio 1.36.1**; the development server it downloads
-reports "Temporal CLI 1.10.1 (Server 1.32.2)"; the time-skipping test server is the build the
-same SDK version downloads.
+this record (Python 3.11). Versions: **temporalio 1.36.1**; the development server is pinned to
+Temporal CLI v1.10.1, which reports Server 1.32.2; the time-skipping test server is pinned to
+v1.36.0 (`sortyard/engine/testing.py` holds both pins).
 
 The kill tests run real worker processes (`tests/engine_worker.py`) on the sample workflows of
 `tests/engine_sample.py` and stop them with SIGKILL. A worker is killed only after the engine
@@ -51,23 +54,28 @@ itself reports the position the test means to kill it at; no test waits a fixed 
 
 | Test (`tests/test_engine_failure.py`) | Result |
 | --- | --- |
-| A workflow finishes after its worker is killed mid-step and finished steps do not run again | **Pass.** Step one ran once. The step the worker died in ran twice (once interrupted, once to its end). The last step ran once. |
+| A workflow finishes after its worker is killed mid-step and finished steps do not run again | **Pass.** Step one ran once. The step the worker died in ran twice (once interrupted, once to its end), although its own timeout is 30 minutes. The last step ran once. |
 | A waiting workflow keeps its position across a worker restart on changed step code | **Pass.** The new worker ran a changed copy of the sample. Step one was not run again and its recorded result was reused; the step after the wait ran on the new code. |
 | A seven-day timer fires under the test clock | **Pass.** After six days on the test clock the timer was still pending; after the seventh it fired and the workflow finished, having waited seven days by the engine's clock. |
 | A signal sent with no worker running is delivered when a worker starts | **Pass.** With every worker dead the engine accepted and kept the signal; a new worker delivered it. A second test starts and signals a workflow before any worker has ever run. |
 
 More tests in the same file cover the rest of the boundary: a step that raises is retried and
-recorded once; a step out of attempts fails the workflow; a signal wait can time out; a workflow
-id cannot be used twice; a step bounded by a limit is abandoned when its durable timer fires
-first.
+recorded once; a step out of attempts fails the workflow unless the workflow catches
+`StepFailed`; a signal wait can time out; a workflow id cannot be used twice; a step bounded by
+a limit is abandoned when its durable timer fires first, and the workflow is reported idle at
+its next wait; a defect in workflow code keeps the workflow running and is reported; calls on
+an unknown or ended workflow raise `WorkflowNotFound`.
 
 ## What the tests showed about Temporal
 
 These are properties the kernel has to design for. Each was observed in the runs above.
 
-1. **A step needs a timeout.** When a worker dies inside a step, the server learns of it only
-   when the step's timeout passes, and reruns the step then. `Registry.step` therefore requires
-   `timeout`. This fits the kernel rule that every state has a limit.
+1. **A dead worker is noticed by silence; a hung step by its timeout.** The server does not
+   know a worker died. The boundary makes every running step report in (a heartbeat) and tells
+   the server to rerun a step that has been silent for 10 seconds, so the kill test's step was
+   rerun in seconds although its timeout is 30 minutes. A step that hangs in a live worker keeps
+   reporting in, so only its `timeout` ends it: `Registry.step` requires one. This fits the
+   kernel rule that every state has a limit.
 2. **A step may run more than once.** The interrupted step ran twice. Steps must be safe to
    repeat (at-least-once); only a step that finished is never run again.
 3. **A restarted worker picks work up after a short delay.** The kill tests take 10 to 15
@@ -83,6 +91,11 @@ These are properties the kernel has to design for. Each was observed in the runs
    level and re-imports workflow modules in a sandbox. The boundary uses one module-level
    dynamic workflow with the unsandboxed runner so the kernel can register plain functions.
    The cost: nothing checks determinism at import time; a broken rule shows as a replay error.
+7. **An error in workflow code does not end the workflow.** Temporal treats an unexpected
+   exception in a workflow function as a defect to fix and redeploy: the workflow stays running
+   and the pass is retried. The boundary keeps that (work in flight survives a bad deploy) and
+   reports the error as `Recorded.defect`. Only the boundary's own outcomes that a workflow lets
+   through (`StepFailed`, `LimitPassed`, a signal wait's `TimeoutError`) fail the workflow.
 6. **The test clock moves only when told, and not while a step runs.** On the time-skipping
    server a timer fires when the test advances the clock (`TestClock.advance`). With a step in
    progress the advance call did not return (it timed out), so a limit that beats a running

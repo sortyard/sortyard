@@ -11,6 +11,7 @@ Both run the engine's own server as a child process on a free local port and sto
 The server binaries are not Python packages. The SDK downloads each one on first use (from
 temporal.download) and caches it in the system temporary directory; later runs use the cache.
 docs/decisions/workflow-engine.md records this as the one network need beyond the package index.
+The versions are pinned here, so every run tests the servers that record names.
 """
 
 from __future__ import annotations
@@ -24,6 +25,9 @@ from temporalio.testing import WorkflowEnvironment
 
 from sortyard.engine._temporal import DEFAULT_TASK_QUEUE, Engine
 
+DEV_SERVER_VERSION = "v1.10.1"  # Temporal CLI; it reports Server 1.32.2
+TEST_SERVER_VERSION = "v1.36.0"  # the time-skipping test server
+
 
 @dataclass(frozen=True)
 class LocalEngine:
@@ -35,7 +39,9 @@ class LocalEngine:
 
 @asynccontextmanager
 async def local_engine(task_queue: str = DEFAULT_TASK_QUEUE) -> AsyncIterator[LocalEngine]:
-    async with await WorkflowEnvironment.start_local() as environment:
+    async with await WorkflowEnvironment.start_local(
+        dev_server_download_version=DEV_SERVER_VERSION
+    ) as environment:
         target = environment.client.service_client.config.target_host
         yield LocalEngine(Engine(environment.client, task_queue), target)
 
@@ -66,5 +72,7 @@ class TimeSkippingEngine:
 async def time_skipping_engine(
     task_queue: str = DEFAULT_TASK_QUEUE,
 ) -> AsyncIterator[TimeSkippingEngine]:
-    async with await WorkflowEnvironment.start_time_skipping() as environment:
+    async with await WorkflowEnvironment.start_time_skipping(
+        test_server_download_version=TEST_SERVER_VERSION
+    ) as environment:
         yield TimeSkippingEngine(Engine(environment.client, task_queue), TestClock(environment))

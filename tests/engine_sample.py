@@ -14,7 +14,7 @@ import time
 from datetime import timedelta
 from typing import Any
 
-from sortyard.engine import Context, LimitPassed, Registry
+from sortyard.engine import Context, LimitPassed, Registry, StepFailed
 
 REGISTRY = Registry()
 VERSION = "v1"
@@ -43,9 +43,13 @@ def two(arg: Any) -> str:
     return f"two-{VERSION}"
 
 
-@REGISTRY.step("held", timeout=timedelta(seconds=3))
+@REGISTRY.step("held", timeout=timedelta(minutes=30))
 def held(arg: Any) -> str:
-    """A step a test can stop a worker in: it does not finish while the hold file exists."""
+    """A step a test can stop a worker in: it does not finish while the hold file exists.
+
+    Its timeout is far longer than any test waits, so a rerun after its worker is killed shows
+    that the engine noticed the dead worker, not that the timeout passed.
+    """
     mark("held-started")
     hold = pathlib.Path(os.environ["SORTYARD_ENGINE_HOLD"])
     while hold.exists():
@@ -121,10 +125,37 @@ async def impatient(ctx: Context, arg: Any) -> str:
 
 @REGISTRY.workflow("bounded")
 async def bounded(ctx: Context, arg: Any) -> list[str]:
-    """A quick step inside its limit, then a stuck step that outlasts a limit of `arg` seconds."""
+    """A quick step inside its limit, a stuck step that outlasts a limit of `arg` seconds, and
+    then a wait: the shape of a state with an owner step and a limit."""
     quick: str = await ctx.step("one", limit=timedelta(days=1))
+    await ctx.wait_signal("first")
     try:
         await ctx.step("stuck", limit=timedelta(seconds=arg))
+        late = "finished"
     except LimitPassed:
-        return [quick, "limit passed"]
-    return [quick, "finished"]
+        late = "limit passed"
+    return [quick, late, await ctx.wait_signal("second")]
+
+
+@REGISTRY.workflow("overruns")
+async def overruns(ctx: Context, arg: Any) -> str:
+    """Lets a passed limit through: the workflow fails."""
+    result: str = await ctx.step("stuck", limit=timedelta(seconds=arg))
+    return result
+
+
+@REGISTRY.workflow("defective")
+async def defective(ctx: Context, arg: Any) -> str:
+    """A defect in workflow code: not a failure of the work, so the engine keeps the workflow."""
+    await ctx.step("one")
+    raise KeyError("a bug in the workflow function")
+
+
+@REGISTRY.workflow("recovers")
+async def recovers(ctx: Context, arg: Any) -> str:
+    """A workflow may catch a step that ran out of attempts and carry on."""
+    try:
+        await ctx.step("doomed")
+    except StepFailed:
+        return "carried on"
+    return "finished"

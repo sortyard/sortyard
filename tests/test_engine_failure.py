@@ -24,7 +24,7 @@ from typing import TypeVar
 
 import pytest
 
-from sortyard.engine import Engine, Recorded, WorkflowFailed, engine_version
+from sortyard.engine import Engine, Recorded, WorkflowFailed, WorkflowNotFound, engine_version
 from sortyard.engine.testing import local_engine, time_skipping_engine
 from tests import engine_sample
 
@@ -154,7 +154,8 @@ def test_a_workflow_finishes_after_its_worker_is_killed_mid_step_and_finished_st
         assert recorded.finished_steps == ("one", "held", "two")
         seen = engine_sample.marks()
         assert seen.count("one-v1") == 1, "the finished step ran again"
-        # The step the worker died in ran twice: once interrupted, once to its end.
+        # The step the worker died in ran twice: once interrupted, once to its end. Its own
+        # timeout is 30 minutes, so the rerun came from the engine noticing the dead worker.
         assert seen.count("held-started") == 2
         assert seen.count("held-finished") == 1
         assert seen.count("two-v1") == 1
@@ -218,6 +219,11 @@ def test_a_seven_day_timer_fires_under_the_test_clock() -> None:
 
                 # The seventh day passes: it fires, and the workflow finishes.
                 await clock.advance(timedelta(days=1))
+                await until(
+                    lambda: engine.recorded("seven-days"),
+                    lambda r: r.pending_timers == (),
+                    "the timer firing",
+                )
                 waited = await asyncio.wait_for(engine.result("seven-days"), DEADLINE)
                 fired = await engine.recorded("seven-days")
                 finished = await clock.now()
@@ -225,9 +231,11 @@ def test_a_seven_day_timer_fires_under_the_test_clock() -> None:
                 worker.cancel()
                 await asyncio.gather(worker, return_exceptions=True)
 
+        # Seven days by the engine's clock, and by the test clock: no more than the two
+        # advances, which the real seconds of this test cannot stretch to an eighth day.
         assert waited >= engine_sample.WEEK.total_seconds()
         assert fired.status == "completed" and fired.pending_timers == ()
-        assert finished - started >= engine_sample.WEEK
+        assert engine_sample.WEEK <= finished - started < timedelta(days=8)
 
     asyncio.run(scenario())
 
@@ -314,6 +322,8 @@ def test_a_step_out_of_attempts_fails_the_workflow_and_a_signal_wait_can_time_ou
                 await engine.start("gives-up", "gives-up")
                 with pytest.raises(WorkflowFailed):
                     await asyncio.wait_for(engine.result("gives-up"), DEADLINE)
+                await engine.start("recovers", "recovers")
+                assert await asyncio.wait_for(engine.result("recovers"), DEADLINE) == "carried on"
                 await engine.start("impatient", "impatient")
                 with pytest.raises(ValueError, match="already used"):
                     await engine.start("impatient", "impatient")
@@ -331,7 +341,7 @@ def test_a_step_out_of_attempts_fails_the_workflow_and_a_signal_wait_can_time_ou
 
     recorded, impatient = asyncio.run(scenario())
     assert recorded.status == "failed" and recorded.finished_steps == ()
-    assert engine_sample.marks() == ["doomed-attempt", "doomed-attempt"]
+    assert engine_sample.marks() == ["doomed-attempt"] * 4
     assert impatient == "timed out"
 
 
@@ -339,7 +349,7 @@ def test_a_step_bounded_by_a_limit_is_abandoned_when_the_durable_timer_fires_fir
     """On the development server, in real time: the test server does not move its clock while
     a step is running, so a limit that beats a running step cannot be shown on the test clock."""
 
-    async def scenario() -> tuple[Recorded, object]:
+    async def scenario() -> tuple[Recorded, Recorded, object]:
         hold = pathlib.Path(os.environ["SORTYARD_ENGINE_HOLD"])
         hold.touch()
         async with local_engine() as local:
@@ -347,23 +357,81 @@ def test_a_step_bounded_by_a_limit_is_abandoned_when_the_durable_timer_fires_fir
             worker = asyncio.create_task(engine.run_worker(engine_sample.REGISTRY))
             try:
                 await engine.start("bounded", "bounded", 1)
-                # The quick step finished inside its limit and its timer is gone; the stuck
-                # step is running beside its own one-second timer.
-                beside = await until(
-                    lambda: engine.recorded("bounded"),
-                    lambda r: r.finished_steps == ("one",) and len(r.pending_timers) == 1,
-                    "the stuck step's limit timer",
+                # A step that finished inside its limit leaves the workflow idle at its wait.
+                in_time = await until(
+                    lambda: engine.recorded("bounded"), lambda r: r.idle, "the first wait"
                 )
-                return beside, await asyncio.wait_for(engine.result("bounded"), DEADLINE)
+                await engine.signal("bounded", "first")
+                # So does a step abandoned at its limit, though its one attempt still runs.
+                abandoned = await until(
+                    lambda: engine.recorded("bounded"),
+                    lambda r: r.idle and r.signals == ("first",),
+                    "the second wait",
+                )
+                await engine.start("overruns", "overruns", 1)
+                with pytest.raises(WorkflowFailed, match="did not finish within"):
+                    await asyncio.wait_for(engine.result("overruns"), DEADLINE)
+                await engine.signal("bounded", "second", "done")
+                return (
+                    in_time,
+                    abandoned,
+                    await asyncio.wait_for(engine.result("bounded"), DEADLINE),
+                )
             finally:
                 hold.unlink()
                 worker.cancel()
                 await asyncio.gather(worker, return_exceptions=True)
 
-    beside, result = asyncio.run(scenario())
-    assert beside.pending_timers == (timedelta(seconds=1),)
-    assert result == ["one-v1", "limit passed"]
-    assert engine_sample.marks() == ["one-v1", "stuck-started"]
+    in_time, abandoned, result = asyncio.run(scenario())
+    assert in_time.finished_steps == ("one",) and in_time.pending_timers == ()
+    assert abandoned.finished_steps == ("one",) and abandoned.pending_timers == ()
+    assert result == ["one-v1", "limit passed", "done"]
+    assert engine_sample.marks() == ["one-v1", "stuck-started", "stuck-started"]
+
+
+def test_a_defect_in_workflow_code_keeps_the_workflow_and_is_reported() -> None:
+    async def scenario() -> Recorded:
+        async with time_skipping_engine() as skipping:
+            engine = skipping.engine
+            worker = asyncio.create_task(engine.run_worker(engine_sample.REGISTRY))
+            try:
+                await engine.start("defective", "defective")
+                return await until(
+                    lambda: engine.recorded("defective"),
+                    lambda r: r.defect is not None,
+                    "the failed pass",
+                )
+            finally:
+                worker.cancel()
+                await asyncio.gather(worker, return_exceptions=True)
+
+    recorded = asyncio.run(scenario())
+    assert recorded.status == "running" and recorded.finished_steps == ("one",)
+    assert recorded.defect is not None and "a bug in the workflow function" in recorded.defect
+    assert engine_sample.marks() == ["one-v1"]
+
+
+def test_calls_on_an_unknown_or_ended_workflow_raise_the_boundarys_own_error() -> None:
+    async def scenario() -> None:
+        async with time_skipping_engine() as skipping:
+            engine = skipping.engine
+            worker = asyncio.create_task(engine.run_worker(engine_sample.REGISTRY))
+            try:
+                with pytest.raises(WorkflowNotFound):
+                    await engine.signal("nobody", "go")
+                with pytest.raises(WorkflowNotFound):
+                    await engine.recorded("nobody")
+                with pytest.raises(WorkflowNotFound):
+                    await engine.result("nobody")
+                await engine.start("retried", "ended")
+                await asyncio.wait_for(engine.result("ended"), DEADLINE)
+                with pytest.raises(WorkflowNotFound):
+                    await engine.signal("ended", "go")
+            finally:
+                worker.cancel()
+                await asyncio.gather(worker, return_exceptions=True)
+
+    asyncio.run(scenario())
 
 
 def test_the_engine_reports_its_version() -> None:

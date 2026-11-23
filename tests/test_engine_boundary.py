@@ -13,7 +13,8 @@ import pathlib
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 ENGINE_PACKAGE = ROOT / "src" / "sortyard" / "engine"
 ENGINE_SDKS = frozenset({"dbos", "temporalio"})
-SKIP_DIRS = frozenset({".git", ".venv", "venv", "build", "dist", "node_modules", "__pycache__"})
+# Skipped at the top of the repository only: a package named build or dist deeper down is code.
+SKIP_TOP = frozenset({".git", ".venv", "venv", "build", "dist", "node_modules"})
 
 
 def imported_modules(source: str) -> set[str]:
@@ -45,7 +46,7 @@ def python_files() -> list[pathlib.Path]:
     return [
         path
         for path in sorted(ROOT.rglob("*.py"))
-        if not SKIP_DIRS.intersection(path.relative_to(ROOT).parts[:-1])
+        if path.relative_to(ROOT).parts[0] not in SKIP_TOP
         and not any(part.endswith(".egg-info") for part in path.relative_to(ROOT).parts)
     ]
 

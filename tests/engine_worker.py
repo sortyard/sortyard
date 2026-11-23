@@ -11,8 +11,11 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
+import os
 import pathlib
 import sys
+import threading
+import time
 from types import ModuleType
 
 from sortyard.engine import Engine
@@ -27,10 +30,23 @@ def load(path: pathlib.Path) -> ModuleType:
     return module
 
 
+def exit_with_parent() -> None:
+    """Do not outlive the test process, however it ends (a worker is never the last one left)."""
+    parent = os.getppid()
+
+    def watch() -> None:
+        while os.getppid() == parent:
+            time.sleep(0.5)
+        os._exit(1)
+
+    threading.Thread(target=watch, daemon=True).start()
+
+
 async def main(sample: pathlib.Path, target: str) -> None:
     engine = await Engine.connect(target)
     await engine.run_worker(load(sample).REGISTRY)
 
 
 if __name__ == "__main__":
+    exit_with_parent()
     asyncio.run(main(pathlib.Path(sys.argv[1]), sys.argv[2]))
