@@ -8,7 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 WORKDIR /src
-COPY pyproject.toml README.md LICENSE ./
+COPY pyproject.toml README.md LICENSE.md LICENSE-APACHE NOTICE ./
 COPY src ./src
 RUN pip install . && rm -rf /src
 
