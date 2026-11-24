@@ -91,6 +91,43 @@ def test_no_other_workflow_runs_on_pull_requests_or_main() -> None:
     assert triggers(PUBLISH)["push"] == {"branches": ["main"]}
 
 
+# The one label of the Sortyard org's runner scale set on the estate (SORTYARD-200; deployed from
+# noncelogic/estate-gitops sortyard-ci/). No job runs on a GitHub-hosted runner.
+RUNNER = "sortyard-ci"
+
+
+def runs_on_hosted(runs_on: object) -> bool:
+    """Whether a job's `runs-on` could pick a runner other than the estate set: anything but the
+    set's one label, in any form `runs-on` takes (a label, a list of labels, a group map)."""
+    return runs_on not in (RUNNER, [RUNNER])
+
+
+def test_every_job_of_every_workflow_runs_on_the_estate_runners() -> None:
+    jobs = {
+        (path.name, name): job
+        for path in sorted(WORKFLOWS.glob("*.y*ml"))
+        for name, job in load(path)["jobs"].items()
+    }
+    assert {"ci.yml", "slow.yml", "publish.yml"} <= {name for name, _ in jobs}
+    for where, job in jobs.items():
+        assert not runs_on_hosted(job.get("runs-on")), where
+
+
+def test_the_runner_rule_catches_a_hosted_runner_in_any_form() -> None:
+    for runs_on in (
+        "ubuntu-latest",
+        ["ubuntu-latest"],
+        ["self-hosted", "linux"],
+        [RUNNER, "ubuntu-latest"],
+        {"group": "Default"},
+        "${{ matrix.os }}",
+        None,
+    ):
+        assert runs_on_hosted(runs_on), runs_on
+    assert not runs_on_hosted(RUNNER)
+    assert not runs_on_hosted([RUNNER])
+
+
 def test_the_other_workflow_rule_reads_every_form_of_on() -> None:
     """`on: push`, `on: [push]` and `on: {push: ...}` are the same trigger."""
     for name in ("push", "pull_request", "pull_request_target", "merge_group"):

@@ -28,7 +28,7 @@ concurrency:
 jobs:
   test:
     name: test
-    runs-on: ubuntu-latest
+    runs-on: sortyard-ci
     # The migration + ledger tests (tests/test_migrations.py) need a real Postgres; they are
     # required here, never skipped.
     services:
