@@ -28,8 +28,8 @@ gap-limit = "2h"
 
 runner-pool = "example-runners"
 
-# Optional: how many of the lane's items may be in work at once (dispatched and neither merged
-# nor waiting on a need). Left out, one.
+# Optional: how many of the lane's items may be out of the queue at once (dispatched and not
+# yet merged, a wait on a need included). Left out, one.
 slots = 2
 
 # Needs every task of the lane has, beyond worker-image and runner-pool.

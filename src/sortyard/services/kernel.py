@@ -68,7 +68,7 @@ import ssl
 import sys
 import tomllib
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import psycopg
@@ -136,11 +136,11 @@ def worker_config(text: str) -> WorkerConfig:
 class Settings:
     engine_target: str
     engine_namespace: str
-    conninfo: str
+    conninfo: str = field(repr=False)  # holds the database password
     lanes: Mapping[str, Lane]
     worker: WorkerConfig
     github_app_id: str
-    github_app_key: bytes
+    github_app_key: bytes = field(repr=False)
     github_api_url: str
     jobs_namespace: str
     kube_url: str | None

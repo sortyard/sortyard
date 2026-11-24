@@ -114,32 +114,56 @@ def test_ten_items_asked_for_at_once_take_two_slots_and_no_more(connect: Connect
 
 
 @requires_postgres
-def test_a_wait_on_a_need_frees_the_slot_and_a_full_lane_dispatches_no_one(
+def test_more_waiters_than_slots_never_puts_more_than_the_slot_count_out_of_the_queue(
     connect: Connect,
 ) -> None:
-    """A slot is held from dispatch until the item is merged, except while the item waits on a
-    named need; an item back from a wait counts again, and nothing is dispatched while the
-    lane is at or over its count."""
+    """A slot is held from dispatch until the item is merged, a wait on a need and a decision
+    included: with more waiters than slots, exactly `slots` items are out of the queue, before
+    the need closes and after."""
     scheduler = Scheduler(connect, LANES)
-    queued(connect, "A", "B", "C", "D")
-    assert [ask(scheduler, item) for item in "ABC"] == [True, True, False]
-    for item in "AB":
+    items = [f"ITEM-{number}" for number in range(1, 9)]
+    queued(connect, *items)
+
+    def out_of_the_queue() -> list[str]:
+        with connect() as conn:
+            rows = conn.execute(
+                "SELECT id FROM sortyard.item WHERE state_kind NOT IN ('queue', 'terminal')"
+                " ORDER BY position"
+            ).fetchall()
+        return [row[0] for row in rows]
+
+    def offer_everyone() -> list[str]:
+        """Every queued item is asked, as a pass of the observer does; whoever is dispatched
+        goes to preflight and fails the lane-wide need: it waits."""
+        moved = []
+        for item in reversed(items):
+            if item not in out_of_the_queue() and item not in merged and ask(scheduler, item):
+                enter(connect, item, "preflight")
+                enter(connect, item, "waiting", detail={"need": "secret:X"})
+                moved.append(item)
+        return moved
+
+    merged: list[str] = []
+    # A need the whole lane fails: the first two wait on it, and however often the rest are
+    # offered, they stay in the queue. Eight items do not drain into the gap.
+    assert sorted(offer_everyone()) == items[:2]
+    for _ in range(3):
+        assert offer_everyone() == []
+    assert out_of_the_queue() == items[:2] and granted(connect) == items[:2]
+    # The gap closes: the two return to preflight. Still two out of the queue, never more.
+    for item in items[:2]:
         enter(connect, item, "preflight")
-    # A waits on a capability gap: its slot goes to C.
-    enter(connect, "A", "waiting")
-    assert [ask(scheduler, item) for item in "DC"] == [False, True]
-    enter(connect, "C", "preflight")
-    # A returns: three items are in work on a lane of two. No one is dispatched until two
-    # of them are done.
-    enter(connect, "A", "preflight")
-    assert not ask(scheduler, "D")
-    enter(connect, "B", "merged")
-    assert not ask(scheduler, "D")
-    # A decision is a pass through, not a wait: the slot stays held.
-    enter(connect, "A", "decision")
-    assert not ask(scheduler, "D")
-    enter(connect, "C", "merged")
-    assert ask(scheduler, "D")
+    assert offer_everyone() == [] and out_of_the_queue() == items[:2]
+    # A decision holds the slot too.
+    enter(connect, items[0], "decision")
+    assert offer_everyone() == [] and out_of_the_queue() == items[:2]
+    # Each merge frees one slot, for the next item created, and the bound holds throughout.
+    for done, following in zip(items, items[2:], strict=False):
+        enter(connect, done, "merged")
+        merged.append(done)
+        assert offer_everyone() == [following]
+        assert len(out_of_the_queue()) == 2
+        assert offer_everyone() == []
 
 
 @requires_postgres
@@ -161,7 +185,9 @@ def test_slots_are_counted_per_lane_and_an_item_without_a_spec_is_not_dispatched
     queued(connect, "LATER", lane=OTHER.name, blocked_by=("X",))
     enter(connect, "X", "preflight")
     enter(connect, "X", "waiting")
-    assert ask(scheduler, "Y") and not ask(scheduler, "LATER")
+    assert not ask(scheduler, "Y") and not ask(scheduler, "LATER")
+    enter(connect, "X", "merged")
+    assert ask(scheduler, "Y") and not ask(scheduler, "LATER")  # one slot: Y was first
 
 
 def test_a_lane_declares_its_slots_and_the_checks_of_a_repository() -> None:

@@ -142,6 +142,10 @@ def test_the_service_registers_every_owner_of_the_shipped_table_and_refuses_one_
     ends outside the kernel, a look for the observer; an owner name with no owner registered
     is refused when the worker is put together."""
     settings = kernel.Settings.from_env(environment(tmp_path))
+    # What a log line or a traceback shows of the settings holds no credential.
+    shown = repr(settings)
+    assert PASSWORD in settings.conninfo and PASSWORD not in shown
+    assert PEM.decode().splitlines()[1] not in shown and "PRIVATE KEY" not in shown
     assert settings.interval == 15 and settings.worker.secret_ref("MODEL_API_KEY") == (
         "models",
         "api-key",

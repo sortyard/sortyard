@@ -11,23 +11,33 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import os
+import pathlib
+import shutil
+import subprocess
+import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from typing import Any
 
 import psycopg
+import psycopg.conninfo
 
 from sortyard.api import handlers
 from sortyard.engine import Engine, Registry, WorkflowNotFound
 from sortyard.engine.blocking import BlockingEngine
 from sortyard.engine.testing import local_engine
+from sortyard.kernel.admission import ref_safe
 from sortyard.kernel.item import register, start_item, workflow_id
 from sortyard.kernel.ledger import Ledger
 from sortyard.kernel.states import shipped
 from sortyard.kernel.store import Items
-from tests.api_harness import ITEM, OTHER_WS, WS, Api, running_api
+from sortyard.services import api as api_service
+from tests.api_harness import ITEM, OTHER_WS, WS, Api, project, running_api
 from tests.kernel_harness import SILENT, Owners, until
 from tests.pg import requires_postgres
+from tests.runtime_harness import LANE as LANE_TEXT
 from tests.worker_harness import LANE
 
 SPEC = {
@@ -114,6 +124,15 @@ def test_admit_item_refuses_what_fails_the_check_and_creates_nothing() -> None:
         ("unknown-risk-tier", {"risk_tier": "extreme"}),
         ("unresolved-link", {"blocked_by": ["THEIRS"]}),  # an item of another tenant
         ("unresolved-link", {"blocked_by": ["ITEM-1"]}),  # itself
+        ("unknown-project", {"project_id": "proj-nowhere"}),
+        ("unknown-project", {"project_id": "proj-theirs"}),  # another tenant's project
+        ("unknown-milestone", {"milestone_id": "ms-nowhere"}),
+        # Ids the API's own pattern allows and git does not, as part of sortyard/<id>.
+        ("unsafe-id", {"id": "ITEM:1"}),
+        ("unsafe-id", {"id": "ITEM..1"}),
+        ("unsafe-id", {"id": "ITEM-1.lock"}),
+        ("unsafe-id", {"id": "ITEM-1/"}),
+        ("unsafe-id", {"id": "group/.hidden"}),
     ]
 
     async def scenario() -> None:
@@ -121,6 +140,8 @@ def test_admit_item_refuses_what_fails_the_check_and_creates_nothing() -> None:
             Ledger(functools.partial(psycopg.connect, api.conninfo)).create_item(
                 tenant=OTHER_WS, item="THEIRS", project="proj-a", title="Another tenant's"
             )
+            theirs = {**project("proj-theirs"), "workspace_id": OTHER_WS}
+            api.insert("project", theirs)
             before = rows(api)
             for rule, change in [*refused.items(), *more]:
                 assert rules(api.ws("POST", "/items", "operator", body(**change))) == [rule], rule
@@ -130,14 +151,20 @@ def test_admit_item_refuses_what_fails_the_check_and_creates_nothing() -> None:
                 blocked_by=["NO-SUCH-ITEM", ITEM],
                 spec={"notes": "no outcome, no acceptance"},
                 risk_tier="extreme",
+                project_id="proj-nowhere",
+                milestone_id="ms-nowhere",
+                id="ITEM:1",
             )
-            assert rules(api.ws("POST", "/items", "operator", everything)) == [
+            assert rules(api.ws("POST", "/items", "admin", everything)) == [
                 "no-acceptance-test",
                 "no-outcome",
                 "undeclared-need",
                 "undeclared-need",
+                "unknown-milestone",
+                "unknown-project",
                 "unknown-risk-tier",
                 "unresolved-link",
+                "unsafe-id",
             ]
             # A body that is not an admission at all is refused before the check.
             for malformed in (
@@ -163,6 +190,10 @@ def test_an_admitted_item_has_its_spec_lane_and_needs_stored_and_its_workflow_st
     async def scenario() -> None:
         async with admitting() as (api, engine):
             connect = functools.partial(psycopg.connect, api.conninfo)
+            api.insert(
+                "milestone",
+                {"id": "ms-1", "workspace_id": WS, "project_id": "proj-a", "name": "First"},
+            )
             asked = body(
                 needs=["secret:MODEL_API_KEY", "service:cluster-api"],
                 blocked_by=[ITEM],
@@ -295,3 +326,65 @@ def test_an_engine_that_does_not_take_the_start_leaves_no_item_behind() -> None:
         reply = api.ws("POST", "/items", "operator", body())
         assert (reply.status, reply.body["reason_code"]) == (503, "engine"), reply.body
         assert rows(api) == before
+
+
+def test_an_item_id_must_be_usable_in_a_branch_name() -> None:
+    """`sortyard/<id>` must be a ref name git accepts (git-check-ref-format) and not look like
+    an option: admission refuses an id that is not, before a worker finds out at push."""
+    for good in ("ITEM-1", "SORTYARD-176", "a", "group/ITEM-1", "v1.2", "a.b/c_d", "x.locked"):
+        assert ref_safe(good), good
+    for bad in (
+        "a:b", "a..b", "a~1", "a^", "a?", "a*", "a[0]", "a\\b", "a b", "a\tb", "a\x7f",
+        "a.lock", "a.lock/b", "a/", "/a", "a//b", ".a", "a/.b", "a.", "-a", "a@{b", "",
+    ):  # fmt: skip
+        assert not ref_safe(bad), bad
+    # Held to git itself for the same names, where git is there to ask.
+    if shutil.which("git"):
+        for name in ("ITEM-1", "group/ITEM-1", "a:b", "a..b", "a.lock", "a/", "a//b", ".a", "a."):
+            asked = subprocess.run(
+                ["git", "check-ref-format", f"refs/heads/sortyard/{name}"], check=False
+            )
+            assert (asked.returncode == 0) == ref_safe(name), name
+
+
+@requires_postgres
+def test_the_api_service_admits_on_its_own_configuration(tmp_path: pathlib.Path) -> None:
+    """The service built from `Config` alone (an engine target and a lanes directory, as the
+    chart sets them) loads the lanes, connects to the engine and admits: the wiring a
+    deployment runs, with nothing handed in."""
+    (tmp_path / "walwarden.toml").write_text(LANE_TEXT)
+
+    async def scenario() -> None:
+        async with local_engine() as local:
+            for seeded in running_api(kernel=None):
+                config = api_service.Config(
+                    host="127.0.0.1",
+                    port=0,
+                    database_host=os.environ["PGHOST"],
+                    database_port=int(os.environ.get("PGPORT", "5432")),
+                    database_name=str(psycopg.conninfo.conninfo_to_dict(seeded.conninfo)["dbname"]),
+                    database_user=os.environ["PGUSER"],
+                    database_password=os.environ["PGPASSWORD"],
+                    engine_target=local.target,
+                    lanes_dir=str(tmp_path),
+                )
+                server = api_service.make_server(config)
+                threading.Thread(target=server.serve_forever, daemon=True).start()
+                try:
+                    api = replace(seeded, base=f"http://127.0.0.1:{server.server_address[1]}")
+                    reply = await asyncio.to_thread(api.ws, "POST", "/items", "operator", body())
+                    assert reply.status == 201, reply.body
+                    assert set(server.kernel.lanes) == {"walwarden"}  # type: ignore[union-attr]
+                    recorded = await local.engine.recorded(workflow_id(WS, "ITEM-1"))
+                    assert recorded.status == "running"
+                    # The same service refuses what the lane file does not declare.
+                    undeclared = body("ITEM-2", needs=["secret:NOT_DECLARED"])
+                    refused = await asyncio.to_thread(
+                        api.ws, "POST", "/items", "operator", undeclared
+                    )
+                    assert rules(refused) == ["undeclared-need"]
+                finally:
+                    server.shutdown()
+                    server.server_close()
+
+    asyncio.run(scenario())

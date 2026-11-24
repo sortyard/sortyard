@@ -19,7 +19,11 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import os
 import pathlib
+import signal
+import subprocess
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from typing import Any
@@ -54,16 +58,6 @@ def job_creates(w: World) -> list[str]:
         for exchange in w.cluster.exchanges
         if exchange.method == "POST" and exchange.path.endswith("/jobs") and exchange.status == 201
     ]
-
-
-def granted_unrecorded(w: World) -> list[str]:
-    """Items the scheduler has granted a slot whose move out of the queue is not recorded."""
-    with w.connect() as conn:
-        rows = conn.execute(
-            "SELECT i.id FROM sortyard.item_slot AS g JOIN sortyard.item AS i"
-            " ON (i.workspace_id, i.id) = (g.workspace_id, g.item_id) WHERE i.state_kind = 'queue'"
-        ).fetchall()
-    return [row[0] for row in rows]
 
 
 def stays(w: World) -> dict[str, dict[str, Any]]:
@@ -137,8 +131,6 @@ def test_ten_items_in_a_row_go_admitted_to_merged(tmp_path: pathlib.Path) -> Non
             service = Service(w)
             try:
                 await drive(w, service, lambda: w.states()["ITEM-5"] == "waiting", "ITEM-5 waiting")
-                # Let every grant already made be recorded before the gap closes.
-                await drive(w, service, lambda: not granted_unrecorded(w), "grants recorded")
                 (gap,) = gaps.for_item(WS, "ITEM-5")
                 assert (gap.need, gap.resolver, gap.open) == (
                     f"repository:{OTHER_REPO}",
@@ -174,25 +166,16 @@ def test_ten_items_in_a_row_go_admitted_to_merged(tmp_path: pathlib.Path) -> Non
                     " FROM sortyard.event WHERE object_kind = 'item' AND object_id <> 'item-1'"
                     " ORDER BY seq"
                 ).fetchall()
-            # An item back from a wait is in work without a new dispatch (the scheduler's
-            # rule: a wait frees the slot), so it is counted apart: at most one such item
-            # here, and never a dispatch beside two items that were themselves dispatched.
+            # A slot is held from dispatch until merged, ITEM-5's wait included.
             holding: set[str] = set()
-            returned: set[str] = set()
             dispatched: list[str] = []
             for item, left, entered in moves:
                 if left == "admitted":
-                    beside = sorted(holding - returned)
-                    assert len(beside) < 2, f"{item} dispatched beside {beside}"
+                    assert len(holding) < 2, f"{item} dispatched beside {sorted(holding)}"
                     dispatched.append(item)
-                if entered in ("merged", "waiting"):
-                    holding.discard(item)
-                    returned.discard(item)
-                elif entered != "admitted":
                     holding.add(item)
-                    if left == "waiting":
-                        returned.add(item)
-                assert len(holding) <= 3
+                if entered == "merged":
+                    holding.discard(item)
             assert sorted(dispatched) == sorted(items)
 
     asyncio.run(scenario())
@@ -399,5 +382,66 @@ def test_the_pull_request_of_an_item_is_opened_once_however_often_it_is_ensured(
                 ensure_pull(port, replace(spec, item="NEVER-PUSHED"))
             assert refused.value.status == 422
             assert len(w.repo.pulls) == 2
+
+    asyncio.run(scenario())
+
+
+@requires_postgres
+def test_the_console_script_is_killed_mid_build_and_a_new_process_merges_the_item(
+    tmp_path: pathlib.Path,
+) -> None:
+    """`sortyard-kernel` as a process of its own: started on its environment, killed with
+    SIGKILL while an item's build Job runs, and started again. The new process shares nothing
+    with the dead one but the engine server and the database, and the item merges."""
+
+    def launch(w: World, name: str) -> subprocess.Popen[bytes]:
+        env = {**os.environ, **w.env, "SORTYARD_OBSERVER_INTERVAL_SECONDS": "0.2"}
+        with (tmp_path / f"{name}.log").open("wb") as log:
+            return subprocess.Popen(
+                [sys.executable, "-m", "sortyard.services.kernel"], env=env, stdout=log, stderr=log
+            )
+
+    async def wait_for(w: World, process: subprocess.Popen[bytes], done: Any, what: str) -> None:
+        """The outside world turns while the process looks by itself, until `done`."""
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + 120
+        while not done():
+            assert process.poll() is None, f"sortyard-kernel exited with {process.returncode}"
+            assert loop.time() < deadline, f"timed out waiting for {what}: {w.states()}"
+            await w.turn()
+            await asyncio.sleep(0.05)
+
+    async def scenario() -> None:
+        async with world(tmp_path) as w:
+            assert w.admit("K").status == 201
+            w.held = {"K"}
+            first = launch(w, "first")
+            second = None
+            try:
+                await wait_for(
+                    w,
+                    first,
+                    lambda: w.states()["K"] == "building" and len(job_creates(w)) == 1,
+                    "K building, its Job launched",
+                )
+                first.send_signal(signal.SIGKILL)
+                assert await asyncio.to_thread(first.wait, 30) == -signal.SIGKILL
+                # The pod finishes while no kernel runs.
+                w.held = set()
+                await w.turn()
+                assert w.states()["K"] == "building"
+                second = launch(w, "second")
+                await wait_for(w, second, lambda: all_merged(w, 1), "K merged")
+                # Asked to stop, the service stops cleanly.
+                second.send_signal(signal.SIGTERM)
+                assert await asyncio.to_thread(second.wait, 30) == 0
+            finally:
+                for process in (first, second):
+                    if process is not None and process.poll() is None:
+                        process.kill()
+                        process.wait(30)
+            assert w.path("K") == HAPPY
+            assert [brief["mode"] for brief in w.ran] == ["build", "review"]
+            assert len(job_creates(w)) == 2 and w.repo.pull_of(branch_of("K")).merges == 1
 
     asyncio.run(scenario())

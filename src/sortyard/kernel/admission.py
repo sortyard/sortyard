@@ -1,6 +1,7 @@
 """Admission: the one way an item enters the kernel (HARNESS-V3 section 3.5, step 4).
 
-A machine check before anything is created: the spec has an outcome and at least one named
+A machine check before anything is created: the id can be part of a branch name, the project
+(and the milestone, if one is named) exists, the spec has an outcome and at least one named
 acceptance test, the lane is known and declares the item's repository and every need, every
 blocked_by link resolves to an item of the same tenant, and the risk tier is one the state
 table has limits for. `check` gives every reason an item fails, not the first. `admit` writes
@@ -14,6 +15,7 @@ inside the same transaction, so an item is never stored without one being starte
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -57,6 +59,21 @@ class Different(Refused):
     """The id is already admitted, with other content. A spec is written once."""
 
 
+_REF_BAD = re.compile(r"[\x00-\x20\x7f~^:?*\[\\]|\.\.|@\{|//")
+
+
+def ref_safe(item: str) -> bool:
+    """Whether `sortyard/<item>` is a branch name git accepts (git-check-ref-format), and one
+    no command takes for an option."""
+    parts = item.split("/")
+    return not (
+        _REF_BAD.search(item)
+        or item.startswith("-")
+        or item.endswith(".")
+        or any(not p or p.startswith(".") or p.endswith(".lock") for p in parts)
+    )
+
+
 def _named(test: Any) -> bool:
     return isinstance(test, Mapping) and all(
         isinstance(test.get(key), str) and test[key].strip() for key in ("test", "name")
@@ -68,6 +85,17 @@ def check(
 ) -> list[str]:
     """Every reason the item cannot be admitted; empty when it can."""
     reasons: list[str] = []
+    if not ref_safe(asked.item):
+        reasons.append(f"unsafe-id: sortyard/{asked.item} is not a branch name git accepts")
+    for kind, wanted in (("project", asked.project), ("milestone", asked.milestone)):
+        if (
+            wanted is not None
+            and not conn.execute(
+                f"SELECT 1 FROM sortyard.{kind} WHERE workspace_id = %s AND id = %s",
+                (asked.tenant, wanted),
+            ).fetchone()
+        ):
+            reasons.append(f"unknown-{kind}: no {kind} {wanted!r} in this workspace")
     outcome, acceptance = asked.spec.get("outcome"), asked.spec.get("acceptance")
     if not isinstance(outcome, str) or not outcome.strip():
         reasons.append("no-outcome: the spec states no outcome")

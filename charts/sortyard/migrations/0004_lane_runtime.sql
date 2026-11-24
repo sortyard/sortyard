@@ -29,9 +29,9 @@ CREATE TRIGGER immutable BEFORE UPDATE OR DELETE OR TRUNCATE ON sortyard.item_sp
     FOR EACH STATEMENT EXECUTE FUNCTION sortyard.refuse('rows are written once, at admission');
 
 -- A lane slot granted to an item: the scheduler's answer "dispatched", made durable so that
--- two answers given at the same moment cannot both take the last slot. The slot is held while
--- the item is neither merged nor waiting on a need (read from the item row); the grant itself
--- is never taken back.
+-- two answers given at the same moment cannot both take the last slot. The slot is held until
+-- the item is merged (read from the item row), a wait on a need included; the grant itself is
+-- never taken back.
 CREATE TABLE sortyard.item_slot (
     workspace_id text NOT NULL,
     item_id text NOT NULL,

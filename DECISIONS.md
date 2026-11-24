@@ -142,3 +142,29 @@ provenance; where they conflict, the amendment wins.
   to make a throwaway key and, in the fake GitHub, to verify the client's signature with the
   public key. To reverse: replace the two `cryptography` calls in `HttpGitHub` (load the key,
   sign); nothing else imports it.
+
+## SY-DEC-009 — A merge that never happens is decided, not re-armed for ever (2026-11-24)
+
+- **Context:** HARNESS-V3 section 3.1 gives the default of `merging` at its 30-minute limit as
+  "update the branch and re-arm", and the state table shipped it as `redispatch`. The merge
+  adapter (SY-V3-GITHUB-PORT) waits while checks on the head to merge have not reported. Checks
+  that never report therefore made `merging` redispatch every 30 minutes with no end: the one
+  wait in the table that nothing bounded (SY-V3-LANE-RUNTIME).
+- **Options:**
+  1. Leave `redispatch`. Faithful to the section's wording, and an item can stay in `merging`
+     for ever with nobody asked.
+  2. `retry = N`, then `decision`, keeping the action `update-branch`. Each passed limit still
+     updates the branch and re-arms; after N of them the decision step is asked, as it is for
+     `building` and `checking`.
+  3. Have the merge adapter answer `conflict` after its own count of looks. That puts a
+     counter in an adapter that holds no state, and sends an item to `fixing` with nothing to
+     fix.
+- **Choice:** option 2 with N = 3: `default = { retry = 3, then = "decision", action =
+  "update-branch" }` in `src/sortyard/kernel/item_states.toml`. Asked for by the build team's
+  lead in the SY-V3-LANE-RUNTIME brief; it carries no owner decision.
+- **Consequences:** `merging` is dispatched at most four times (two hours) before a decision.
+  The decision's table default is `resume`, which returns the item to `merging`; the same
+  question answered the same way a second time waits on a named need, as every repeated
+  decision does. The first limits behave as section 3.1 says. The number 3 is the team's and
+  provisional: it is one value in the data file, and changing it is a change to that file only.
+  `tests/test_item_workflow.py` and `tests/test_state_table.py` hold the behaviour.

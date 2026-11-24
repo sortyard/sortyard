@@ -16,10 +16,11 @@ from sortyard.kernel.admission import Admission, admit
 from sortyard.kernel.capabilities import Lane
 from sortyard.kernel.ledger import Ledger
 from sortyard.kernel.states import shipped
-from tests.api_harness import INSTALLATION, OTHER_WS, WS
+from tests.api_harness import INSTALLATION, OTHER_WS, WS, project
 from tests.pg import fresh_database
 
 Connect = Callable[[], "psycopg.Connection[Any]"]
+PROJECTS = {WS: "proj-a", OTHER_WS: "proj-theirs"}  # each tenant's one project
 SPEC = {"outcome": "it works", "acceptance": [{"test": "tests/test_it.py", "name": "it works"}]}
 
 
@@ -38,6 +39,8 @@ def database() -> Iterator[Connect]:
             for tenant in (WS, OTHER_WS):
                 doc = {"id": tenant, "installation_id": INSTALLATION["id"], "name": tenant}
                 conn.execute("INSERT INTO sortyard.workspace (doc) VALUES (%s)", [Jsonb(doc)])
+                mine = {**project(PROJECTS[tenant]), "workspace_id": tenant}
+                conn.execute("INSERT INTO sortyard.project (doc) VALUES (%s)", [Jsonb(mine)])
         yield opener
 
 
@@ -49,7 +52,7 @@ def admitted(
     asked = Admission(
         tenant=tenant,
         item=item,
-        project="proj-a",
+        project=PROJECTS[tenant],
         title=f"Item {item}",
         lane=lane,
         repository=repository,

@@ -52,7 +52,8 @@
 # merging: section 3.1 gives its default as "update the branch and re-arm". That is what each
 # passed limit does, three times; a merge that still has not happened after four half hours
 # (checks on the head that never report, say) then goes to a decision instead of re-arming for
-# ever. The count is the build team's (SY-V3-LANE-RUNTIME) and carries no owner decision.
+# ever. That departs from the section's wording, and the count is the build team's and
+# provisional: DECISIONS.md SY-DEC-009 records the options and the choice.
 
 version = 1
 

@@ -5,9 +5,10 @@ Among a lane's queued items whose blockers are merged, the one created first goe
 is link order, since an item cannot be dispatched before what it is blocked by.
 
 A lane's slot count is `slots` in its capability file. A slot is held from the grant until the
-item is merged, except while the item waits on a named need: a wait can last a day, and a lane
-does not stand still behind it. So an item that returns from a wait may put the lane one over
-its count until something merges; no item is *dispatched* while the lane is at or over it.
+item is merged, through every state between, a wait on a named need and a decision included.
+So a lane never has more than `slots` items out of the queue: a need that fails for the whole
+lane parks at most that many and the rest stay queued, and no build starts beside them. The
+cost is that an item waiting on a need of its own keeps one slot until its wait ends.
 
 The grant is a row (`sortyard.item_slot`), written under a lock on the lane, so answers given
 at the same moment by any number of workers cannot both take the last slot, and an answer
@@ -40,11 +41,11 @@ _READY = (
     "                     AND NOT COALESCE(b.state = ANY(%(merged)s), false))"
     " ORDER BY i.position LIMIT %(free)s"
 )
-# Grants whose item is neither merged nor waiting on a need.
+# Grants whose item is not yet merged.
 _HELD = (
     "SELECT count(*) FROM sortyard.item_slot AS g JOIN sortyard.item AS i"
     "   ON (i.workspace_id, i.id) = (g.workspace_id, g.item_id)"
-    " WHERE g.lane = %(lane)s AND i.state_kind NOT IN ('terminal', 'need')"
+    " WHERE g.lane = %(lane)s AND NOT COALESCE(i.state = ANY(%(merged)s), false)"
 )
 
 
