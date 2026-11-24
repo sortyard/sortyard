@@ -20,8 +20,20 @@ app.kubernetes.io/instance: {{ .root.Release.Name }}
 app.kubernetes.io/component: {{ .component }}
 {{- end -}}
 
+{{- /* The one Sortyard image, as every Sortyard container names it. With image.digest set it is
+named by that digest and by nothing else (repository@sha256:...): the tag of a published image
+is its commit, which this chart does not know, and a tag beside a digest is not looked at by
+the container runtime, so rendering one would only show a name that may not exist. */ -}}
 {{- define "sortyard.image" -}}
+{{- with .Values.image.digest -}}
+{{- $digest := toString . -}}
+{{- if not (regexMatch "^sha256:[0-9a-f]{64}$" $digest) -}}
+{{- fail (printf "image.digest must be sha256: followed by 64 lower-case hex characters, not %q" $digest) -}}
+{{- end -}}
+{{- printf "%s@%s" $.Values.image.repository $digest -}}
+{{- else -}}
 {{- printf "%s:%s" .Values.image.repository (.Values.image.tag | default .Chart.AppVersion) -}}
+{{- end -}}
 {{- end -}}
 
 {{- define "sortyard.postgres.fullname" -}}

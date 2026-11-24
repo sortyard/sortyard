@@ -132,6 +132,86 @@ def test_image_defaults_to_the_chart_app_version() -> None:
     assert image == f"ghcr.io/sortyard/sortyard:{app_version}"
 
 
+IMAGE_REPOSITORY = "registry.example/team/sortyard"
+IMAGE_DIGEST = "sha256:" + "0123456789abcdef" * 4
+
+
+def images(docs: list[dict[str, Any]]) -> dict[tuple[str, str, str], str]:
+    """Every container of every rendered workload: (kind, name, container) to its image."""
+    found: dict[tuple[str, str, str], str] = {}
+    for doc in docs:
+        pod = doc.get("spec", {}).get("template", {}).get("spec")
+        if not isinstance(pod, dict):
+            continue
+        for made in [*pod.get("initContainers", []), *pod["containers"]]:
+            found[(doc["kind"], doc["metadata"]["name"], made["name"])] = made["image"]
+    return found
+
+
+def test_with_a_digest_every_sortyard_container_is_named_by_it_and_none_by_tag(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Every workload the chart can render (API, shadow conductor, engine, kernel) is on; the
+    Sortyard containers are the ones the render without a digest gives the Sortyard image."""
+    everything = (
+        *kernel_values(tmp_path),
+        *SHADOW_SNAPSHOT,
+        "--set",
+        f"image.repository={IMAGE_REPOSITORY}",
+        "--set",
+        "image.tag=1.2.3",
+    )
+    by_tag = images(render(*everything))
+    ours = {key for key, image in by_tag.items() if image.startswith(IMAGE_REPOSITORY)}
+    assert {by_tag[key] for key in ours} == {f"{IMAGE_REPOSITORY}:1.2.3"}
+    assert {(name, container) for _, name, container in ours} >= {
+        ("sy-sortyard-api", "api"),
+        ("sy-sortyard-kernel", "kernel"),
+        ("sy-sortyard-kernel", "wait-engine"),
+        ("sy-sortyard-shadow-conductor", "shadow-conductor"),
+    }
+
+    by_digest = images(render(*everything, "--set", f"image.digest={IMAGE_DIGEST}"))
+    assert set(by_digest) == set(by_tag)
+    for key, image in by_digest.items():
+        if key in ours:
+            assert image == f"{IMAGE_REPOSITORY}@{IMAGE_DIGEST}", key
+        else:
+            # Another image (Postgres, the engine's) is what it was, and is not ours renamed.
+            assert image == by_tag[key] and "sortyard" not in image, key
+
+
+@pytest.mark.parametrize(
+    "digest",
+    [
+        "0123456789abcdef" * 4,  # no algorithm
+        "sha256:" + "0123456789abcdef" * 3,  # short
+        "sha256:" + "0123456789ABCDEF" * 4,  # upper case
+        "sha256:" + "0123456789abcdef" * 4 + "0",  # long
+        "sha512:" + "0123456789abcdef" * 8,
+        "1.2.3",  # a tag
+    ],
+)
+def test_a_malformed_image_digest_fails_the_render(digest: str) -> None:
+    assert "image.digest" in render_fails("--set-string", f"image.digest={digest}")
+
+
+def test_an_empty_image_digest_renders_the_image_by_tag_as_before(tmp_path: pathlib.Path) -> None:
+    assert HELM is not None
+    assert yaml.safe_load((CHART / "values.yaml").read_text())["image"]["digest"] == ""
+    everything = (*kernel_values(tmp_path), *SHADOW_SNAPSHOT)
+
+    def text(*args: str) -> str:
+        argv = [HELM, "template", "sy", str(CHART), *everything, *args]
+        return subprocess.run(argv, check=True, capture_output=True, text=True).stdout
+
+    plain = text()
+    assert text("--set", "image.digest=") == plain
+    app_version = yaml.safe_load((CHART / "Chart.yaml").read_text())["appVersion"]
+    ours = [image for image in images(render(*everything)).values() if "sortyard" in image]
+    assert len(ours) >= 4 and set(ours) == {f"ghcr.io/sortyard/sortyard:{app_version}"}
+
+
 def test_app_version_matches_the_package() -> None:
     from sortyard import __version__
 

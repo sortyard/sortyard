@@ -3,9 +3,10 @@ gates on exactly one required status check (policies/placement-defaults.yaml#gat
 
 The conductor's merge gate observes required checks. `ci.yml` therefore runs one job, `test`,
 on every pull request to main and on push to main, and that job is the one required, strict
-(up to date with main) check on main. main runs no other job, so nothing main runs goes
+(up to date with main) check on main. main runs no other check, so no check main runs goes
 unproven on the pull request. The slow suite (the kind replica boot) runs outside the gate, in
-`slow.yml`, nightly and on demand.
+`slow.yml`, nightly and on demand. The one other job on main is `publish.yml`, which pushes the
+image and can never run for a pull request (`tests/test_workflows.py` holds what it may do).
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 WORKFLOWS = ROOT / ".github" / "workflows"
 WORKFLOW = WORKFLOWS / "ci.yml"
 SLOW = WORKFLOWS / "slow.yml"
+PUBLISH = WORKFLOWS / "publish.yml"
 REQUIRED_CHECK = "test"
 
 
@@ -64,14 +66,15 @@ def test_ci_has_exactly_one_job_and_it_is_the_required_check() -> None:
 
 
 def test_no_other_workflow_runs_on_pull_requests_or_main() -> None:
-    # main-stays-green: every job main runs is required; no non-gating jobs.
+    # main-stays-green: every check main runs is the required one; no non-gating checks. The
+    # one exception is by name: the image publish, on push to main and never for a pull request.
     for path in sorted(WORKFLOWS.glob("*.y*ml")):
         if path == WORKFLOW:
             continue
         on = triggers(path)
-        assert not {"pull_request", "pull_request_target", "push", "merge_group"} & set(on), (
-            path.name
-        )
+        gated = {"pull_request", "pull_request_target", "merge_group"}
+        assert not (gated if path == PUBLISH else gated | {"push"}) & set(on), path.name
+    assert triggers(PUBLISH)["push"] == {"branches": ["main"]}
 
 
 def test_the_required_check_runs_lint_typecheck_tests_spec_chart_and_image() -> None:
