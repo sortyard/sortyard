@@ -184,7 +184,9 @@ def test_values_override_only_what_the_replica_must() -> None:
     """Routing and auth stay the chart's: no Service type, no Postgres password, no image
     repository is overridden."""
     values = replica_values()
-    assert set(values) <= {"shadow", "postgres", "image"}
+    assert set(values) <= {"shadow", "postgres", "image", "engine"}
+    # The engine is switched on and nothing else: its images, store and settings are the chart's.
+    assert values.get("engine", {"enabled": True}) == {"enabled": True}
     assert "auth" not in values.get("postgres", {})
     assert "repository" not in values.get("image", {})
     assert "api" not in values
@@ -230,7 +232,15 @@ def test_replica_renders_the_deployment_topology_plus_the_shadow() -> None:
         for d in helm_render("-f", str(REPLICA / "values.yaml"), "--set", "image.tag=replica-x")
     }
     assert set(default) < set(replica)
-    assert set(replica) - set(default) == {("Deployment", "sortyard-shadow-conductor")}
+    added = set(replica) - set(default)
+    (schema_job,) = [name for kind, name in added if kind == "Job"]
+    assert added == {
+        ("Deployment", "sortyard-shadow-conductor"),
+        ("Deployment", "sortyard-engine"),
+        ("Service", "sortyard-engine"),
+        ("ConfigMap", "sortyard-engine"),
+        ("Job", schema_job),
+    }
     # The API Deployment is the deployment's own, image tag aside.
     api_default = default[("Deployment", "sortyard-api")]
     api_replica = replica[("Deployment", "sortyard-api")]
@@ -238,6 +248,10 @@ def test_replica_renders_the_deployment_topology_plus_the_shadow() -> None:
     (c_replica,) = api_replica["spec"]["template"]["spec"]["containers"]
     assert c_replica["image"] == "ghcr.io/sortyard/sortyard:replica-x"
     c_replica["image"] = c_default["image"]
+    # ... and the address of the engine the replica switches on.
+    (engine_target,) = [e for e in c_replica["env"] if e["name"] == "SORTYARD_ENGINE_TARGET"]
+    assert engine_target["value"] == "sortyard-engine:7233"
+    c_replica["env"].remove(engine_target)
     assert api_replica == api_default
     assert replica[("Service", "sortyard-api")] == default[("Service", "sortyard-api")]
 

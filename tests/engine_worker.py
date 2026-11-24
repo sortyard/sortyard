@@ -4,7 +4,8 @@
 
 SAMPLE is the path of the sample workflow module (`tests/engine_sample.py` or a changed copy of
 it); TARGET is the engine service address. The process holds no state: everything it knows
-about a workflow it reads from the engine.
+about a workflow it reads from the engine. SORTYARD_ENGINE_TASK_QUEUE, when set, is the task
+queue it serves (`tests/test_engine_server.py` gives each test its own on a shared server).
 """
 
 from __future__ import annotations
@@ -43,7 +44,8 @@ def exit_with_parent() -> None:
 
 
 async def main(sample: pathlib.Path, target: str) -> None:
-    engine = await Engine.connect(target)
+    queue = os.environ.get("SORTYARD_ENGINE_TASK_QUEUE")
+    engine = await (Engine.connect(target, task_queue=queue) if queue else Engine.connect(target))
     await engine.run_worker(load(sample).REGISTRY)
 
 
