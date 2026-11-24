@@ -458,3 +458,35 @@ def test_a_withdraw_the_policy_does_not_grant_is_reported_and_a_withdrawn_run_is
         assert act.what == "refused" and "ended-item" in act.detail
         assert triage(w.api) == [item] and w.api.open_ids() == []
         w.verify()
+
+
+def test_a_red_run_before_the_fix_merged_is_not_answered_while_the_merge_runs() -> None:
+    """The newest run speaks for the branch, not the newest finished one. Found on the estate
+    (SORTYARD-204 drill, 2026-11-24): a fix merged while the run of the merge commit was still
+    in progress, the newest finished run was the earlier red one recorded as evidence, and a
+    second item was admitted for it. A run of an older commit never speaks for the branch."""
+    with world() as w:
+        w.github.workflow_run(w.repo, w.workflow, "failure")
+        w.observe()
+        (item,) = triage(w.api)
+        w.github.workflow_run(w.repo, w.workflow, "failure", event="workflow_dispatch")
+        assert [a.what for a in w.observe()] == ["evidence"]
+        w.api.merge(item)
+        w.github.push(w.repo, "main")  # the fix lands; its run starts
+        merge_run = w.github.workflow_run(w.repo, w.workflow, None)
+        assert w.observe() == []
+        assert w.again().run_once() == []
+        (run,) = [r for r in w.repo.actions if r["id"] == merge_run]
+        run["conclusion"] = "success"
+        assert w.observe() == []
+        assert triage(w.api) == [item]
+        # A newest run that finished neither red nor green leaves the branch without a verdict;
+        # the red run of an older commit is not taken in its place.
+        w.github.workflow_run(w.repo, w.workflow, "failure")  # the same commit, red again
+        assert [a.what for a in w.observe()] == ["admitted"]
+        w.api.merge(triage(w.api)[-1])
+        w.github.push(w.repo, "main")
+        w.github.workflow_run(w.repo, w.workflow, "cancelled")
+        assert w.observe() == []
+        assert len(triage(w.api)) == 2
+        w.verify()
