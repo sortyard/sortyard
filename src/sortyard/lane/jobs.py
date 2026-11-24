@@ -188,6 +188,11 @@ class KubeJobs:
             raise JobsError(f"{what} answered something that is not an object")
         return answer
 
+    def _labelled(self, path: str, label: str, value: str) -> Any:
+        """The objects listed at `path` that carry the label with that value."""
+        selector = urllib.parse.quote(f"{label}={value}")
+        return (self._call("GET", f"{path}?labelSelector={selector}") or {}).get("items") or ()
+
     def launch(
         self, job: Mapping[str, Any], *, brief: str, token: Callable[[], str], stamp: str
     ) -> bool:
@@ -231,9 +236,7 @@ class KubeJobs:
         phase = _phase(job)
         if phase == RUNNING:
             return JobStatus(RUNNING)
-        selector = urllib.parse.quote(f"{JOB_LABEL}={name}")
-        pods = self._call("GET", f"{self._core}/pods?labelSelector={selector}") or {}
-        for pod in pods.get("items") or ():
+        for pod in self._labelled(f"{self._core}/pods", JOB_LABEL, name):
             for container in (pod.get("status") or {}).get("containerStatuses") or ():
                 terminated = (container.get("state") or {}).get("terminated")
                 if container.get("name") == RESULT_CONTAINER and terminated:
@@ -254,9 +257,7 @@ class KubeJobs:
         self._delete(f"{self._core}/configmaps/{name}")
 
     def delete_earlier(self, item: str, dispatch: int) -> None:
-        selector = urllib.parse.quote(f"{ITEM_LABEL}={item}")
-        jobs = self._call("GET", f"{self._batch}/jobs?labelSelector={selector}") or {}
-        for job in jobs.get("items") or ():
+        for job in self._labelled(f"{self._batch}/jobs", ITEM_LABEL, item):
             labels = job["metadata"].get("labels") or {}
             if str(labels.get(DISPATCH_LABEL, "")).isdigit() and int(labels[DISPATCH_LABEL]) < (
                 dispatch

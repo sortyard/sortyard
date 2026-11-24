@@ -66,11 +66,7 @@ class BlockingEngine:
         reached, or `TimeoutError` when it does not answer in time (the signal may or may not
         have been delivered).
         """
-
-        async def send() -> None:
-            await (await self._connected()).signal(workflow_id, name, payload)
-
-        self._run(send())
+        self.call(lambda engine: engine.signal(workflow_id, name, payload))
 
     def call(self, use: Callable[[Engine], Coroutine[Any, Any, T]]) -> T:
         """Run `use` with the connected engine, for example to start a workflow. Raises what

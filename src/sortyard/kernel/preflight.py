@@ -272,6 +272,22 @@ class Preflight:
             return f"the lookup of the item's needs returned no task: {task!r}"
         return task
 
+    def _where(self, task: TaskNeeds | str) -> tuple[str, str]:
+        """The lane a gap item names and who resolves it: the lane's own resolver, or this
+        checker's when the lane could not be read."""
+        if isinstance(task, str):
+            return UNKNOWN_LANE, self._resolver
+        return task.lane.name, task.lane.resolver
+
+    def _open(
+        self, tenant: str, item: str, task: TaskNeeds | str, need: str, output: str
+    ) -> GapItem:
+        """Link the item to the open gap item for the need, opening one if there is none."""
+        lane, resolver = self._where(task)
+        return self._gaps.open_or_link(
+            tenant=tenant, lane=lane, need=need, resolver=resolver, output=output, item=item
+        )
+
     def _probe(self, text: str, lane: Lane) -> ProbeResult:
         """Exercise the need `text` names; anything short of a passing result is a failure."""
         try:
@@ -297,15 +313,15 @@ class Preflight:
         dispatch = int(call["dispatch"])
         task = self._task(tenant, item)
         records: list[ProbeRecord] = []
+        lane_name, resolver = self._where(task)
+        limit: str | None = None
         if isinstance(task, str):
             # No lane, so no need can be exercised: the preflight itself is the failed need.
-            lane_name, resolver, limit = UNKNOWN_LANE, self._resolver, None
             records.append(
                 ProbeRecord(tenant, item, lane_name, dispatch, PREFLIGHT_NEED, False, task)
             )
         else:
-            lane = task.lane
-            lane_name, resolver, limit = lane.name, lane.resolver, lane.gap_limit_text
+            lane, limit = task.lane, task.lane.gap_limit_text
             # The lane's defaults, then the task's own needs, each once. A task need is kept
             # as the text the task gave, so one the lane does not declare is still named in
             # its gap item.
@@ -327,17 +343,7 @@ class Preflight:
             "probes": [record.to_record() for record in records],
         }
         failed = [record for record in records if not record.passed]
-        opened = [
-            self._gaps.open_or_link(
-                tenant=tenant,
-                lane=lane_name,
-                need=record.need,
-                resolver=resolver,
-                output=record.output,
-                item=item,
-            )
-            for record in failed
-        ]
+        opened = [self._open(tenant, item, task, record.need, record.output) for record in failed]
         self._gaps.settle(tenant, item, keep=[gap.id for gap in opened])
         if not failed:
             return {"outcome": "ready", "detail": detail}
@@ -374,17 +380,8 @@ class Preflight:
             task = self._task(tenant, item)
             output = "the preflight did not finish within its limit"
             if isinstance(task, str):
-                lane_name, resolver, output = UNKNOWN_LANE, self._resolver, f"{output}; {task}"
-            else:
-                lane_name, resolver = task.lane.name, task.lane.resolver
-            self._gaps.open_or_link(
-                tenant=tenant,
-                lane=lane_name,
-                need=PREFLIGHT_NEED,
-                resolver=resolver,
-                output=output,
-                item=item,
-            )
+                output = f"{output}; {task}"
+            self._open(tenant, item, task, PREFLIGHT_NEED, output)
             return None
         detail = call.get("detail")
         named = detail.get("gaps") if isinstance(detail, Mapping) else None

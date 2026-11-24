@@ -346,6 +346,7 @@ class _Inputs:
 async def item_workflow(ctx: Context, arg: Any) -> dict[str, Any]:
     table = from_record(arg["table"])
     item, tenant, tier = arg["item"], arg["tenant"], arg["risk_tier"]
+    who = {"item": item, "tenant": tenant}
     item_default: Any = arg.get("decision_default")
 
     state = table.state(table.initial)
@@ -385,8 +386,7 @@ async def item_workflow(ctx: Context, arg: Any) -> dict[str, Any]:
         await ctx.step(
             RECORD_STEP,
             {
-                "item": item,
-                "tenant": tenant,
+                **who,
                 "sequence": sequence,
                 "state": state.name,
                 "state_kind": state.kind,
@@ -410,15 +410,14 @@ async def item_workflow(ctx: Context, arg: Any) -> dict[str, Any]:
             },
         )
         if state.terminal:
-            return {"item": item, "tenant": tenant, "state": state.name, "transitions": sequence}
+            return {**who, "state": state.name, "transitions": sequence}
         declared_limit, default = state.limit, state.default
         assert declared_limit is not None and default is not None
         here = {"from_state": state.name, "from_kind": state.kind}
 
         if state.decision:
             question = {
-                "item": item,
-                "tenant": tenant,
+                **who,
                 "state": origin.name if origin else None,
                 "cause": move["cause"],
                 "outcome": move.get("outcome"),
@@ -501,8 +500,7 @@ async def item_workflow(ctx: Context, arg: Any) -> dict[str, Any]:
             outcome = await inputs.next(state, dispatch, deadline)
         elif not repeated:
             call = {
-                "item": item,
-                "tenant": tenant,
+                **who,
                 "state": state.name,
                 "owner": state.owner,
                 "dispatch": dispatch,

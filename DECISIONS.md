@@ -168,3 +168,106 @@ provenance; where they conflict, the amendment wins.
   decision does. The first limits behave as section 3.1 says. The number 3 is the team's and
   provisional: it is one value in the data file, and changing it is a change to that file only.
   `tests/test_item_workflow.py` and `tests/test_state_table.py` hold the behaviour.
+
+## SY-DEC-010 — What the kernel size budget counts (2026-11-24)
+
+- **Context:** win criterion 10 of HARNESS-V3 section 5 is "Size of the hand-written kernel:
+  under 5,000 lines, against 37,797 in the conductor; a new failure class adds a table row, not
+  a module". Nothing said which files count or whether a comment counts, and nothing but the
+  builders' own `wc -l` measured it. On main at `125e827` that count stood at 4,998, before
+  the phase 2 release workflow is written (SY-V3-KERNEL-SIZE).
+- **The baseline's count:** 37,797 is raw lines, comments, docstrings and blank lines
+  included: `wc -l` over the 144 `.py` files under `control-plane/conductor` of k3s-harness at
+  `66a72b6` whose path does not contain `test`. Recounted on 2026-11-24 from that commit
+  (`git ls-tree -r`, then `git show` of each file into `wc -l`): 144 files, 37,797 lines.
+- **Options:**
+  1. Raw lines (`wc -l`) of the `.py` files of `engine`, `kernel` and `lane`. The same count
+     as the baseline's, so the two numbers of the criterion compare like for like. It charges
+     a line of explanation the same as a line of code.
+  2. Budget code lines instead (a blank line, a comment line and a docstring not counted),
+     with the raw figure beside it. Explaining why would cost nothing. Considered and not
+     taken: it drops the figure from 4,998 to 3,445 on the same commit, which is a change of
+     measure and not a reduction, and it would compare a code-line figure with a raw-line
+     baseline. The build team does not loosen a win criterion the owner agreed by changing
+     how it is measured.
+  3. Count fewer packages (the lane adapters out, as "not kernel"). It makes the most room and
+     measures the least: the adapters are hand-written and are where failure classes land.
+  4. Count the shipped data files (`.toml`) too. It would charge a new state or policy rule
+     against the budget, which is the opposite of what the criterion asks for (a table row,
+     not a module).
+- **Choice:** option 1, decided by the build team's lead.
+  - **Counted:** every line of the `.py` files of `src/sortyard/engine`, `src/sortyard/kernel`
+    and `src/sortyard/lane`, sub-packages included, as `wc -l` counts them.
+  - **The budget:** that figure stays under 5,000. `tests/test_kernel_size.py` fails when it
+    does not.
+  - **Reported beside it, gating nothing:** code lines, as `code_lines` in that file computes
+    them with the standard library (`tokenize`, `ast`): the physical lines that hold a token
+    of code. Blank lines, lines holding only a comment and docstrings (the string that opens
+    a module, class or function) are left out; any other string is in, SQL included. A
+    docstring that is executed (`exec(__doc__)`) would be left out too; nothing does that.
+  - **Data files do not count:** `item_states.toml`, `decision_policy.toml` and
+    `lane_example.toml` (260 lines today) are not Python and are where the criterion wants a
+    new failure class to go. A counted package may hold `.py` and `.toml` files only; any
+    other kind of file fails the test, so code cannot sit uncounted in a stub or a script.
+  - **One place:** the rule as values (`COUNTED`, `MAY_IMPORT`, `DATA_SUFFIXES`, `BUDGET`) is
+    in `tests/test_kernel_size.py`; the test fails when the rows marked counted in the
+    tables below are not the packages it counts. `python -m tests.test_kernel_size` prints
+    both figures by package.
+- **What keeps kernel code inside the count, and what does not:**
+  - A counted package may import only the standard library, the project's declared runtime
+    dependencies (`pyproject.toml`) and the counted packages. Anything else fails the test:
+    another `sortyard` package, a second package beside `sortyard` (and `src/` may hold only
+    `sortyard`), `import sortyard` alone, and an `import_module` or `__import__` whose
+    argument is not a literal. The list of other packages the kernel may import
+    (`MAY_IMPORT`) is empty; an entry needs its reason here.
+  - **The limit of that check:** it follows what the kernel imports, not what imports the
+    kernel. `src/sortyard/services/kernel.py` imports `engine`, `kernel` and `lane` to start
+    them, so kernel logic written in `services` would be counted by nothing and seen by no
+    test here. The rule is therefore stated, and held by review: `services` holds wiring and
+    entry points only (read settings, build the runtime, run it, exit codes). A state, an
+    owner, an adapter, a decision or a retry belongs in a counted package. The same goes
+    for `api`, which calls admission and the ledger. The sizes of the uncounted packages are
+    given below so that growth there is visible.
+  - Nothing is moved out of the counted packages to make room.
+- **The figures.** On main at `125e827`, before this change:
+
+  | Package | In the budget | Raw lines (`wc -l`) | Code lines |
+  |---|---|---|---|
+  | `src/sortyard/engine` | counted | 722 | 438 |
+  | `src/sortyard/kernel` | counted | 2,715 | 1,917 |
+  | `src/sortyard/lane` | counted | 1,561 | 1,090 |
+  | Total counted | | 4,998 | 3,445 |
+
+  After the duplication removed with this record (SY-V3-KERNEL-SIZE), on main at `9b637f1`:
+
+  | Package | In the budget | Raw lines (`wc -l`) | Code lines |
+  |---|---|---|---|
+  | `src/sortyard/engine` | counted | 718 | 436 |
+  | `src/sortyard/kernel` | counted | 2,690 | 1,878 |
+  | `src/sortyard/lane` | counted | 1,553 | 1,076 |
+  | Total counted | | 4,961 | 3,390 |
+  | `src/sortyard/services` | not counted | 1,269 | 873 |
+  | `src/sortyard/api` | not counted | 2,740 | 2,173 |
+  | `src/sortyard/shadow` | not counted | 1,073 | 773 |
+  | `src/sortyard/models` | not counted | 2,541 | 1,775 |
+
+  `models` is 1,936 lines of generated code (`_generated.py`) and 605 hand-written.
+
+  The duplication removed is 37 raw lines (55 code lines): field lists written out twice, a
+  typed read repeated per call, one rule kept in three places. No behaviour changed and no
+  existing test was edited. It is small because the code repeats little: a scan for any
+  three lines repeated anywhere in the counted packages finds only import lines and the method
+  signatures that a Protocol and its implementations share.
+- **Consequences:**
+  - **The room is 38 lines** (4,999 less 4,961). That is enough for small fixes and for
+    nothing else. It is **not** enough for the phase 2 release workflow (canary, promote,
+    prober, live marks, leased rollback; HARNESS-V3 section 3.4), and no refactor of this
+    code makes it enough.
+  - **Open, not decided here:** where the release workflow's code lives and whether it counts
+    toward criterion 10. Section 3.4 makes it a workflow per product that starts where the
+    item workflow ends; whether that is "the kernel" of the criterion is to be settled when
+    phase 2 starts. Until then nothing is moved out of the counted packages to make room.
+  - A line of explanation costs a line of budget. The answer to that is to remove what
+    repeats, not to cut the explanation; a comment or docstring that says why stays.
+  - To reverse: set the rule's values in `tests/test_kernel_size.py` and amend this record in
+    the same change.
