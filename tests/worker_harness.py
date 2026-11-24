@@ -169,6 +169,31 @@ def run_worker(
     With `token_in="env"` the token is instead put in the environment of all three, the agent
     step included: the worst a deployment could do.
     """
+    trusted, untrusted = worker_env(root, brief, token, token_in=token_in)
+    status, text = 0, ""
+    for step in ("clone", "agent", "push"):
+        done = subprocess.run(
+            [sys.executable, "-m", "sortyard.services.worker", step],
+            env=untrusted if step == "agent" else trusted,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+        assert token not in done.stdout + done.stderr, f"{step} printed the token"
+        status, text = done.returncode, (root / "result.json").read_text()
+        if step == "agent":
+            assert status == 0, "the agent container always exits 0"
+        elif status != 0:
+            break
+    return status, text
+
+
+def worker_env(
+    root: pathlib.Path, brief: dict[str, Any], token: str = TOKEN, *, token_in: str = "file"
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Lay out a Job's directories under `root` and give the environment of the containers
+    that hold the token (`clone`, `push`) and of the one that does not (`agent`)."""
     root.mkdir(parents=True, exist_ok=True)
     for directory in ("work", "state"):
         (root / directory).mkdir(exist_ok=True)
@@ -189,20 +214,16 @@ def run_worker(
         trusted["SORTYARD_GITHUB_TOKEN_FILE"] = str(root / "token")
     else:
         trusted["SORTYARD_GITHUB_TOKEN"] = untrusted["SORTYARD_GITHUB_TOKEN"] = token
-    status, text = 0, ""
-    for step in ("clone", "agent", "push"):
-        done = subprocess.run(
-            [sys.executable, "-m", "sortyard.services.worker", step],
-            env=untrusted if step == "agent" else trusted,
-            capture_output=True,
-            text=True,
-            timeout=120,
-            check=False,
-        )
-        assert token not in done.stdout + done.stderr, f"{step} printed the token"
-        status, text = done.returncode, (root / "result.json").read_text()
-        if step == "agent":
-            assert status == 0, "the agent container always exits 0"
-        elif status != 0:
-            break
-    return status, text
+    return trusted, untrusted
+
+
+def start_step(step: str, env: dict[str, str], result: pathlib.Path) -> subprocess.Popen[str]:
+    """Start one step of the real entry point as its own process, as a container of the pod
+    runs beside the others; its result (the termination message) lands in `result`."""
+    return subprocess.Popen(
+        [sys.executable, "-m", "sortyard.services.worker", step],
+        env={**env, "SORTYARD_RESULT": str(result)},
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
