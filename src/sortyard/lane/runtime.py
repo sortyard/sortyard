@@ -20,8 +20,9 @@ Three things happen here that no single adapter owns:
 - **An item that ends without merging** (withdrawn). A terminal state has no owner and no open
   stay, so the record step, retried until it succeeds, cleans up: it records what the item left
   (its branch; its pull request open, merged, closed or none), then deletes its Jobs and per-job
-  secrets, recording after them when GitHub was not read so that a retry reads again. No look is
-  made for a stay the item has left, so a pass that read it before the withdrawal does not merge.
+  secrets. When GitHub was not read it records after them, so that a retry reads again, until
+  `UNREAD_FIRST_AFTER`: then "not read" is recorded first, and the item ends and frees its slot.
+  No look is made for a stay the item has left, so a pass that read it before does not merge.
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from sortyard.engine import Engine, Registry
@@ -59,6 +61,7 @@ from sortyard.lane.worker import probes as worker_probes
 
 # The outcomes of a worker that mean a change is on the item's branch.
 PUSHED = frozenset({"built", "fixed"})
+UNREAD_FIRST_AFTER = 300.0  # seconds since the withdrawal (see the module's docstring)
 _IN_STATE = "SELECT 1 FROM sortyard.item WHERE (workspace_id, id, state) = (%s, %s, %s)"
 
 
@@ -201,7 +204,8 @@ def build(
         left |= {"pull_state": state if read else "not read", "pull_number": found and found.number}
         left["merge_sha"] = found.merge_sha if found is not None and merged else None
         detail = {**transition["detail"], "left_open": left}
-        if read and not done:  # first, so the item reads as ended while its cleanup is retried
+        waited = clock() - datetime.fromisoformat(transition["entered_at"]).timestamp()
+        if (read or waited >= UNREAD_FIRST_AFTER) and not done:  # ends while cleanup is retried
             ledger.record({**transition, "left_open": left, "detail": detail})
         gaps.settle(tenant, item)  # it waits on no capability-gap item any more
         jobs.delete_earlier(worker.item_label(tenant, item), 2**31)

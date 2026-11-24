@@ -34,6 +34,7 @@ from sortyard.engine import Engine
 from sortyard.kernel.item import workflow_id
 from sortyard.kernel.preflight import close_gap
 from sortyard.kernel.store import Items, ItemSpec, PgGapRegistry
+from sortyard.lane import runtime
 from sortyard.lane.github import GitHubError, HttpGitHub, branch_of
 from sortyard.lane.jobs import ITEM_LABEL
 from sortyard.lane.runtime import ensure_pull
@@ -523,6 +524,64 @@ def test_withdrawing_an_item_whose_pull_request_is_merged_records_it_as_merged_w
             }
             assert left_in_cluster(w, "R") == left_in_cluster(w, "M") == GONE
             assert kept.open and not kept.merged and merged.merges == kept.merges == 0
+
+    asyncio.run(scenario())
+
+
+def slotted(w: World) -> set[str]:
+    with w.connect() as conn:
+        rows = conn.execute("SELECT item_id FROM sortyard.item_slot WHERE workspace_id = %s", [WS])
+        return {row[0] for row in rows.fetchall()}
+
+
+@requires_postgres
+def test_a_withdrawn_item_frees_its_slot_while_its_cleanup_is_refused(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A withdrawn item whose Jobs the cluster refuses to delete ends and frees its lane slot,
+    and its Jobs are deleted once the cluster allows it: when GitHub was read, even though its
+    pull request changed between the attempts (the record is not made again); when GitHub
+    cannot be read, once `UNREAD_FIRST_AFTER` has passed, with the pull request "not read"."""
+    monkeypatch.setattr(runtime, "UNREAD_FIRST_AFTER", 3.0)
+
+    async def scenario() -> None:
+        async with world(tmp_path) as w:
+            # M and R are each mid-fix and hold the lane's two slots; X waits for one.
+            w.held, w.red_once = {"M:fix", "R:fix", "X"}, {"M", "R"}
+            for item in ("M", "R"):
+                assert w.admit(item).status == 201
+            service = Service(w)
+            try:
+                fixing = {"M": "fixing", "R": "fixing"}
+                await drive(w, service, lambda: w.states() == fixing, "M and R mid-fix")
+                assert w.admit("X").status == 201
+                pull = w.repo.pull_of(branch_of("R"))
+
+                # GitHub is read; the cluster refuses deletes. R ends, X takes its slot.
+                w.cluster.refuse[("DELETE", "job")] = 403
+                assert withdraw(w, "R") == 202
+                await drive(w, service, lambda: "X" in slotted(w), "R withdrawn, X dispatched")
+                assert w.states()["R"] == "withdrawn" and left_in_cluster(w, "R") != GONE
+                # R's pull request merges before the cleanup is retried; deletes are allowed.
+                pull.open, pull.merged = False, True
+                pull.merge_sha = w.fake.commit(w.repo, [w.repo.refs["refs/heads/main"]])
+                del w.cluster.refuse[("DELETE", "job")]
+                await drive(w, service, lambda: left_in_cluster(w, "R") == GONE, "R cleaned")
+                assert left_open(w, "R")["pull_state"] == "open"  # as read when it ended
+
+                # GitHub cannot be read and deletes are refused, for longer than the bound.
+                assert w.admit("Y").status == 201
+                hidden = w.fake.repos.pop(REPO)
+                w.cluster.refuse[("DELETE", "job")] = 403
+                assert withdraw(w, "M") == 202
+                await drive(w, service, lambda: "Y" in slotted(w), "M withdrawn, Y dispatched")
+                assert w.states()["M"] == "withdrawn" and left_in_cluster(w, "M") != GONE
+                assert left_open(w, "M")["pull_state"] == "not read"
+                w.fake.repos[REPO] = hidden
+                del w.cluster.refuse[("DELETE", "job")]
+                await drive(w, service, lambda: left_in_cluster(w, "M") == GONE, "M cleaned")
+            finally:
+                await service.kill()
 
     asyncio.run(scenario())
 
