@@ -6,6 +6,10 @@
 # ACR_PUSH_USERNAME and ACR_PUSH_PASSWORD: the registry belongs to whoever deploys, so its name
 # is not written in this repository.
 #
+# The two secrets are not repository secrets: they exist only in the environment `publish`,
+# whose deployment branches are limited to main (a repository setting), so a run on any other
+# branch is not given them, whatever its copy of this file says.
+#
 # Never on a pull request: a fork's pull request gets no secrets, and nothing unreviewed may
 # push. So this is the one job main runs that a pull request cannot run first. What it builds
 # is the Dockerfile that ci.yml's `test` built and smoke-tested on the pull request; the push
@@ -20,15 +24,17 @@ on:
 permissions:
   contents: read
 
-# One publish per commit at a time; a publish that has started is never cancelled half-pushed.
+# One publish per branch at a time; a publish that has started is never cancelled half-pushed.
 concurrency:
-  group: publish-${{ github.sha }}
+  group: publish-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   image:
     name: publish image
     runs-on: ubuntu-latest
+    # Where the push credentials are, and what limits them to main.
+    environment: publish
     timeout-minutes: 20
     outputs:
       image: ${{ steps.published.outputs.image }}
@@ -63,7 +69,9 @@ jobs:
             missing=1
           fi
           exit "$missing"
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - name: Container image build
         run: docker build --label "org.opencontainers.image.revision=$COMMIT" -t "$TAGGED" .
       - name: Registry login
@@ -78,9 +86,11 @@ jobs:
       - name: Digest of the pushed image
         id: published
         run: |
-          # The digest the registry holds the pushed image under, read back from the push.
-          digest=$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$TAGGED" |
-            grep -F "$REPOSITORY@" | head -n 1 | sed 's/^.*@//' || true)
+          # The digest the local daemon recorded for the pushed name when it pushed. It is not
+          # yet proof of what the registry holds: the pull by this digest, next, is.
+          digests=$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$TAGGED")
+          digest=$(printf '%s\n' "$digests" |
+            awk -v p="$REPOSITORY@" 'index($0, p) == 1 { print substr($0, length(p) + 1); exit }')
           if ! printf '%s' "$digest" | grep -Eqx 'sha256:[0-9a-f]{64}'; then
             echo "::error::no sha256 digest found for the pushed image"
             exit 1

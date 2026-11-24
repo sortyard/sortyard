@@ -29,10 +29,26 @@ def load(path: pathlib.Path = WORKFLOW) -> dict[Any, Any]:
     return data
 
 
+def as_triggers(on: object) -> dict[str, Any]:
+    """A workflow's `on`, which may be one event name, a list of names or a map, as a map."""
+    if isinstance(on, str):
+        return {on: None}
+    if isinstance(on, list):
+        return {str(name): None for name in on}
+    assert isinstance(on, dict), on
+    return {str(name): value for name, value in on.items()}
+
+
 def triggers(path: pathlib.Path) -> dict[str, Any]:
     # PyYAML reads the bare key `on` as boolean True.
-    on: dict[str, Any] = load(path)[True]
-    return on
+    return as_triggers(load(path)[True])
+
+
+def refused_events(path: pathlib.Path, on: dict[str, Any]) -> set[str]:
+    """The events of a workflow other than ci.yml that the gate does not allow: any that run
+    for a pull request, and a push, except the image publish's push."""
+    gated = {"pull_request", "pull_request_target", "merge_group"}
+    return (gated if path == PUBLISH else gated | {"push"}) & set(on)
 
 
 def gate() -> dict[str, Any]:
@@ -71,10 +87,19 @@ def test_no_other_workflow_runs_on_pull_requests_or_main() -> None:
     for path in sorted(WORKFLOWS.glob("*.y*ml")):
         if path == WORKFLOW:
             continue
-        on = triggers(path)
-        gated = {"pull_request", "pull_request_target", "merge_group"}
-        assert not (gated if path == PUBLISH else gated | {"push"}) & set(on), path.name
+        assert not refused_events(path, triggers(path)), path.name
     assert triggers(PUBLISH)["push"] == {"branches": ["main"]}
+
+
+def test_the_other_workflow_rule_reads_every_form_of_on() -> None:
+    """`on: push`, `on: [push]` and `on: {push: ...}` are the same trigger."""
+    for name in ("push", "pull_request", "pull_request_target", "merge_group"):
+        for text in (f"on: {name}", f"on: [{name}, workflow_dispatch]", f"on:\n  {name}:\n"):
+            on = as_triggers(yaml.safe_load(text)[True])
+            assert refused_events(SLOW, on) == {name}, text
+            assert refused_events(PUBLISH, on) == ({name} - {"push"}), text
+    for text in ("on: workflow_dispatch", "on: [schedule]", "on:\n  workflow_dispatch:\n"):
+        assert not refused_events(SLOW, as_triggers(yaml.safe_load(text)[True])), text
 
 
 def test_the_required_check_runs_lint_typecheck_tests_spec_chart_and_image() -> None:

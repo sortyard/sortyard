@@ -196,6 +196,15 @@ def test_a_malformed_image_digest_fails_the_render(digest: str) -> None:
     assert "image.digest" in render_fails("--set-string", f"image.digest={digest}")
 
 
+@pytest.mark.parametrize("value", ["0", "false", "1", "true"])
+def test_an_image_digest_that_is_not_a_string_fails_the_render_and_never_means_no_digest(
+    value: str,
+) -> None:
+    # --set (not --set-string) gives the chart a number or a boolean.
+    assert "image.digest" in render_fails("--set", f"image.digest={value}")
+    render("--set", "image.digest=null")  # unset is the one other way to say "no digest"
+
+
 def test_an_empty_image_digest_renders_the_image_by_tag_as_before(tmp_path: pathlib.Path) -> None:
     assert HELM is not None
     assert yaml.safe_load((CHART / "values.yaml").read_text())["image"]["digest"] == ""

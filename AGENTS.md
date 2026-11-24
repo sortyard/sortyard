@@ -166,12 +166,15 @@ Every check `main` runs is that job, so it is proven on the pull request first. 
 One other job runs on `main` and cannot run for a pull request: `publish.yml` builds the
 `Dockerfile` (the one `test` built and smoke-tested on the pull request) and pushes it as
 `<registry>/sortyard/sortyard:<commit sha>` to the registry named by the repository variable
-`ACR_REGISTRY`, logging in with the Actions secrets `ACR_PUSH_USERNAME` and
-`ACR_PUSH_PASSWORD`. It then pulls the image by digest, smoke-tests it, and reports
+`ACR_REGISTRY`, logging in with the secrets `ACR_PUSH_USERNAME` and `ACR_PUSH_PASSWORD`. Those
+two are not repository secrets: they exist only in the environment `publish`, whose deployment
+branches are limited to `main` (a repository setting), and the job names that environment, so
+a run on another branch is not given them. It then pulls the image by digest, smoke-tests it, and reports
 `image=<registry>/sortyard/sortyard@sha256:...` in the job summary and as a job output. It is
 not a required check, and its push is first exercised on `main`. No registry name is written in
-this repository. `tests/test_workflows.py` holds its triggers, its read-only permissions, the
-commit tag and how the password reaches `docker login`.
+this repository. `tests/test_workflows.py` holds its triggers, its read-only permissions, its
+environment, the one pinned action and which steps hold a secret, and runs the job's scripts
+against a stand-in `docker` to hold what is built, pushed, pulled and reported.
 
 ## Local replica
 

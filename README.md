@@ -252,8 +252,10 @@ build, in one job, `test`: the one required status check on `main` (strict, up t
 [`.github/workflows/publish.yml`](.github/workflows/publish.yml) builds the `Dockerfile` for
 every commit on `main` (and on demand, on `main`) and pushes it as
 `<registry>/sortyard/sortyard:<full commit sha>`. The registry is not named in this repository:
-it is the repository variable `ACR_REGISTRY`, with the Actions secrets `ACR_PUSH_USERNAME` and
-`ACR_PUSH_PASSWORD` to log in. The job never runs for a pull request. After the push it pulls
+it is the repository variable `ACR_REGISTRY`. The login is the secrets `ACR_PUSH_USERNAME` and
+`ACR_PUSH_PASSWORD`, which exist only in the environment `publish`; its deployment branches are
+limited to `main`, so a run on any other branch is not given them. The job never runs for a
+pull request. After the push it pulls
 the image by digest, smoke-tests it, and writes `image=<registry>/sortyard/sortyard@sha256:...`
 and the commit to the job summary (and as job outputs).
 
