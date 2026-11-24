@@ -42,6 +42,7 @@ import yaml
 from sortyard.kernel import capabilities
 from sortyard.lane.github import HttpGitHub
 from sortyard.lane.worker import Work, WorkerConfig, brief
+from sortyard.services import api as api_service
 from sortyard.services import kernel
 from sortyard.services.api import load_lanes
 from sortyard.shadow import evaluate, sources
@@ -603,9 +604,15 @@ def api() -> Iterator[Any]:
 def test_the_replicas_admit_script_admits_an_item_through_the_api(
     api: Any, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """replica/admit.py, run as the replica runs it in the API pod: it seeds an operator once
-    and admits through the API's own door, which checks the item against its lanes."""
+    """The replica's declaration (replica/bootstrap.toml) and replica/admit.py, run as the
+    replica runs them in the API pod: `sortyard-api --bootstrap` makes the operator, and the
+    script admits through the API's own door, which checks the item against its lanes."""
     module = load_module("replica_admit", REPLICA / "admit.py")
+    script = SCRIPT.read_text()
+    workspace, project, binding = (
+        re.search(rf"^{name}=(\S+)$", script, re.MULTILINE).group(1)  # type: ignore[union-attr]
+        for name in ("LANE_WORKSPACE", "LANE_PROJECT", "LANE_BINDING")
+    )
     database = dict(part.split("=", 1) for part in api.conninfo.split())["dbname"]
     for name, value in {
         "SORTYARD_API_PORT": api.base.rsplit(":", 1)[1],
@@ -621,22 +628,48 @@ def test_the_replicas_admit_script_admits_an_item_through_the_api(
                 "SELECT s.lane, s.repository FROM sortyard.item AS i JOIN sortyard.item_spec AS s"
                 " ON (s.workspace_id, s.item_id) = (i.workspace_id, i.id)"
                 " WHERE i.workspace_id = %s AND i.id = %s",
-                [module.WORKSPACE, item],
+                [workspace, item],
             ).fetchall()
         return rows
 
+    def admit(item: str, lane: str = "example") -> int:
+        code: int = module.main(
+            ["admit.py", item, "example/app", lane, workspace, project, binding]
+        )
+        return code
+
+    # The script makes no operator: before the bootstrap there is no binding to get a token for.
+    with pytest.raises(ValueError):
+        admit("replica-1-a")
+    declaration = str(REPLICA / "bootstrap.toml")
+    assert api_service.main(["--bootstrap", declaration]) == 0
+    assert f"created role_binding {binding}" in capsys.readouterr().out.splitlines()
     # The API of the harness runs the shipped example lane.
-    assert module.main(["admit.py", "replica-1-a", "example/app", "example"]) == 0
+    assert admit("replica-1-a") == 0
     assert capsys.readouterr().out.startswith("201 ")
     assert stored("replica-1-a") == [("example", "example/app")]
-    # Again: the same item is there already, and the seed is not written twice.
-    assert module.main(["admit.py", "replica-1-a", "example/app", "example"]) == 0
+    # Again, as a second `replica.sh lane` does: nothing is made twice.
+    assert api_service.main(["--bootstrap", declaration]) == 0
+    assert all(line.startswith("unchanged ") for line in capsys.readouterr().out.splitlines())
+    assert admit("replica-1-a") == 0
     assert capsys.readouterr().out.startswith("200 ")
-    assert module.main(["admit.py", "replica-1-b", "example/app", "example"]) == 0
+    assert admit("replica-1-b") == 0
     # The API refuses what its lanes do not declare, and the script says so.
-    assert module.main(["admit.py", "replica-1-c", "example/app", "no-such-lane"]) == 1
+    assert admit("replica-1-c", "no-such-lane") == 1
     assert capsys.readouterr().out.rsplit("\n", 2)[-2].startswith("422 ")
     assert stored("replica-1-c") == []
+
+
+def test_the_replica_gets_its_operator_from_the_bootstrap_command() -> None:
+    """replica.sh makes the workspace, project and operator with `sortyard-api --bootstrap`
+    before it admits, and neither it nor admit.py writes a row for them."""
+    script = SCRIPT.read_text()
+    lane = script.split("\nlane() {", 1)[1].split("\n}\n", 1)[0]
+    assert "sortyard-api --bootstrap -" in script and '<"$ROOT/replica/bootstrap.toml"' in script
+    assert re.search(r"^    bootstrap$", lane, re.MULTILINE)
+    assert lane.index("\n    bootstrap\n") < lane.index('admit "$first"')
+    for source in (script, (REPLICA / "admit.py").read_text()):
+        assert "INSERT INTO" not in source and "ensure_workspace" not in source
 
 
 @pytest.mark.skipif(

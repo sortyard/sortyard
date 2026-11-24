@@ -45,7 +45,10 @@ GITHUB_CONFIGMAP=sortyard-replica-fake-github
 GITHUB=sortyard-fake-github
 LANE=replica
 LANE_REPOSITORY=replica/app
+# The workspace, project and role binding replica/bootstrap.toml declares.
 LANE_WORKSPACE=ws-replica-lane
+LANE_PROJECT=proj-replica
+LANE_BINDING=rb-replica
 
 # Tool: minimum supported version, the version CI and this script are tested with, install docs.
 KIND_MIN=0.20.0 KIND_TESTED=v0.25.0 KIND_URL=https://kind.sigs.k8s.io/docs/user/quick-start/#installation
@@ -403,9 +406,19 @@ wait_item() {
     die "item $1 is in state '${state:-none}', not '$2', after ${TIMEOUT}s"
 }
 
+# bootstrap: the workspace, project, operator and role binding of replica/bootstrap.toml, made
+# by the API service's own command (safe to run again: it creates only what is missing).
+bootstrap() {
+    local out
+    out=$(k exec -i "deployment/$RELEASE-api" -- sortyard-api --bootstrap - \
+        <"$ROOT/replica/bootstrap.toml" 2>&1) || die "sortyard-api --bootstrap failed: $out"
+    printf '%s\n' "$out" | sed 's/^/    /'
+}
+
 admit() {
     local out
     out=$(k exec -i "deployment/$RELEASE-api" -- python - "$1" "$LANE_REPOSITORY" "$LANE" \
+        "$LANE_WORKSPACE" "$LANE_PROJECT" "$LANE_BINDING" \
         <"$ROOT/replica/admit.py" 2>&1) || die "the API did not admit item $1: $out"
 }
 
@@ -442,6 +455,9 @@ lane() {
     local run first second state active pod
     run=$(date +%s)
     first="replica-$run-a" second="replica-$run-b"
+
+    say "lane: sortyard-api --bootstrap makes the workspace, project and first operator"
+    bootstrap
 
     say "lane: admit $first through the API and see it merged"
     admit "$first"

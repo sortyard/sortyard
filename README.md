@@ -119,8 +119,73 @@ Every call carries `Authorization: Bearer <token>`. Tokens are stored only as SH
   `sortyard-api --issue-operator-token <role-binding-id>` (admin/operator/viewer bindings;
   the binding's current role applies on every call), e.g.
   `kubectl exec deployment/sortyard-api -- sortyard-api --issue-operator-token rb-admin`.
+  The binding comes from `sortyard-api --bootstrap` ([First operator](#first-operator)).
 
 Every mutation writes an AuditLog entry and a ledger event.
+
+### First operator
+
+A new deployment has no workspace, no project and no operator, and the API takes no call
+without an operator's token. `sortyard-api --bootstrap FILE` makes them from a declaration
+file, and `--issue-operator-token` then prints a token for a binding the file declares. Both
+are interim, until OIDC sessions exist.
+
+The declaration is TOML: one workspace, with its projects, operators and role bindings. Each
+entry is the object as its schema in [`spec/`](spec/) defines it (`workspace`, `project`,
+`operator`, `role-binding`), without `workspace_id`. It holds no credential.
+
+```toml
+[workspace]
+id = "ws-acme"
+name = "Acme"
+# installation_id: leave it out for the deployment's own installation, which is created as a
+# provisional record (id from SORTYARD_INSTALLATION_ID, default inst-sortyard) if there is none.
+
+[[projects]]
+id = "proj-app"
+name = "App"
+archetype = { id = "arch-saas-product", version = "1.0.0" }
+repos = []
+tracker = { kind = "internal" }
+state = "active"
+
+[[operators]]
+id = "op-first"
+subject = "oidc|first"        # the OIDC subject this operator will sign in as
+display_name = "First operator"
+state = "active"
+
+[[role_bindings]]
+id = "rb-first-admin"
+principal = { kind = "operator", id = "op-first" }
+role = "admin"                # admin, operator or viewer
+scope = { kind = "workspace" } # or { kind = "project", ref = "proj-app" }
+```
+
+```sh
+# 1. Create what the file declares (FILE, or - for standard input; a Job can mount the file).
+kubectl exec -i deployment/sortyard-api -- sortyard-api --bootstrap - < bootstrap.toml
+# 2. A token for a declared binding.
+kubectl exec deployment/sortyard-api -- sortyard-api --issue-operator-token rb-first-admin
+```
+
+What the command does:
+
+- It validates every entry as the API validates a request body (the generated model and the
+  full JSON Schema), and checks that a binding's operator and a project scope's project are
+  declared or already in the workspace.
+- It creates what is missing, in one transaction, and prints one line for each object:
+  `created <kind> <id>` or `unchanged <kind> <id>`. It prints no credential and issues none.
+- Running it again with the same file changes nothing. Add a project or an operator to the
+  file and run it again: only the new objects are created.
+- An object that exists with different content is **refused and named, never overwritten**
+  (so is an invalid entry). A refused run writes nothing at all and exits 1. To change an
+  existing object, use the API. A workspace the shadow conductor made first has its id as
+  its name: declare that name.
+- Each object it creates is in the AuditLog (channel `system`) and the ledger, with the actor
+  `system/bootstrap`.
+
+[`replica/bootstrap.toml`](replica/bootstrap.toml) is the file the local replica uses.
 
 ## Shadow conductor (Phase 1)
 
@@ -259,7 +324,7 @@ build, in one job, `test`: the one required status check on `main` (strict, up t
 | `charts/sortyard/migrations/` | The SQL migrations (§3 tables + event ledger; 0002: the API token store) and `migrate.sh`, the Job's runner. |
 | `Dockerfile` | One image for every service; the Deployment's `command` picks the entry point. It is also the base of a lane's worker image (it has `sortyard-worker` and `git`, and no agent). |
 | `spec/` | Phase 0: the §3 JSON Schemas and the OpenAPI spec, with their tests. |
-| `replica/` | The one-command local replica: `replica.sh` (kind + this chart + fake outside providers), its kind config, values overrides, fakes, its lane file and its worker image (`replica/worker/`). |
+| `replica/` | The one-command local replica: `replica.sh` (kind + this chart + fake outside providers), its kind config, values overrides, fakes, its lane file, its bootstrap declaration (`bootstrap.toml`) and its worker image (`replica/worker/`). |
 | `tests/` | Tests for the package, chart, CI, replica, this quickstart and `AGENTS.md`. |
 | `docs/findings/` | Friction found while building the repo's own foundations, filed as findings ([`contributor-foundation.md`](docs/findings/contributor-foundation.md)). |
 | `docs/goldfish/` | Goldfish reports: a zero-context agent runs the documented install and files every point of friction (Phase 1: [`phase-1-install-smoke.md`](docs/goldfish/phase-1-install-smoke.md)). |
