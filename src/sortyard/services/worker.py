@@ -37,10 +37,12 @@ workspace, so the sentinel is not trusted for being a file there: it is trusted 
 digest, whose key it cannot read. The key is in no file it can open once the command starts,
 and the entry point's memory is closed to it (the entry point is not dumpable, so the kernel
 refuses same-user ptrace and its `/proc` files, and it does not run the command while holding
-CAP_SYS_PTRACE or CAP_SYS_ADMIN; the command runs with no-new-privileges). The answer is not
-in a file at all: the kernel names the writer of each piece read from the command's standard
-output, and only the command's own process is heard. What is left to such code is to make the
-result fail, or to act on the command process itself (see SY-DEC-011 for the residual risk).
+CAP_SYS_PTRACE, CAP_SYS_ADMIN or CAP_DAC_READ_SEARCH, or any capability as a user who is not
+root; the command runs with no-new-privileges). The answer is not in a file at all: the kernel
+names the writer of each piece read from the command's standard output, and only the command's
+own process is heard (`AttestedOutput`, which a wrapper that relays a program's answer uses in
+turn). What is left to such code is to make the result fail, or to act on the command process
+itself (see SY-DEC-011 for the residual risk).
 
 Every result carries the head commit. A failed result (`{"outcome":"failed","reason":...}`,
 exit status 1) is no outcome: the launcher's observer gives no reply for it.
@@ -105,9 +107,15 @@ ORIGIN, RECORD = "origin.git", "state.json"
 # `push` looks for the sentinel: bytes, bytes, seconds, seconds.
 ANSWER_LIMIT, SENTINEL_LIMIT, REAP_SECONDS, POLL_SECONDS = 1 << 20, 8 << 20, 20.0, 0.2
 PR_SET_DUMPABLE, PR_SET_CHILD_SUBREAPER, PR_SET_NO_NEW_PRIVS = 4, 36, 38  # <linux/prctl.h>
-# Capabilities with which the agent command could read the entry point's memory (the key) or
-# write as another process: the entry point does not run it while it holds one.
-UNSAFE_CAPABILITIES = {"CAP_SYS_PTRACE": 19, "CAP_SYS_ADMIN": 21}  # <linux/capability.h>
+# Capabilities with which the agent command could read the entry point's memory (the key),
+# write as another process, or open a file of the state volume by its handle (open_by_handle_at
+# reaches files of the same filesystem that the container does not mount): the entry point
+# does not run it while it holds one. As any user but root it holds none at all.
+UNSAFE_CAPABILITIES = {
+    "CAP_DAC_READ_SEARCH": 2,
+    "CAP_SYS_PTRACE": 19,
+    "CAP_SYS_ADMIN": 21,
+}  # <linux/capability.h>
 PROC_STATUS = "/proc/self/status"
 # Room for the writer's credentials (pid, uid, gid) that come with each read of the answer.
 CREDENTIALS = socket.CMSG_SPACE(struct.calcsize("3i"))
@@ -263,13 +271,19 @@ def _digest(key: str, status: str, answer: str) -> str:
 
 def _privileged(status: str) -> str:
     """The capability in `status` (a `/proc/<pid>/status` text) that would let the agent
-    command read this process's memory or pass itself off as another process, if any."""
-    for line in status.splitlines():
-        name, _, value = line.partition(":")
-        if name in ("CapPrm", "CapAmb"):
-            for cap, bit in UNSAFE_CAPABILITIES.items():
-                if int(value, 16) >> bit & 1:
-                    return cap
+    command read this process's memory, pass itself off as another process or open a file it
+    was not given, if any; and for a process whose effective user is not root, any capability
+    it holds (none is needed to run an agent)."""
+    fields = dict(line.partition(":")[::2] for line in status.splitlines())
+    held = 0
+    for name in ("CapPrm", "CapEff", "CapAmb"):
+        held |= int(fields.get(name, "0").strip() or "0", 16)
+    for cap, bit in UNSAFE_CAPABILITIES.items():
+        if held >> bit & 1:
+            return cap
+    uids = fields.get("Uid", "").split()
+    if held and (len(uids) < 2 or uids[1] != "0"):
+        return f"capabilities {held:#x} as a user who is not root"
     return ""
 
 
@@ -333,33 +347,76 @@ def _start(argv: Sequence[str], text: str, cwd: pathlib.Path, stdout: int | None
     return child
 
 
-def _run(argv: Sequence[str], text: str, cwd: pathlib.Path, capture: bool) -> tuple[int, str]:
-    """Run the agent command to its exit: its exit status and, with `capture`, the end of what
-    the command's own process wrote to its standard output.
+class AttestedOutput:
+    """The standard output of one child process, as only that process wrote it.
 
-    That output is a socket, not a pipe: a socket cannot be opened again through `/proc`, and
-    the kernel tells the reader which process wrote each piece (`SO_PASSCRED`) and never joins
-    two writers' pieces in one read. Only the command's own pieces are its answer; what other
-    processes write there (ones it gave the socket to, or that took it) is copied to our output
-    and is no part of the answer. Reading stops at what was queued when the command exited."""
-    if not capture:
-        return _start(argv, text, cwd, None).wait(), ""
-    ours, theirs = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
-    answer, left = b"", -1  # left: the bytes still to read once the command has ended
-    with ours:
-        ours.setsockopt(socket.SOL_SOCKET, socket.SO_PASSCRED, 1)
-        with theirs:
-            child = _start(argv, text, cwd, theirs.fileno())
+    The channel a wrapper uses when it prints an answer it got from a program it runs (an agent
+    command that runs Claude Code and post-processes its output): the worker attests only its
+    own child, so the wrapper must attest its own in the same way, and a file or a pipe is no
+    such channel. Code the program runs can rename a file over the one the wrapper reads, and
+    can open a pipe again through `/proc/<pid>/fd` (that needs only PTRACE_MODE_READ, which Yama
+    `ptrace_scope` 1 does not refuse). This is one end of a Unix socket pair, which `/proc`
+    does not open again; with `SO_PASSCRED` the kernel names the process that wrote each piece
+    read and never joins two writers' pieces in one read, and a writer can claim another's pid
+    only with CAP_SYS_ADMIN over our pid namespace. Only the child's own pieces are kept; what
+    other processes write there (ones the child gave the socket to, or that took it) goes to
+    `echo` if one is given, and is never part of what `collect` returns.
+
+        with AttestedOutput() as output:
+            child = subprocess.Popen(argv, stdout=output.child_fd, ...)
+            output.started()
+            answer = output.collect(child, timeout=limit)  # bytes; the child is not reaped
+
+    The caller must not let the child, or code the child runs, act on the caller's own
+    process: run it with `ptrace_scope` 1 or more, make the caller non-dumpable, and do not
+    reap the child (or let anything else reap it) before `collect` returns, so that its pid is
+    not given to another process while its output is read.
+    """
+
+    def __init__(self, echo: Any = None, limit: int = ANSWER_LIMIT) -> None:
+        self._ours, self._theirs = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
+        self._ours.setsockopt(socket.SOL_SOCKET, socket.SO_PASSCRED, 1)
+        self._echo, self._limit = echo, limit
+
+    @property
+    def child_fd(self) -> int:
+        """The descriptor to give the child as its standard output."""
+        return self._theirs.fileno()
+
+    def started(self) -> None:
+        """Close our copy of the child's end, once the child holds it."""
+        self._theirs.close()
+
+    def close(self) -> None:
+        self._theirs.close()
+        self._ours.close()
+
+    def __enter__(self) -> AttestedOutput:
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self.close()
+
+    def collect(self, child: subprocess.Popen[Any], timeout: float | None = None) -> bytes:
+        """The last `limit` bytes the child's own process wrote, read until it exits (its exit
+        is seen without reaping it) and then up to what was queued at that moment: a process
+        left holding the socket cannot make this wait. `subprocess.TimeoutExpired` when the
+        child runs past `timeout` seconds; it is then still running."""
+        self.started()
+        until = None if timeout is None else time.monotonic() + timeout
+        answer, left = b"", -1  # left: the bytes still to read once the child has ended
         while left:
             if left < 0 and os.waitid(os.P_PID, child.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT):
-                queued = fcntl.ioctl(ours.fileno(), termios.FIONREAD, b"\0" * 4)
+                queued = fcntl.ioctl(self._ours.fileno(), termios.FIONREAD, b"\0" * 4)
                 left = struct.unpack("i", queued)[0]
                 continue
-            if left < 0 and not select.select([ours], [], [], 0.05)[0]:
+            if left < 0 and until is not None and time.monotonic() > until:
+                raise subprocess.TimeoutExpired(child.args, timeout or 0.0, answer)
+            if left < 0 and not select.select([self._ours], [], [], 0.05)[0]:
                 continue
             size = 65536 if left < 0 else min(left, 65536)
             try:
-                data, extra, _, _ = ours.recvmsg(size, CREDENTIALS, socket.MSG_DONTWAIT)
+                data, extra, _, _ = self._ours.recvmsg(size, CREDENTIALS, socket.MSG_DONTWAIT)
             except BlockingIOError:
                 if left > 0:
                     break  # what was queued is gone: not ours to wait for
@@ -371,11 +428,25 @@ def _run(argv: Sequence[str], text: str, cwd: pathlib.Path, capture: bool) -> tu
                 for level, kind, body in extra
                 if (level, kind) == (socket.SOL_SOCKET, socket.SCM_CREDENTIALS)
             ]
-            sys.stdout.buffer.write(data)
+            if self._echo is not None:
+                self._echo.write(data)
             if writer == [child.pid]:
-                answer = (answer + data)[-ANSWER_LIMIT:]
+                answer = (answer + data)[-self._limit :]
             left -= len(data) if left > 0 else 0
-    sys.stdout.flush()
+        if self._echo is not None:
+            self._echo.flush()
+        return answer
+
+
+def _run(argv: Sequence[str], text: str, cwd: pathlib.Path, capture: bool) -> tuple[int, str]:
+    """Run the agent command to its exit: its exit status and, with `capture`, the end of what
+    the command's own process wrote to its standard output (`AttestedOutput`). Everything
+    written there is copied to our output; only the command's own pieces are its answer."""
+    if not capture:
+        return _start(argv, text, cwd, None).wait(), ""
+    with AttestedOutput(echo=sys.stdout.buffer) as output:
+        child = _start(argv, text, cwd, output.child_fd)
+        answer = output.collect(child)
     return child.wait(), answer.decode(errors="replace")
 
 

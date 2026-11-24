@@ -310,7 +310,8 @@ provenance; where they conflict, the amendment wins.
   seen without reaping it, so its pid cannot be reused meanwhile). Then every process it left
   is killed, until `waitpid` says the entry point (pid 1, or a child subreaper) has no child.
   The entry point is made non-dumpable, sets no-new-privileges for the command, and refuses
-  to run it while holding CAP_SYS_PTRACE or CAP_SYS_ADMIN. The answer is in the sentinel,
+  to run it while holding CAP_SYS_PTRACE, CAP_SYS_ADMIN or CAP_DAC_READ_SEARCH, or any
+  capability as a user who is not root. The answer is in the sentinel,
   under the digest; `agent-output` is gone. `push` reads the sentinel without following a
   link or blocking, and anything there without the digest is a failed result at once.
   Nothing changes in the Job manifest or the observer.
@@ -318,8 +319,13 @@ provenance; where they conflict, the amendment wins.
   sentinel, a full volume, killing or stopping the entry point where it is not the
   container's first process, a process that cannot be killed within 20 seconds); it cannot
   make one succeed or approve by writing files or the answer stream. An agent command must
-  write its answer from its own process: a wrapper script `exec`s the agent, or prints the
-  answer itself. Residual risk, stated: (a) the command's own process is not protected from
+  write its answer from its own process. A wrapper that prints an answer it got from a program
+  it runs is attested only as far as its own channel to that program, and a file or a pipe is
+  not one (2026-11-24 review: one `os.rename` by the tests a reviewer ran forged an approval
+  through the estate's wrapper, which read Claude Code's output from a file; a pipe is opened
+  again through `/proc/<pid>/fd` under Yama `ptrace_scope` 1). So the wrapper `exec`s the
+  program, or reads it through `AttestedOutput`, the same socket and `SO_PASSCRED` check as the
+  worker's, and makes itself non-dumpable. Residual risk, stated: (a) the command's own process is not protected from
   code it runs: where the node allows same-user ptrace of an ancestor (Yama `ptrace_scope` 0,
   or no Yama), that code can drive the command process and so write its answer; and a command
   that reloads its configuration or code from files the agent's user can write, or that is
