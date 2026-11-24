@@ -34,6 +34,7 @@ from sortyard.engine import Engine
 from sortyard.kernel.item import workflow_id
 from sortyard.kernel.preflight import close_gap
 from sortyard.kernel.store import Items, ItemSpec, PgGapRegistry
+from sortyard.lane import runtime
 from sortyard.lane.github import GitHubError, HttpGitHub, branch_of
 from sortyard.lane.jobs import ITEM_LABEL
 from sortyard.lane.runtime import ensure_pull
@@ -299,6 +300,7 @@ def test_withdrawing_an_item_mid_build_deletes_its_job_and_per_job_secret_and_le
             waited = w.api.ws("GET", "/items/W", "viewer").body["detail"]["left_open"]
             assert (waited["repository"], waited["branch"]) == (OTHER_REPO, branch_of("W"))
             assert isinstance(waited["pull_request"], str) and "404" in waited["pull_request"]
+            assert (waited["pull_state"], waited["pull_number"]) == ("not read", None)
 
             for item in ("A", "B"):
                 assert w.admit(item).status == 201
@@ -398,8 +400,12 @@ def test_withdrawing_an_item_mid_build_deletes_its_job_and_per_job_secret_and_le
                 "repository": REPO,
                 "branch": branch_of("B"),
                 "pull_request": pull.number,
+                "pull_state": "open",
+                "pull_number": pull.number,
+                "merge_sha": None,
             }
             assert read["A"]["detail"]["left_open"]["pull_request"] is None
+            assert read["A"]["detail"]["left_open"]["pull_state"] == "none"
             # Neither is recorded as merged: no transition of theirs has that lifecycle kind.
             for item in "AB":
                 kinds = [event["facts"]["lifecycle"]["kind"] for event in w.timeline(item)]
@@ -434,6 +440,148 @@ def test_withdrawing_an_item_mid_build_deletes_its_job_and_per_job_secret_and_le
             assert [reason.split(":")[0] for reason in refused.body["reasons"]] == ["ended-item"]
             assert "withdrawn" in refused.body["reasons"][0]
             assert w.admit("C").status == 200  # a merged item admitted again: nothing, as before
+
+    asyncio.run(scenario())
+
+
+def withdraw(w: World, item: str) -> int:
+    body = {"answer": "withdraw", "reason": "the lane moves back"}
+    reply = w.api.ws("POST", f"/items/{item}/requests", "operator", body)
+    return reply.status
+
+
+def left_open(w: World, item: str) -> dict[str, Any]:
+    """What getItem says the withdrawn item left, after checking that the ledger Event of the
+    withdrawal says the same."""
+    read = w.api.ws("GET", f"/items/{item}", "viewer").body
+    ended = w.timeline(item)[-1]
+    assert (read["state"], ended["transition"]["to"]) == ("withdrawn", "withdrawn")
+    left: dict[str, Any] = read["detail"]["left_open"]
+    assert ended["facts"]["left_open"] == left
+    return left
+
+
+@requires_postgres
+def test_withdrawing_an_item_whose_pull_request_is_merged_records_it_as_merged_with_its_commit(
+    tmp_path: pathlib.Path,
+) -> None:
+    """withdrawing an item whose pull request is merged records the pull request as merged with
+    its commit; and the ledger event of a withdrawal carries the same left-open facts as getItem.
+    A record step retried after its first attempt could not read the pull request stores what
+    the later attempt read."""
+
+    async def scenario() -> None:
+        async with world(tmp_path) as w:
+            # M and R are each mid-fix, each with its pull request open.
+            w.held, w.red_once = {"M:fix", "R:fix"}, {"M", "R"}
+            for item in ("M", "R"):
+                assert w.admit(item).status == 201
+            service = Service(w)
+            try:
+                fixing = {"M": "fixing", "R": "fixing"}
+                await drive(w, service, lambda: w.states() == fixing, "M and R mid-fix")
+                merged, kept = w.repo.pull_of(branch_of("M")), w.repo.pull_of(branch_of("R"))
+                assert merged.open and kept.open
+
+                # M's pull request is merged outside the kernel, then M is withdrawn.
+                merged.open, merged.merged = False, True
+                merged.merge_sha = w.fake.commit(w.repo, [w.repo.refs["refs/heads/main"]])
+                assert withdraw(w, "M") == 202
+                await drive(w, service, lambda: w.states()["M"] == "withdrawn", "M withdrawn")
+                assert left_open(w, "M") == {
+                    "repository": REPO,
+                    "branch": branch_of("M"),
+                    "pull_request": None,  # as before: M has no open pull request
+                    "pull_state": "merged",
+                    "pull_number": merged.number,
+                    "merge_sha": merged.merge_sha,
+                }
+
+                # R is withdrawn while GitHub cannot be read and the cluster refuses to
+                # delete Jobs: the first attempts of its record step fail. Nothing is
+                # recorded yet, so no attempt's "not read" can stay behind.
+                hidden = w.fake.repos.pop(REPO)
+                w.cluster.refuse[("DELETE", "job")] = 500
+                assert withdraw(w, "R") == 202
+                await until(
+                    lambda: asyncio.sleep(0, w.cluster.exchanges),
+                    lambda seen: any(e.method == "DELETE" and e.status == 500 for e in seen),
+                    "a refused delete",
+                )
+                assert w.states()["R"] == "decision"
+                w.fake.repos[REPO] = hidden
+                del w.cluster.refuse[("DELETE", "job")]
+                await drive(w, service, lambda: w.states()["R"] == "withdrawn", "R withdrawn")
+            finally:
+                await service.kill()
+            assert left_open(w, "R") == {
+                "repository": REPO,
+                "branch": branch_of("R"),
+                "pull_request": kept.number,
+                "pull_state": "open",
+                "pull_number": kept.number,
+                "merge_sha": None,
+            }
+            assert left_in_cluster(w, "R") == left_in_cluster(w, "M") == GONE
+            assert kept.open and not kept.merged and merged.merges == kept.merges == 0
+
+    asyncio.run(scenario())
+
+
+def slotted(w: World) -> set[str]:
+    with w.connect() as conn:
+        rows = conn.execute("SELECT item_id FROM sortyard.item_slot WHERE workspace_id = %s", [WS])
+        return {row[0] for row in rows.fetchall()}
+
+
+@requires_postgres
+def test_a_withdrawn_item_frees_its_slot_while_its_cleanup_is_refused(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A withdrawn item whose Jobs the cluster refuses to delete ends and frees its lane slot,
+    and its Jobs are deleted once the cluster allows it: when GitHub was read, even though its
+    pull request changed between the attempts (the record is not made again); when GitHub
+    cannot be read, once `UNREAD_FIRST_AFTER` has passed, with the pull request "not read"."""
+    monkeypatch.setattr(runtime, "UNREAD_FIRST_AFTER", 3.0)
+
+    async def scenario() -> None:
+        async with world(tmp_path) as w:
+            # M and R are each mid-fix and hold the lane's two slots; X waits for one.
+            w.held, w.red_once = {"M:fix", "R:fix", "X"}, {"M", "R"}
+            for item in ("M", "R"):
+                assert w.admit(item).status == 201
+            service = Service(w)
+            try:
+                fixing = {"M": "fixing", "R": "fixing"}
+                await drive(w, service, lambda: w.states() == fixing, "M and R mid-fix")
+                assert w.admit("X").status == 201
+                pull = w.repo.pull_of(branch_of("R"))
+
+                # GitHub is read; the cluster refuses deletes. R ends, X takes its slot.
+                w.cluster.refuse[("DELETE", "job")] = 403
+                assert withdraw(w, "R") == 202
+                await drive(w, service, lambda: "X" in slotted(w), "R withdrawn, X dispatched")
+                assert w.states()["R"] == "withdrawn" and left_in_cluster(w, "R") != GONE
+                # R's pull request merges before the cleanup is retried; deletes are allowed.
+                pull.open, pull.merged = False, True
+                pull.merge_sha = w.fake.commit(w.repo, [w.repo.refs["refs/heads/main"]])
+                del w.cluster.refuse[("DELETE", "job")]
+                await drive(w, service, lambda: left_in_cluster(w, "R") == GONE, "R cleaned")
+                assert left_open(w, "R")["pull_state"] == "open"  # as read when it ended
+
+                # GitHub cannot be read and deletes are refused, for longer than the bound.
+                assert w.admit("Y").status == 201
+                hidden = w.fake.repos.pop(REPO)
+                w.cluster.refuse[("DELETE", "job")] = 403
+                assert withdraw(w, "M") == 202
+                await drive(w, service, lambda: "Y" in slotted(w), "M withdrawn, Y dispatched")
+                assert w.states()["M"] == "withdrawn" and left_in_cluster(w, "M") != GONE
+                assert left_open(w, "M")["pull_state"] == "not read"
+                w.fake.repos[REPO] = hidden
+                del w.cluster.refuse[("DELETE", "job")]
+                await drive(w, service, lambda: left_in_cluster(w, "M") == GONE, "M cleaned")
+            finally:
+                await service.kill()
 
     asyncio.run(scenario())
 

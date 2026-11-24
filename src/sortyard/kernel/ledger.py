@@ -107,7 +107,8 @@ _WHEN_GIVEN = ("owner", "limit", "outcome", "default", "action", "decision", "re
 def event_for(transition: Mapping[str, Any]) -> dict[str, Any]:
     """The ledger Event (spec/event.schema.json, less the seq the ledger assigns) of a transition.
 
-    It carries the state left, the state entered, the owner, the limit and the typed reason.
+    It carries the state left, the state entered, the owner, the limit and the typed reason,
+    and for an item that ended without merging what it left (`left_open`, as its row has it).
     Its id is fixed by the tenant, the item and the transition's sequence, so recording a
     transition twice appends one Event. The tenant and the item go into the id as a digest: both
     may contain every character an id allows, so no separator could keep two tenants' ids apart.
@@ -118,6 +119,7 @@ def event_for(transition: Mapping[str, Any]) -> dict[str, Any]:
         "reason": transition["reason"],
         "cause": transition["cause"],
         **{key: transition.get(key) for key in _WHEN_GIVEN},
+        **{key: transition[key] for key in ("left_open",) if key in transition},
         "lifecycle": {"record_type": LIFECYCLE_RECORD_TYPE, "kind": lifecycle_kind(transition)},
     }
     return {
