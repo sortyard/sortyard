@@ -360,3 +360,26 @@ def test_a_redirect_is_refused_and_the_credential_goes_to_no_other_host() -> Non
             server.shutdown()
             server.server_close()
             thread.join()
+
+
+def test_a_pull_request_is_opened_only_by_a_token_that_reads_contents() -> None:
+    """GitHub refuses to open a pull request for a token with pull_requests:write alone, with a
+    422 whose errors say "not all refs are readable" (SORTYARD-178, seen on the estate canary),
+    and opens it once the token reads contents too. The fake answers the same, in the
+    documented validation-error shape."""
+    with github() as (fake, port):
+        repo = fake.repo(REPO)
+        fake.push(repo, "sortyard/ITEM-1")
+        short = port.token(REPO, {"pull_requests": "write"})
+        with pytest.raises(GitHubError) as caught:
+            port.open_pull(short, REPO, branch="sortyard/ITEM-1", base="main", title="ITEM-1")
+        assert (caught.value.status, caught.value.said) == (422, "Validation Failed")
+        (said,) = [payload for name, status, payload in fake.replies if status == 422]
+        assert said["errors"] == [
+            {"resource": "PullRequest", "code": "custom", "message": "not all refs are readable"}
+        ]
+        assert repo.pulls == []
+        enough = port.token(REPO, {"pull_requests": "write", "contents": "read"})
+        opened = port.open_pull(enough, REPO, branch="sortyard/ITEM-1", base="main", title="ITEM-1")
+        assert [pull.number for pull in repo.pulls] == [opened.number]
+        fake.verify()

@@ -64,7 +64,7 @@ _IN_STATE = "SELECT 1 FROM sortyard.item WHERE (workspace_id, id, state) = (%s, 
 
 def ensure_pull(port: GitHub, spec: ItemSpec) -> None:
     """Open the item's pull request unless its branch has one that is open or merged."""
-    token = port.token(spec.repository, {"pull_requests": "write"})
+    token = port.token(spec.repository, {"pull_requests": "write", "contents": "read"})
     branch = branch_of(spec.item)
 
     def there() -> bool:
