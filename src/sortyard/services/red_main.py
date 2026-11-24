@@ -588,7 +588,10 @@ def build(env: Mapping[str, str]) -> tuple[Observer, float]:
         raise ValueError(f"required settings missing: {', '.join(missing)}")
     lanes = api_service.load_lanes(env["SORTYARD_LANES_DIR"])
     watches = load_watches(pathlib.Path(env["SORTYARD_RED_MAIN_CONFIG"]).read_text(), lanes)
-    conninfo = api_service.Config.from_env(env).conninfo()
+    # The database settings only: Kubernetes puts SORTYARD_API_PORT=tcp://... into a pod of a
+    # release named sortyard (the API Service's link variable), which is no port number.
+    database = {name: value for name, value in env.items() if name.startswith("SORTYARD_DATABASE_")}
+    conninfo = api_service.Config.from_env(database).conninfo()
     github = ActionsGitHub(
         env["SORTYARD_GITHUB_APP_ID"],
         pathlib.Path(env["SORTYARD_GITHUB_APP_KEY_FILE"]).read_bytes(),

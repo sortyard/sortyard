@@ -1179,6 +1179,10 @@ def test_red_main_enabled_renders_the_observer_and_nothing_else_new(tmp_path: pa
     secrets = {**APP_SECRET, "sy-sortyard-postgres": {"password": "a-database-password"}}
     started = as_started(docs, deploy, "red-main", tmp_path, secrets)
     assert set(red_main.REQUIRED) <= set(started)
+    assert pod["enableServiceLinks"] is False
+    # Even given the link variables Kubernetes sets for the API Service of a release named
+    # sortyard (as on the estate, where the first start failed on it), the service starts.
+    started = {**started, "SORTYARD_API_PORT": "tcp://10.0.100.229:8080"}
     observer, interval = red_main.build(started)  # the App key loads, the watch file parses
     assert interval == 60
     (watch,) = observer.watches

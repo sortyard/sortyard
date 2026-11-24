@@ -69,6 +69,9 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       automountServiceAccountToken: false
+      # No Service link variables: the observer is told the API's URL, and a release named
+      # sortyard would otherwise be given SORTYARD_API_PORT=tcp://... among its settings.
+      enableServiceLinks: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
