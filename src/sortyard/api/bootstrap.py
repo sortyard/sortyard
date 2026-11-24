@@ -70,7 +70,7 @@ class Declaration:
 
 @dataclass
 class Outcome:
-    """What a run did, as `kind id` names."""
+    """What a run did, as `kind id` names; a created role binding also says what it grants."""
 
     created: list[str] = field(default_factory=list)
     unchanged: list[str] = field(default_factory=list)
@@ -83,6 +83,9 @@ def parse(text: str, installation_id: str) -> Declaration:
     except tomllib.TOMLDecodeError as exc:
         raise Refused([f"the declaration is not TOML: {exc}"]) from None
     reasons = [f"{key}: not a section of a declaration" for key in raw if key not in _TOP]
+    if _has_nul(raw):
+        # Postgres stores no NUL in text; refused here, by name, not by the driver later.
+        reasons.append("a string holds a NUL character")
     workspace = raw.get("workspace")
     if not isinstance(workspace, dict):
         raise Refused([*reasons, "workspace: a [workspace] table is required"])
@@ -110,6 +113,16 @@ def parse(text: str, installation_id: str) -> Declaration:
             except ApiError as refused:
                 reasons.append(f"{where} ({entry.get('id', 'no id')}): {refused.detail}")
                 continue
+            if table == "role_binding" and (
+                doc["role"] == "agent-service-account" or doc["principal"]["kind"] != "operator"
+            ):
+                # The file declares operators and their bindings. An agent has no object here
+                # to check the binding against; an admin grants those through the API.
+                reasons.append(
+                    f"{where} ({doc['id']}): a declaration binds operators only, with the"
+                    " role admin, operator or viewer"
+                )
+                continue
             if doc["id"] in seen:
                 reasons.append(f"{where}: {table} {doc['id']!r} is declared twice")
             seen.add(doc["id"])
@@ -120,6 +133,27 @@ def parse(text: str, installation_id: str) -> Declaration:
 
 
 _TOP = ("workspace", *SECTIONS)
+
+
+def _has_nul(value: Any) -> bool:
+    if isinstance(value, str):
+        return "\x00" in value
+    if isinstance(value, dict):
+        return any(_has_nul(k) or _has_nul(v) for k, v in value.items())
+    return isinstance(value, list) and any(_has_nul(v) for v in value)
+
+
+def describe(table: str, doc: Doc) -> str:
+    """An object's name in the output: `kind id`, and for a role binding what it grants."""
+    if table != "role_binding":
+        return f"{table} {doc['id']}"
+    scope = doc["scope"]
+    where = f"project {scope.get('ref')}" if scope["kind"] == "project" else "workspace"
+    principal = doc["principal"]
+    return (
+        f"{table} {doc['id']} ({doc['role']} for {principal['kind']} {principal['id']},"
+        f" scope {where})"
+    )
 
 
 def _workspace(doc: Doc) -> Doc:
@@ -234,5 +268,5 @@ def apply(conn: Conn, declaration: Declaration, installation: Doc) -> Outcome:
                 after=doc,
                 channel="system",
             )
-            outcome.created.append(f"{table} {doc['id']}")
+            outcome.created.append(describe(table, doc))
     return outcome

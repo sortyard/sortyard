@@ -206,8 +206,9 @@ def test_bootstrap_creates_what_a_file_declares_and_a_token_for_a_declared_bindi
             "project proj-app",
             "operator op-first",
             "operator op-reader",
-            "role_binding rb-first",
-            "role_binding rb-reader",
+            # A created binding says what it grants, so a new admin shows in the output.
+            "role_binding rb-first (operator for operator op-first, scope workspace)",
+            "role_binding rb-reader (viewer for operator op-reader, scope workspace)",
         )
     )
     made = deployment.rows()
@@ -260,7 +261,7 @@ def test_running_bootstrap_twice_changes_nothing_the_second_time(deployment: Dep
     assert code == 0, err
     assert second and all(line.startswith("unchanged ") for line in second)
     assert {line.split(" ", 1)[1] for line in second} == {
-        line.split(" ", 1)[1] for line in first if " installation " not in line
+        line.split(" ", 1)[1].split(" (")[0] for line in first if " installation " not in line
     }
     assert deployment.rows() == before
 
@@ -276,7 +277,7 @@ def test_running_bootstrap_twice_changes_nothing_the_second_time(deployment: Dep
     assert sorted(line for line in third if line.startswith("created ")) == [
         "created operator op-second",
         "created project proj-site",
-        "created role_binding rb-second",
+        "created role_binding rb-second (admin for operator op-second, scope project proj-site)",
     ]
     after = deployment.rows()
     for table in ("installation", "workspace", "api_token"):
@@ -329,6 +330,12 @@ INVALID = {
     "an external tracker with no integration": DECLARED + project("proj-ext", "Ext", "external"),
     "an operator role binding an agent": DECLARED
     + binding("rb-agent", "sa-agent", "admin", kind="agent"),
+    # Valid for the API (an admin grants it there), but not something a declaration makes:
+    # the file has no agents, so nothing says this one exists.
+    "a service-account binding": DECLARED
+    + binding("rb-agent", "sa-agent", "agent-service-account", kind="agent"),
+    # Postgres stores no NUL; refused as a reason, not as the driver's error.
+    "a NUL character in a string": DECLARED.replace('"Acme"', '"Ac\\u0000me"'),
     "an object of another workspace": DECLARED + operator("op-late") + 'workspace_id = "ws-b"\n',
     "an id that is not an id": DECLARED + operator("op late"),
     "an id declared twice": DECLARED + operator("op-first"),
@@ -355,6 +362,7 @@ def test_an_invalid_declaration_or_a_conflicting_existing_object_is_refused_and_
     for what, declaration in INVALID.items():
         code, lines, err = deployment.bootstrap(declaration)
         assert code == 1 and lines == [] and err, what
+        assert err.count("refused: ") >= 1 and "psycopg" not in err, (what, err)
         assert deployment.rows() == empty, what
 
     code, _, err = deployment.bootstrap(DECLARED)
@@ -399,6 +407,43 @@ def test_an_invalid_declaration_or_a_conflicting_existing_object_is_refused_and_
 
 
 @requires_postgres
+def test_the_same_file_under_another_installation_id_is_refused(
+    deployment: Deployment, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A file that leaves installation_id out takes it from SORTYARD_INSTALLATION_ID; under
+    another value it is not the stored workspace's declaration, and nothing is written."""
+    assert deployment.bootstrap(DECLARED)[0] == 0
+    before = deployment.rows()
+    monkeypatch.setenv("SORTYARD_INSTALLATION_ID", "inst-renamed")
+    code, lines, err = deployment.bootstrap(DECLARED + operator("op-new"))
+    assert code == 1 and lines == [] and f"workspace {WS}" in err
+    assert deployment.rows() == before
+
+
+@requires_postgres
+def test_the_two_commands_are_separate_runs_and_an_empty_value_is_refused(
+    deployment: Deployment, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`--bootstrap ""` (an unset variable in a Job) and `--issue-operator-token ""` are usage
+    errors, not a reason to start serving; both flags at once are refused before either runs."""
+
+    def serving(*_: object, **__: object) -> None:
+        raise AssertionError("the service was started")
+
+    monkeypatch.setattr(api_service, "make_server", serving)
+    deployment.file.write_text(DECLARED)
+    for argv in (
+        ["--bootstrap", ""],
+        ["--issue-operator-token", ""],
+        ["--bootstrap", str(deployment.file), "--issue-operator-token", "rb-first"],
+    ):
+        with pytest.raises(SystemExit) as stopped:
+            api_service.main(argv)
+        assert stopped.value.code == 2, argv
+    assert all(rows == [] for rows in deployment.rows().values())
+
+
+@requires_postgres
 def test_two_runs_at_once_create_each_object_once(deployment: Deployment) -> None:
     """Two runs of one declaration at the same time (a Job retried while the first still runs)
     both succeed, and each object is created by exactly one of them."""
@@ -419,6 +464,7 @@ def test_two_runs_at_once_create_each_object_once(deployment: Deployment) -> Non
         thread.join(timeout=60)
     assert len(outcomes) == 4
     created = [name for outcome in outcomes for name in outcome.created]
+    assert "role_binding rb-first (operator for operator op-first, scope workspace)" in created
     assert len(created) == len(set(created)) == 7
     assert sorted(len(outcome.created) for outcome in outcomes) == [0, 0, 0, 7]
     rows = deployment.rows()

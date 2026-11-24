@@ -269,6 +269,7 @@ def run_bootstrap(config: Config, source: str, env: Mapping[str, str] = os.envir
         return 1
     except (OSError, UnicodeDecodeError, psycopg.Error) as exc:
         print(f"sortyard-api: {exc}", file=sys.stderr)
+        print("sortyard-api: nothing was written", file=sys.stderr)
         return 1
     for verb, names in (("created", outcome.created), ("unchanged", outcome.unchanged)):
         for name in names:
@@ -282,7 +283,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         description="Sortyard API service. Configured by SORTYARD_API_* and "
         "SORTYARD_DATABASE_* environment variables.",
     )
-    parser.add_argument(
+    commands = parser.add_mutually_exclusive_group()
+    commands.add_argument(
         "--issue-operator-token",
         metavar="ROLE_BINDING_ID",
         help="print a bearer token for an admin/operator/viewer RoleBinding and exit "
@@ -295,7 +297,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         metavar="SECONDS",
         help="lifetime of a token from --issue-operator-token (default 43200)",
     )
-    parser.add_argument(
+    commands.add_argument(
         "--bootstrap",
         metavar="FILE",
         help="create the workspace, projects, operators and role bindings the TOML declaration "
@@ -303,9 +305,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         "object with different content is refused, never overwritten",
     )
     args = parser.parse_args(argv)
-    if args.bootstrap:
+    # `is not None`: an empty value (an unset variable in a Job's args) is a mistake to refuse,
+    # not a reason to start serving.
+    if args.bootstrap is not None:
+        if not args.bootstrap:
+            parser.error("--bootstrap needs a file path (or - for standard input)")
         return run_bootstrap(Config.from_env(), args.bootstrap)
-    if args.issue_operator_token:
+    if args.issue_operator_token is not None:
+        if not args.issue_operator_token:
+            parser.error("--issue-operator-token needs a role binding id")
         return issue_operator_token(Config.from_env(), args.issue_operator_token, args.ttl)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     server = make_server(Config.from_env())

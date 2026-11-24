@@ -643,7 +643,7 @@ def test_the_replicas_admit_script_admits_an_item_through_the_api(
         admit("replica-1-a")
     declaration = str(REPLICA / "bootstrap.toml")
     assert api_service.main(["--bootstrap", declaration]) == 0
-    assert f"created role_binding {binding}" in capsys.readouterr().out.splitlines()
+    assert f"created role_binding {binding} (operator for operator" in capsys.readouterr().out
     # The API of the harness runs the shipped example lane.
     assert admit("replica-1-a") == 0
     assert capsys.readouterr().out.startswith("201 ")

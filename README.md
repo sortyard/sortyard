@@ -138,8 +138,9 @@ entry is the object as its schema in [`spec/`](spec/) defines it (`workspace`, `
 [workspace]
 id = "ws-acme"
 name = "Acme"
-# installation_id: leave it out for the deployment's own installation, which is created as a
-# provisional record (id from SORTYARD_INSTALLATION_ID, default inst-sortyard) if there is none.
+# installation_id: leave it out for the deployment's own installation: its id is the API
+# service's SORTYARD_INSTALLATION_ID (default inst-sortyard), and it is created as a provisional
+# record if there is none.
 
 [[projects]]
 id = "proj-app"
@@ -175,13 +176,21 @@ What the command does:
   full JSON Schema), and checks that a binding's operator and a project scope's project are
   declared or already in the workspace.
 - It creates what is missing, in one transaction, and prints one line for each object:
-  `created <kind> <id>` or `unchanged <kind> <id>`. It prints no credential and issues none.
+  `created <kind> <id>` or `unchanged <kind> <id>`. A created role binding's line also says
+  what it grants: `created role_binding rb-first-admin (admin for operator op-first, scope
+  workspace)`. It prints no credential and issues none.
 - Running it again with the same file changes nothing. Add a project or an operator to the
   file and run it again: only the new objects are created.
 - An object that exists with different content is **refused and named, never overwritten**
   (so is an invalid entry). A refused run writes nothing at all and exits 1. To change an
   existing object, use the API. A workspace the shadow conductor made first has its id as
-  its name: declare that name.
+  its name: declare that name. A file that leaves `installation_id` out is the same
+  declaration only under the same `SORTYARD_INSTALLATION_ID`: run under another value, it
+  differs from the stored workspace and is refused.
+- The file declares operators and their bindings (`admin`, `operator`, `viewer`). An
+  `agent-service-account` binding is refused here: an admin grants those through the API.
+- `--bootstrap` and `--issue-operator-token` are separate runs; giving both, or an empty
+  value, is a usage error (exit 2).
 - Each object it creates is in the AuditLog (channel `system`) and the ledger, with the actor
   `system/bootstrap`.
 
