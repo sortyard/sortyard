@@ -118,3 +118,31 @@ def test_slow_suite_boots_the_one_command_replica_outside_the_gate() -> None:
         assert version in versions and version in brief, version
     assert any("kind/releases/download/v0.25.0/" in run for run in runs)
     assert "v0.25.0" in brief
+
+
+def test_the_slow_suite_runs_the_kernel_acceptance_against_the_booted_replica() -> None:
+    """The one test that needs the cluster runs after the boot, told which cluster, and is
+    named so that a renamed test fails the step (pytest exits 5 when nothing is selected)."""
+    replica = load(SLOW)["jobs"]["replica"]
+    steps = replica["steps"]
+    runs = [step.get("run", "") for step in steps]
+    boot = runs.index("./replica/replica.sh up")
+    (step,) = [s for s in steps if "pytest tests/test_replica.py" in s.get("run", "")]
+    assert steps.index(step) > boot
+    assert step["env"]["SORTYARD_REPLICA_CLUSTER"] == "sortyard"
+    selected = step["run"].split("-k", 1)[1].strip()
+    names = [
+        line.split("(")[0].removeprefix("def ")
+        for line in (ROOT / "tests" / "test_replica.py").read_text().splitlines()
+        if line.startswith("def test_")
+    ]
+    assert len([name for name in names if selected in name]) == 1
+    assert "continue-on-error" not in step and "if" not in step
+
+
+def test_the_image_smoke_runs_the_kernel_and_worker_entry_points_and_git() -> None:
+    runs = run_lines(gate())
+    for command in ("sortyard-conductor --once", "sortyard-api --help", "git --version"):
+        assert f"sortyard:ci {command}" in runs, command
+    assert "sortyard-kernel; test $? -eq 2" in runs
+    assert "sortyard-worker | grep -q usage" in runs

@@ -167,6 +167,58 @@ helm upgrade sortyard charts/sortyard --reuse-values --set shadow.enabled=false
 Locally: `SORTYARD_SHADOW_SNAPSHOT=board.json sortyard-conductor --shadow --once` (environment
 variables: `src/sortyard/services/conductor.py`).
 
+## Kernel service
+
+`sortyard-kernel` takes an item from admitted to merged: it is the workflow engine's worker,
+with every owner of the item state table, and the observer loop that asks GitHub and the
+cluster how each item's outside work is going. The chart installs it with `kernel.enabled=true`
+(which needs `engine.enabled=true`, the workflow engine server on Postgres): one Deployment, a
+service account, and a Role in the worker namespace that grants what the worker Jobs' port
+calls and nothing else. The API then mounts the lane files too and admits items
+(`POST /v1/workspaces/{id}/items`).
+
+What it runs on is values, mounted as files (`charts/sortyard/values.yaml`, `kernel.*`): the
+lane capability files (`kernel.lanes`, format `src/sortyard/kernel/lane_example.toml`), the
+decision policy (`kernel.decisionPolicy`) and how workers run (`kernel.worker`: the agent
+command for build, fix and review). Every credential is a Secret you create and name; the
+render fails when one is missing, and none is optional:
+
+```sh
+# The GitHub App the lanes' tokens are minted from: its id in the values, its key in a Secret.
+kubectl create secret generic github-app --from-file=private-key.pem=<the App's private key file>
+helm upgrade sortyard charts/sortyard --reuse-values \
+  --set engine.enabled=true --set kernel.enabled=true \
+  --set kernel.github.appId=<App id> --set kernel.github.appKeySecret=github-app \
+  --set-file kernel.lanes.<lane>=<lane capability file> \
+  --set-json 'kernel.worker.agents={"build":["<agent>","..."],"fix":["<agent>","..."],"review":["<agent>","..."]}'
+kubectl logs -f deployment/sortyard-kernel
+```
+
+Worker Jobs run in the release's cluster by default (`kernel.workers.namespace`, default the
+release namespace). To run them in another cluster, set `kernel.workers.sameCluster=false` and
+`kernel.workers.clusterSecret` to a Secret with the keys `server`, `token` and `ca.crt`: no
+Role is rendered and the pod holds no token of its own cluster. One replica runs; a pod that
+is deleted loses nothing, since the engine and Postgres hold every item's state.
+
+### Worker image
+
+A worker Job runs three containers of the lane's worker image (`sortyard-worker clone`,
+`agent`, `push`), so that image needs `sortyard-worker`, `git` and the agent command. The
+Sortyard image has the first two and no agent. A worker image is the Sortyard image plus your
+agent, in one layer:
+
+```dockerfile
+FROM ghcr.io/sortyard/sortyard:<version>
+USER root
+RUN <install your agent CLI>
+USER 10001
+```
+
+Push it, name it by digest in the lane capability file (`[images] worker` and `ci`: they are
+the same image), and give the agent's command line in `kernel.worker.agents`. The agent is run
+in the item's clone with the brief on standard input, and never holds the GitHub token.
+`replica/worker/` is a complete example with a scripted agent.
+
 ## Data model
 
 The §3 domain objects are frozen as JSON Schemas in [`spec/`](spec/), and everything else is
@@ -203,11 +255,11 @@ build, in one job, `test`: the one required status check on `main` (strict, up t
 | `src/sortyard/api/` | The API's REST surface: the §7 permission matrix (`permissions.py`), tokens (`auth.py`), routing, handlers and the Postgres store with its audit/ledger writes. |
 | `src/sortyard/shadow/` | The shadow conductor: read-only input adapters, the claim decision (a pure function), and the DecisionLog writer. |
 | `src/sortyard/models/` | The §3 data models, generated from `spec/` (`codegen.py` is the generator). |
-| `charts/sortyard/` | The Helm chart: API Deployment + Service, Postgres StatefulSet + Service + Secret, the migration Job, and (opt-in) the shadow conductor Deployment. |
+| `charts/sortyard/` | The Helm chart: API Deployment + Service, Postgres StatefulSet + Service + Secret, the migration Job, and (opt-in) the shadow conductor Deployment, the workflow engine server on Postgres and the kernel service with its worker Role. |
 | `charts/sortyard/migrations/` | The SQL migrations (§3 tables + event ledger; 0002: the API token store) and `migrate.sh`, the Job's runner. |
-| `Dockerfile` | One image for every service; the Deployment's `command` picks the entry point. |
+| `Dockerfile` | One image for every service; the Deployment's `command` picks the entry point. It is also the base of a lane's worker image (it has `sortyard-worker` and `git`, and no agent). |
 | `spec/` | Phase 0: the §3 JSON Schemas and the OpenAPI spec, with their tests. |
-| `replica/` | The one-command local replica: `replica.sh` (kind + this chart + fake outside providers), its kind config, values overrides and fakes. |
+| `replica/` | The one-command local replica: `replica.sh` (kind + this chart + fake outside providers), its kind config, values overrides, fakes, its lane file and its worker image (`replica/worker/`). |
 | `tests/` | Tests for the package, chart, CI, replica, this quickstart and `AGENTS.md`. |
 | `docs/findings/` | Friction found while building the repo's own foundations, filed as findings ([`contributor-foundation.md`](docs/findings/contributor-foundation.md)). |
 | `docs/goldfish/` | Goldfish reports: a zero-context agent runs the documented install and files every point of friction (Phase 1: [`phase-1-install-smoke.md`](docs/goldfish/phase-1-install-smoke.md)). |

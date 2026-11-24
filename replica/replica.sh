@@ -4,6 +4,8 @@
 #   ./replica/replica.sh up        check tools, create the cluster, build + load the image,
 #                                  deploy the fake providers and the chart, then smoke-test
 #   ./replica/replica.sh smoke     re-run the smoke test against a running replica
+#   ./replica/replica.sh lane      admit two items and see each merged (the second with the
+#                                  kernel pod deleted mid-item) against a running replica
 #   ./replica/replica.sh forward   expose the API on localhost:8080 (foreground; Ctrl-C stops)
 #   ./replica/replica.sh status    pods, jobs and the Helm release
 #   ./replica/replica.sh logs [C]  follow a component's logs (default shadow-conductor; api)
@@ -11,10 +13,14 @@
 #   ./replica/replica.sh check     only check the prerequisites
 #
 # What it deploys is charts/sortyard itself (with replica/values.yaml layered on): the API
-# Deployment + Service, Postgres StatefulSet + Service + password Secret, the migration Job and
-# the shadow conductor. Only outside third-party providers are faked (replica/fakes.yaml:
-# Plane's REST API and the production conductor's pass log, behind the same read-only API key
-# Secret shape production uses). Re-running `up` rebuilds the image and rolls out the change.
+# Deployment + Service, Postgres StatefulSet + Service + password Secret, the migration Job,
+# the shadow conductor, the workflow engine server and the kernel service with its Role. Only
+# outside third-party providers are faked: Plane's REST API and the production conductor's
+# pass log (replica/fakes.yaml, behind the same read-only API key Secret shape production
+# uses), and GitHub, its API and its git hosting (replica/fake-github.yaml, behind a GitHub App
+# key Secret made for the cluster). The lane's worker Jobs are real Jobs in the cluster, running
+# the worker image: the Sortyard image plus a scripted agent (replica/worker/). Re-running `up`
+# rebuilds the images and rolls out the change.
 #
 # Every kubectl/helm call is pinned to the replica's own context (kind-$CLUSTER): the script
 # never touches whatever cluster your current kube-context points at.
@@ -32,6 +38,14 @@ IMAGE_REPO=ghcr.io/sortyard/sortyard
 API_KEY_SECRET=sortyard-replica-plane-read
 FAKES_CONFIGMAP=sortyard-replica-fakes
 FAKES=sortyard-fake-providers
+# The lane half: the worker image, the fake GitHub and what an item is admitted against.
+WORKER_REPO=ghcr.io/sortyard/sortyard-replica-worker
+GITHUB_APP_SECRET=sortyard-replica-github-app
+GITHUB_CONFIGMAP=sortyard-replica-fake-github
+GITHUB=sortyard-fake-github
+LANE=replica
+LANE_REPOSITORY=replica/app
+LANE_WORKSPACE=ws-replica-lane
 
 # Tool: minimum supported version, the version CI and this script are tested with, install docs.
 KIND_MIN=0.20.0 KIND_TESTED=v0.25.0 KIND_URL=https://kind.sigs.k8s.io/docs/user/quick-start/#installation
@@ -44,8 +58,8 @@ say() { printf '==> %s\n' "$*"; }
 die() { printf 'replica: %s\n' "$*" >&2; exit 1; }
 
 usage() {
-    sed -n '3,10p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2
-    printf 'usage: %s {up|smoke|forward|status|logs|down|check}\n' "$0" >&2
+    sed -n '3,12p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2
+    printf 'usage: %s {up|smoke|lane|forward|status|logs|down|check}\n' "$0" >&2
     exit 2
 }
 
@@ -138,8 +152,67 @@ build_image() {
     TAG=replica-${id#sha256:}
     TAG=${TAG:0:20}
     docker tag "$IMAGE_REPO:replica" "$IMAGE_REPO:$TAG"
-    say "loading $IMAGE_REPO:$TAG into the cluster"
-    kind load docker-image "$IMAGE_REPO:$TAG" --name "$CLUSTER" >/dev/null
+    # The worker image: the Sortyard image plus the lane's agent (here a scripted one).
+    docker build -q --build-arg BASE="$IMAGE_REPO:$TAG" -t "$WORKER_REPO:replica" \
+        "$ROOT/replica/worker" >/dev/null
+    id=$(docker image inspect -f '{{.Id}}' "$WORKER_REPO:replica")
+    WORKER_TAG=replica-${id#sha256:}
+    WORKER_TAG=${WORKER_TAG:0:20}
+    docker tag "$WORKER_REPO:replica" "$WORKER_REPO:$WORKER_TAG"
+    say "loading $IMAGE_REPO:$TAG and $WORKER_REPO:$WORKER_TAG into the cluster"
+    kind load docker-image "$IMAGE_REPO:$TAG" "$WORKER_REPO:$WORKER_TAG" --name "$CLUSTER" \
+        >/dev/null
+    worker_image_by_digest
+}
+
+# worker_image_by_digest: sets WORKER_IMAGE to the worker image as a lane must name it, by
+# digest. There is no registry: the digest is the one the node's containerd holds the loaded
+# image under, and the image is given that name there so a Job that asks for it finds it.
+worker_image_by_digest() {
+    local node digest
+    node=$(kind get nodes --name "$CLUSTER" | head -n 1)
+    digest=$(docker exec "$node" ctr --namespace=k8s.io images ls "name==$WORKER_REPO:$WORKER_TAG" |
+        grep -oE 'sha256:[0-9a-f]{64}' | head -n 1 || true)
+    [[ -n $digest ]] || die "the node does not hold $WORKER_REPO:$WORKER_TAG"
+    WORKER_IMAGE="$WORKER_REPO@$digest"
+    docker exec "$node" ctr --namespace=k8s.io images tag --force \
+        "$WORKER_REPO:$WORKER_TAG" "$WORKER_IMAGE" >/dev/null
+    # The runtime learns the new name from containerd a moment later.
+    local _
+    for _ in $(seq 1 30); do
+        docker exec "$node" crictl inspecti "$WORKER_IMAGE" >/dev/null 2>&1 && break
+        sleep 1
+    done
+    docker exec "$node" crictl inspecti "$WORKER_IMAGE" >/dev/null ||
+        die "the node's runtime does not know $WORKER_IMAGE"
+    say "worker image: $WORKER_IMAGE"
+}
+
+# deploy_fake_github: GitHub's API and git hosting, behind a GitHub App key made for this
+# cluster. The key is made in a container and piped into the Secret: it is never printed.
+deploy_fake_github() {
+    say "deploying the fake GitHub (API + git hosting)"
+    if ! k get secret "$GITHUB_APP_SECRET" >/dev/null 2>&1; then
+        docker run --rm "$IMAGE_REPO:$TAG" python -c '
+import sys
+from cryptography.hazmat.primitives import serialization as s
+from cryptography.hazmat.primitives.asymmetric import rsa
+key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+sys.stdout.write(key.private_bytes(
+    s.Encoding.PEM, s.PrivateFormat.TraditionalOpenSSL, s.NoEncryption()).decode())
+' | k create secret generic "$GITHUB_APP_SECRET" --from-file=private-key.pem=/dev/stdin \
+            >/dev/null
+    fi
+    local files=("$ROOT/replica/fakes/fake_github_host.py" "$ROOT/tests/fake_github.py"
+        "$ROOT/tests/contracts/github/fragment.json")
+    # Server-side: the files are too large for the annotation a client-side apply keeps.
+    k create configmap "$GITHUB_CONFIGMAP" "${files[@]/#/--from-file=}" \
+        --dry-run=client -o yaml | k apply --server-side --force-conflicts -f - >/dev/null
+    local sha
+    sha=$(cat "${files[@]}" | cksum | cut -d ' ' -f 1)
+    sed -e "s|__IMAGE__|$IMAGE_REPO:$TAG|" -e "s|__FAKES_SHA__|$sha|" \
+        "$ROOT/replica/fake-github.yaml" | k apply -f - >/dev/null
+    k rollout status "deployment/$GITHUB" --timeout="${TIMEOUT}s"
 }
 
 deploy_fakes() {
@@ -164,10 +237,16 @@ deploy_fakes() {
 deploy_chart() {
     say "installing charts/sortyard as release '$RELEASE' (namespace $NAMESPACE)"
     # Helm returns once the post-install/upgrade migration Job has finished.
+    # The lane capability file names the worker image by the digest the cluster holds.
+    local lane_file
+    lane_file=$(mktemp)
+    sed "s|__WORKER_IMAGE__|$WORKER_IMAGE|g" "$ROOT/replica/lane.toml" >"$lane_file"
     h upgrade --install "$RELEASE" "$ROOT/charts/sortyard" \
         -f "$ROOT/replica/values.yaml" \
         --set image.tag="$TAG" \
+        --set-file "kernel.lanes.$LANE=$lane_file" \
         --timeout "${TIMEOUT}s"
+    rm -f "$lane_file"
     k rollout status "statefulset/$RELEASE-postgres" --timeout="${TIMEOUT}s"
     k rollout status "deployment/$RELEASE-api" --timeout="${TIMEOUT}s"
     k rollout status "deployment/$RELEASE-shadow-conductor" --timeout="${TIMEOUT}s"
@@ -176,6 +255,8 @@ deploy_chart() {
     k rollout status "deployment/$RELEASE-engine" --timeout="${TIMEOUT}s"
     k wait --for=condition=complete job \
         --selector app.kubernetes.io/component=engine-schema --timeout="${TIMEOUT}s"
+    # The kernel's pod waits for the engine, then serves.
+    k rollout status "deployment/$RELEASE-kernel" --timeout="${TIMEOUT}s"
 }
 
 psql_value() {
@@ -284,6 +365,138 @@ PY
     say "replica is up and smoke-tested"
 }
 
+item_state() {
+    psql_value "SELECT coalesce(state, '') FROM sortyard.item
+        WHERE workspace_id = '$LANE_WORKSPACE' AND id = '$1'"
+}
+
+# lane_diagnostics ITEM: what a failed wait leaves to read.
+lane_diagnostics() {
+    {
+        echo "--- item $1: the states it entered"
+        psql_value "SELECT sequence, state, cause, coalesce(detail::text, '') FROM sortyard.item_run
+            WHERE workspace_id = '$LANE_WORKSPACE' AND item_id = '$1' ORDER BY sequence" || true
+        echo "--- probe results"
+        psql_value "SELECT need, passed, output FROM sortyard.probe_result
+            WHERE workspace_id = '$LANE_WORKSPACE' AND item_id = '$1'" || true
+        echo "--- jobs and pods"
+        k get jobs,pods -o wide || true
+        echo "--- kernel"
+        k logs "deployment/$RELEASE-kernel" --all-containers --tail=80 || true
+        echo "--- worker pods"
+        k logs --selector app.kubernetes.io/managed-by=sortyard --all-containers --prefix \
+            --tail=30 || true
+        echo "--- fake GitHub"
+        k logs "deployment/$GITHUB" --tail=40 || true
+    } >&2
+}
+
+# wait_item ITEM STATE: until the item is in STATE.
+wait_item() {
+    local state="" _
+    for _ in $(seq 1 $((TIMEOUT / 2))); do
+        state=$(item_state "$1")
+        [[ $state == "$2" ]] && return 0
+        sleep 2
+    done
+    lane_diagnostics "$1"
+    die "item $1 is in state '${state:-none}', not '$2', after ${TIMEOUT}s"
+}
+
+admit() {
+    local out
+    out=$(k exec -i "deployment/$RELEASE-api" -- python - "$1" "$LANE_REPOSITORY" "$LANE" \
+        <"$ROOT/replica/admit.py" 2>&1) || die "the API did not admit item $1: $out"
+}
+
+# github_get PATH: a GET of the fake GitHub's own report (no credential), through its Service.
+github_get() {
+    local out
+    start_forward "$GITHUB" 8080
+    trap stop_forward EXIT
+    out=$(curl -fsS "http://127.0.0.1:$FORWARD_PORT$1") || die "fake GitHub: GET $1 failed"
+    stop_forward
+    trap - EXIT
+    printf '%s' "$out"
+}
+
+# merged_on_github ITEM: the item's pull request is merged, and its head is the commit the
+# worker Job pushed over git.
+merged_on_github() {
+    local pull
+    pull=$(github_get "/_fake/pull?repository=$LANE_REPOSITORY&branch=sortyard/$1")
+    [[ $pull == *'"merged": true'* && $pull == *'"pushed": true'* ]] ||
+        die "item $1 is merged in Sortyard but not on the fake GitHub: $pull"
+    echo "    $1 merged: $pull"
+}
+
+# active_worker_jobs: how many worker Jobs have a pod that has not ended.
+active_worker_jobs() {
+    k get jobs --selector app.kubernetes.io/managed-by=sortyard \
+        -o jsonpath='{range .items[*]}{.status.active}{"\n"}{end}' | grep -c '^[1-9]' || true
+}
+
+# lane: the kernel takes an item from admitted to merged on the engine on Postgres, through
+# real worker Jobs and the fake GitHub; and again with the kernel pod deleted mid-item.
+lane() {
+    local run first second state active pod
+    run=$(date +%s)
+    first="replica-$run-a" second="replica-$run-b"
+
+    say "lane: admit $first through the API and see it merged"
+    admit "$first"
+    wait_item "$first" merged
+    merged_on_github "$first"
+
+    say "lane: admit $second, delete the kernel pod while its build Job runs, see it merged"
+    admit "$second"
+    wait_item "$second" building
+    # Mid-item means: the item is in `building` and its build Job is running in the cluster at
+    # the moment the kernel pod is deleted. Both are read first, and the run fails otherwise.
+    local _
+    for _ in $(seq 1 30); do
+        active=$(active_worker_jobs)
+        ((active > 0)) && break
+        sleep 1
+    done
+    pod=$(k get pods --selector app.kubernetes.io/component=kernel -o name)
+    state=$(item_state "$second")
+    active=$(active_worker_jobs)
+    [[ $state == building ]] && ((active > 0)) ||
+        die "item $second is in '$state' with $active worker Job(s) running: not mid-build"
+    k delete "$pod" --wait=false >/dev/null
+    echo "    deleted $pod with $second in '$state' (worker Jobs running: $active)"
+    for _ in $(seq 1 "$TIMEOUT"); do
+        k get "$pod" >/dev/null 2>&1 || break
+        sleep 1
+    done
+    k rollout status "deployment/$RELEASE-kernel" --timeout="${TIMEOUT}s"
+    [[ $(k get pods --selector app.kubernetes.io/component=kernel -o name) != "$pod" ]] ||
+        die "the kernel pod was not replaced"
+    wait_item "$second" merged
+    merged_on_github "$second"
+
+    say "lane: both items ran as workflows the engine stored in Postgres"
+    local prefix="item:${#LANE_WORKSPACE}:$LANE_WORKSPACE" stored=0 _
+    for _ in $(seq 1 15); do
+        stored=$(k exec "statefulset/$RELEASE-postgres" -- \
+            psql -X -q -tA -U sortyard temporal_visibility -c "SELECT count(*)
+            FROM executions_visibility WHERE workflow_id IN ('$prefix:$first', '$prefix:$second')")
+        [[ $stored == 2 ]] && break
+        sleep 2
+    done
+    [[ $stored == 2 ]] || die "the engine's Postgres holds $stored of the 2 item workflows"
+    echo "    engine: $stored item workflows in Postgres (temporal_visibility)"
+
+    say "lane: the kernel and the workers stayed inside GitHub's published API"
+    local report
+    report=$(github_get /_fake/state)
+    [[ $report == *'"violations": []'* ]] || die "the fake GitHub recorded violations: $report"
+    [[ $report != *'"pushes": 0'* ]] || die "no worker pushed over git: $report"
+    echo "    $report"
+    say "lane: two items merged, the second across a kernel pod deletion"
+}
+
 forward() {
     say "API on http://localhost:8080 (Ctrl-C stops)"
     k port-forward "svc/$RELEASE-api" 8080:8080
@@ -301,8 +514,10 @@ up() {
     ensure_cluster
     build_image
     deploy_fakes
+    deploy_fake_github
     deploy_chart
     smoke
+    lane
     cat <<EOF
 
 Next:
@@ -322,6 +537,7 @@ down() {
 case "${1:-}" in
     up) up ;;
     smoke) smoke ;;
+    lane) lane ;;
     forward) forward ;;
     status) status ;;
     logs) logs "${2:-}" ;;

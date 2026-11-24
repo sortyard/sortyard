@@ -1,0 +1,117 @@
+# GitHub, faked (replica only; never part of the chart): its REST API and its git hosting, served
+# by fakes/fake_github_host.py on top of the strict fake the tests use (tests/fake_github.py).
+# The kernel service is pointed at it as its GitHub API, and the worker Jobs clone from it and
+# push to it.
+#
+# replica.sh applies this after creating the sortyard-replica-fake-github ConfigMap (the host,
+# the fake and the vendored API description) and the sortyard-replica-github-app Secret (a
+# GitHub App key made for this cluster, the same Secret the chart's kernel reads), substituting
+# __IMAGE__ (the Sortyard image: the fake needs its Python, its libraries and its git) and
+# __FAKES_SHA__ (restarts on change). The repositories live in the pod: a restart starts over.
+apiVersion: v1
+kind: Service
+metadata:
+  name: sortyard-fake-github
+  labels:
+    app.kubernetes.io/name: sortyard-replica
+    app.kubernetes.io/component: fake-github
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+  selector:
+    app.kubernetes.io/name: sortyard-replica
+    app.kubernetes.io/component: fake-github
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sortyard-fake-github
+  labels:
+    app.kubernetes.io/name: sortyard-replica
+    app.kubernetes.io/component: fake-github
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sortyard-replica
+      app.kubernetes.io/component: fake-github
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sortyard-replica
+        app.kubernetes.io/component: fake-github
+      annotations:
+        sortyard.ai/fakes-sha: "__FAKES_SHA__"
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: fake-github
+          image: "__IMAGE__"
+          imagePullPolicy: IfNotPresent
+          command:
+            - python
+            - /fakes/fake_github_host.py
+            - --url=http://sortyard-fake-github:8080
+            - --app-id=4242
+            - --app-key-file=/var/run/github-app/private-key.pem
+            - --repository=replica/app
+            - --root=/data
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PYTHONPATH
+              value: /fakes
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: fakes
+              mountPath: /fakes
+              readOnly: true
+            - name: github-app
+              mountPath: /var/run/github-app
+              readOnly: true
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: fakes
+          configMap:
+            name: sortyard-replica-fake-github
+            items:
+              - key: fake_github_host.py
+                path: fake_github_host.py
+              - key: fake_github.py
+                path: tests/fake_github.py
+              - key: fragment.json
+                path: tests/contracts/github/fragment.json
+        - name: github-app
+          secret:
+            secretName: sortyard-replica-github-app
+        - name: data
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}

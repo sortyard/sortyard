@@ -7,7 +7,15 @@
 - fake only the outside third-party providers (Plane, the production conductor's pass log),
   and fake them faithfully enough that the real adapter (`PlaneSource`) reads them unchanged.
 
-The full boot runs in CI (`slow.yml`, `replica` job, nightly) on a kind cluster; these tests
+Acceptance (SY-V3-CHART-KERNEL): the replica boots the engine on Postgres and the kernel, admits
+one item against the fake GitHub and a Job that runs a scripted agent, and sees it merged; then
+deletes the kernel pod mid-item and sees the next item merged. GitHub is the one more outside
+provider faked for that (`replica/fakes/fake_github_host.py`: the tests' strict fake of the API,
+and git over HTTP on a bare repository), faithfully enough that the real GitHub client and the
+real worker entry point use it unchanged.
+
+The full boot runs in CI (`slow.yml`, `replica` job, nightly) on a kind cluster, and the one
+test that needs that cluster (`SORTYARD_REPLICA_CLUSTER` names it) runs there; the other tests
 hold the parts that need no cluster.
 """
 
@@ -17,6 +25,7 @@ import importlib.util
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -30,7 +39,17 @@ from typing import Any
 import pytest
 import yaml
 
+from sortyard.kernel import capabilities
+from sortyard.lane.github import HttpGitHub
+from sortyard.lane.worker import Work, WorkerConfig, brief
+from sortyard.services import kernel
+from sortyard.services.api import load_lanes
 from sortyard.shadow import evaluate, sources
+from tests.api_harness import running_api
+from tests.chart_mounts import as_started, container_of, named
+from tests.fake_github import APP_ID, KEY, PEM
+from tests.pg import requires_postgres
+from tests.worker_harness import DIGEST, run_worker
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 REPLICA = ROOT / "replica"
@@ -184,9 +203,16 @@ def test_values_override_only_what_the_replica_must() -> None:
     """Routing and auth stay the chart's: no Service type, no Postgres password, no image
     repository is overridden."""
     values = replica_values()
-    assert set(values) <= {"shadow", "postgres", "image", "engine"}
+    assert set(values) <= {"shadow", "postgres", "image", "engine", "kernel"}
     # The engine is switched on and nothing else: its images, store and settings are the chart's.
     assert values.get("engine", {"enabled": True}) == {"enabled": True}
+    # The kernel is switched on and pointed at the replica's outside (the fake GitHub, the App
+    # key Secret, the scripted agent) and nothing else: where its workers run, its Role and its
+    # service account are the chart's.
+    kernel_values = values["kernel"]
+    assert set(kernel_values) == {"enabled", "observerIntervalSeconds", "worker", "github"}
+    assert set(kernel_values["worker"]) == {"gitUrl", "agents"}
+    assert set(kernel_values["github"]) == {"appId", "appKeySecret", "apiUrl"}
     assert "auth" not in values.get("postgres", {})
     assert "repository" not in values.get("image", {})
     assert "api" not in values
@@ -224,13 +250,32 @@ def helm_render(*args: str) -> list[dict[str, Any]]:
     return [d for d in yaml.safe_load_all(out) if d]
 
 
+WORKER_IMAGE = f"ghcr.io/sortyard/sortyard-replica-worker@{DIGEST}"
+
+
+def replica_render(tmp_path: pathlib.Path) -> list[dict[str, Any]]:
+    """The chart as replica.sh installs it: the replica's values, an image tag, and the lane
+    file with the worker image it loaded."""
+    lane = tmp_path / "lane.toml"
+    lane.write_text((REPLICA / "lane.toml").read_text().replace("__WORKER_IMAGE__", WORKER_IMAGE))
+    return helm_render(
+        "--namespace",
+        "sortyard",
+        "-f",
+        str(REPLICA / "values.yaml"),
+        "--set",
+        "image.tag=replica-x",
+        "--set-file",
+        f"kernel.lanes.replica={lane}",
+    )
+
+
 @requires_helm
-def test_replica_renders_the_deployment_topology_plus_the_shadow() -> None:
+def test_replica_renders_the_deployment_topology_plus_the_shadow_the_engine_and_the_kernel(
+    tmp_path: pathlib.Path,
+) -> None:
     default = {(d["kind"], d["metadata"]["name"]): d for d in helm_render()}
-    replica = {
-        (d["kind"], d["metadata"]["name"]): d
-        for d in helm_render("-f", str(REPLICA / "values.yaml"), "--set", "image.tag=replica-x")
-    }
+    replica = {(d["kind"], d["metadata"]["name"]): d for d in replica_render(tmp_path)}
     assert set(default) < set(replica)
     added = set(replica) - set(default)
     (schema_job,) = [name for kind, name in added if kind == "Job"]
@@ -240,6 +285,12 @@ def test_replica_renders_the_deployment_topology_plus_the_shadow() -> None:
         ("Service", "sortyard-engine"),
         ("ConfigMap", "sortyard-engine"),
         ("Job", schema_job),
+        ("Deployment", "sortyard-kernel"),
+        ("ServiceAccount", "sortyard-kernel"),
+        ("Role", "sortyard-kernel"),
+        ("RoleBinding", "sortyard-kernel"),
+        ("ConfigMap", "sortyard-kernel"),
+        ("ConfigMap", "sortyard-lanes"),
     }
     # The API Deployment is the deployment's own, image tag aside.
     api_default = default[("Deployment", "sortyard-api")]
@@ -248,12 +299,24 @@ def test_replica_renders_the_deployment_topology_plus_the_shadow() -> None:
     (c_replica,) = api_replica["spec"]["template"]["spec"]["containers"]
     assert c_replica["image"] == "ghcr.io/sortyard/sortyard:replica-x"
     c_replica["image"] = c_default["image"]
-    # ... and the address of the engine the replica switches on.
+    # ... and the address of the engine the replica switches on,
     (engine_target,) = [e for e in c_replica["env"] if e["name"] == "SORTYARD_ENGINE_TARGET"]
     assert engine_target["value"] == "sortyard-engine:7233"
     c_replica["env"].remove(engine_target)
+    # ... and the lane files of the kernel it switches on, which the API admits against.
+    (lanes_dir,) = [e for e in c_replica["env"] if e["name"] == "SORTYARD_LANES_DIR"]
+    c_replica["env"].remove(lanes_dir)
+    (mount,) = c_replica.pop("volumeMounts")
+    assert mount["mountPath"] == lanes_dir["value"]
+    (volume,) = api_replica["spec"]["template"]["spec"].pop("volumes")
+    assert volume == {"name": mount["name"], "configMap": {"name": "sortyard-lanes"}}
+    assert list(api_replica["spec"]["template"]["metadata"].pop("annotations")) == [
+        "checksum/lanes"
+    ]
     assert api_replica == api_default
     assert replica[("Service", "sortyard-api")] == default[("Service", "sortyard-api")]
+    # The worker Jobs run in the release's own namespace, under the chart's Role.
+    assert replica[("Role", "sortyard-kernel")]["metadata"]["namespace"] == "sortyard"
 
 
 # --- the fake providers -----------------------------------------------------------------------
@@ -340,3 +403,304 @@ def test_the_fake_refuses_and_counts_writes(fake: Running) -> None:
     assert err.value.code == 405
     assert err.value.headers["Allow"] == "GET"
     assert fake.audit()["writes"] == 1
+
+
+# --- the kernel half: the lane, the worker image and the fake GitHub -------------------------
+
+REPOSITORY = "replica/app"
+CLUSTER = os.environ.get("SORTYARD_REPLICA_CLUSTER")
+
+
+def github_manifests() -> list[dict[str, Any]]:
+    return [d for d in yaml.safe_load_all((REPLICA / "fake-github.yaml").read_text()) if d]
+
+
+@requires_helm
+def test_the_replicas_kernel_starts_on_what_the_chart_and_the_replica_give_it(
+    tmp_path: pathlib.Path,
+) -> None:
+    """The kernel service's own settings loader reads the rendered Deployment, and what it
+    reads names the replica's fake GitHub, its lane and its worker image's agent."""
+    docs = replica_render(tmp_path)
+    values = replica_values()["kernel"]
+    app_secret = values["github"]["appKeySecret"]
+    secrets = {
+        app_secret: {"private-key.pem": PEM.decode()},
+        "sortyard-postgres": {"password": "pw"},
+    }
+    deploy = named(docs, "Deployment", "sortyard-kernel")
+    started = as_started(docs, deploy, "kernel", tmp_path, secrets)
+    settings = kernel.Settings.from_env({**started, "KUBERNETES_SERVICE_HOST": "10.96.0.1"})
+    lane = settings.lanes["replica"]
+    assert set(settings.lanes) == {"replica"} and set(lane.repositories) == {REPOSITORY}
+    assert lane.worker_image.reference == WORKER_IMAGE
+    assert settings.jobs_namespace == "sortyard"
+    # The API admits against the same lane.
+    api = as_started(docs, named(docs, "Deployment", "sortyard-api"), "api", tmp_path, secrets)
+    assert load_lanes(api["SORTYARD_LANES_DIR"]) == settings.lanes
+
+    # The fake GitHub is the API the kernel calls and the git host its workers clone from.
+    (service,) = [d for d in github_manifests() if d["kind"] == "Service"]
+    base = f"http://{service['metadata']['name']}:{service['spec']['ports'][0]['port']}"
+    assert settings.github_api_url == base
+    assert settings.worker.git_url == base + "/git/{repository}.git"
+    (fake,) = [d for d in github_manifests() if d["kind"] == "Deployment"]
+    args = container_of(fake, "fake-github")["command"]
+    assert f"--url={base}" in args and f"--app-id={settings.github_app_id}" in args
+    assert [a.split("=", 1)[1] for a in args if a.startswith("--repository=")] == [REPOSITORY]
+    # One Secret holds the App key: the kernel signs with it, the fake verifies with it.
+    volumes = {v["name"]: v for v in fake["spec"]["template"]["spec"]["volumes"]}
+    assert volumes["github-app"]["secret"]["secretName"] == app_secret
+    script = SCRIPT.read_text()
+    assert f"GITHUB_APP_SECRET={app_secret}" in script
+    # The fake's files are the ones the script puts in its ConfigMap: the host, the tests'
+    # strict fake and the vendored API description, where the fake looks for them.
+    assert f"GITHUB_CONFIGMAP={volumes['fakes']['configMap']['name']}" in script
+    paths = {item["key"]: item["path"] for item in volumes["fakes"]["configMap"]["items"]}
+    assert paths == {
+        "fake_github_host.py": "fake_github_host.py",
+        "fake_github.py": "tests/fake_github.py",
+        "fragment.json": "tests/contracts/github/fragment.json",
+    }
+    for source in ("replica/fakes/fake_github_host.py", "tests/fake_github.py"):
+        assert f'"$ROOT/{source}"' in script and (ROOT / source).is_file()
+    assert '"$ROOT/tests/contracts/github/fragment.json"' in script
+
+    # The agent commands are in the worker image the script builds on the Sortyard image.
+    dockerfile = (REPLICA / "worker" / "Dockerfile").read_text()
+    assert "ARG BASE" in dockerfile and "FROM ${BASE}" in dockerfile
+    for mode, argv in settings.worker.agents.items():
+        assert argv[0] == "python" and f"COPY agent.py {argv[1]}" in dockerfile and argv[2] == mode
+    assert '--build-arg BASE="$IMAGE_REPO:$TAG"' in script
+    # What the script admits is an item of this lane and repository.
+    assert f"LANE={lane.name}\n" in script and f"LANE_REPOSITORY={REPOSITORY}\n" in script
+
+
+def test_up_runs_the_lane_after_the_smoke_test_and_the_lane_checks_both_sides() -> None:
+    text = SCRIPT.read_text()
+    up = text.split("\nup() {", 1)[1].split("\n}", 1)[0]
+    steps = [line.strip() for line in up.splitlines()]
+    wanted = ["build_image", "deploy_fakes", "deploy_fake_github", "deploy_chart", "smoke", "lane"]
+    assert [step for step in steps if step in wanted] == wanted
+    lane = text.split("\nlane() {", 1)[1].split("\n}\n", 1)[0]
+    # Both items are waited to `merged` in Sortyard and checked as merged on GitHub; between
+    # the second's admission and its merge, the kernel pod is deleted.
+    order = [
+        'admit "$first"',
+        'wait_item "$first" merged',
+        'merged_on_github "$first"',
+        'admit "$second"',
+        # Mid-item is checked, not assumed: in `building` with a worker Job running, or fail.
+        "[[ $state == building ]] && ((active > 0)) ||",
+        'k delete "$pod"',
+        'wait_item "$second" merged',
+        'merged_on_github "$second"',
+    ]
+    at = [lane.index(step) for step in order]
+    assert at == sorted(at)
+
+
+def load_module(name: str, path: pathlib.Path) -> ModuleType:
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture
+def github(tmp_path: pathlib.Path) -> Iterator[tuple[str, Any]]:
+    """The replica's fake GitHub, serving on a free local port: its URL and its host."""
+    module = load_module("fake_github_host", REPLICA / "fakes" / "fake_github_host.py")
+    server, host = module.make_server(
+        "127.0.0.1",
+        0,
+        app_id=APP_ID,
+        public_key=KEY.public_key(),
+        root=tmp_path / "git",
+        repositories=[REPOSITORY],
+    )
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}", host
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def get_json(url: str) -> Any:
+    with urllib.request.urlopen(url, timeout=10) as response:
+        return json.load(response)
+
+
+def test_the_real_github_client_and_the_real_worker_use_the_fake_github_unchanged(
+    github: tuple[str, Any], tmp_path: pathlib.Path
+) -> None:
+    """What the replica's kernel and worker Jobs do against the fake, done here without a
+    cluster: the real client mints tokens as the App, the real worker entry point clones,
+    runs the replica's scripted agent and pushes over git with such a token, and the pull
+    request the client then opens and merges is of the pushed commit."""
+    url, host = github
+    client = HttpGitHub(APP_ID, PEM, base_url=url)
+    lane = capabilities.load(
+        (REPLICA / "lane.toml").read_text().replace("__WORKER_IMAGE__", WORKER_IMAGE)
+    )
+    agent = [sys.executable, str(REPLICA / "worker" / "agent.py")]
+    config = WorkerConfig(
+        agents={mode: [*agent, mode] for mode in ("build", "fix", "review")},
+        git_url=f"{url}/git/{{repository}}.git",
+    )
+    work = Work(lane, REPOSITORY, {"outcome": "a change is made"})
+    runs = iter(range(100))
+
+    def worker(mode: str, item: str, token: str) -> tuple[int, dict[str, Any]]:
+        call = {"tenant": "ws", "item": item, "dispatch": 1, "detail": {}}
+        made = brief(mode, work, call, config)
+        status, text = run_worker(tmp_path / f"job-{next(runs)}", made, token)
+        return status, json.loads(text)
+
+    write = client.token(REPOSITORY, {"contents": "write"})
+    status, built = worker("build", "R-1", write.value)
+    assert status == 0 and built["outcome"] == "built", built
+    # GitHub shows what was pushed: the pull request the client opens is of that commit.
+    pulls = client.token(REPOSITORY, {"contents": "write", "pull_requests": "write"})
+    client.open_pull(pulls, REPOSITORY, branch="sortyard/R-1", base="main", title="R-1", body="")
+    pull = client.find_pull(pulls, REPOSITORY, "sortyard/R-1")
+    assert pull is not None and pull.open and pull.head == built["head"]
+    # A reviewer's token reads; the scripted agent approves the head it was given.
+    read = client.token(REPOSITORY, {"contents": "read", "pull_requests": "read"})
+    status, reviewed = worker("review", "R-1", read.value)
+    assert status == 0 and reviewed == {"outcome": "approved", "head": built["head"]}
+    # The git host takes a token as GitHub would: a read token does not push, and a token
+    # the App never minted does not even clone.
+    status, refused = worker("build", "R-2", read.value)
+    assert status == 1 and refused["outcome"] == "failed" and "push" in refused["reason"]
+    status, refused = worker("build", "R-3", "ghs_" + "0" * 36)
+    assert status == 1 and refused["outcome"] == "failed" and "clone" in refused["reason"]
+    assert client.find_pull(pulls, REPOSITORY, "sortyard/R-2") is None
+
+    assert client.merge(pulls, REPOSITORY, pull.number, pull.head, "squash")
+    # What the replica's smoke test reads, without a credential.
+    report = get_json(f"{url}/_fake/pull?repository={REPOSITORY}&branch=sortyard/R-1")
+    assert report["merged"] is True and report["open"] is False and report["pushed"] is True
+    assert report["head"] == built["head"]
+    with pytest.raises(urllib.error.HTTPError) as missing:
+        get_json(f"{url}/_fake/pull?repository={REPOSITORY}&branch=sortyard/R-2")
+    assert missing.value.code == 404
+    state = get_json(f"{url}/_fake/state")
+    assert state["violations"] == [] and state["git"]["pushes"] == 1
+    assert state["git"]["refused"] >= 2 and state["tokens"] == 3
+    host.fake.verify()
+
+
+@pytest.fixture
+def api() -> Iterator[Any]:
+    yield from running_api()
+
+
+@requires_postgres
+def test_the_replicas_admit_script_admits_an_item_through_the_api(
+    api: Any, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """replica/admit.py, run as the replica runs it in the API pod: it seeds an operator once
+    and admits through the API's own door, which checks the item against its lanes."""
+    module = load_module("replica_admit", REPLICA / "admit.py")
+    database = dict(part.split("=", 1) for part in api.conninfo.split())["dbname"]
+    for name, value in {
+        "SORTYARD_API_PORT": api.base.rsplit(":", 1)[1],
+        "SORTYARD_DATABASE_HOST": os.environ["PGHOST"],
+        "SORTYARD_DATABASE_PORT": os.environ.get("PGPORT", "5432"),
+        "SORTYARD_DATABASE_NAME": database,
+    }.items():
+        monkeypatch.setenv(name, value)
+
+    def stored(item: str) -> list[tuple[Any, ...]]:
+        with api.db() as conn:
+            rows: list[tuple[Any, ...]] = conn.execute(
+                "SELECT s.lane, s.repository FROM sortyard.item AS i JOIN sortyard.item_spec AS s"
+                " ON (s.workspace_id, s.item_id) = (i.workspace_id, i.id)"
+                " WHERE i.workspace_id = %s AND i.id = %s",
+                [module.WORKSPACE, item],
+            ).fetchall()
+        return rows
+
+    # The API of the harness runs the shipped example lane.
+    assert module.main(["admit.py", "replica-1-a", "example/app", "example"]) == 0
+    assert capsys.readouterr().out.startswith("201 ")
+    assert stored("replica-1-a") == [("example", "example/app")]
+    # Again: the same item is there already, and the seed is not written twice.
+    assert module.main(["admit.py", "replica-1-a", "example/app", "example"]) == 0
+    assert capsys.readouterr().out.startswith("200 ")
+    assert module.main(["admit.py", "replica-1-b", "example/app", "example"]) == 0
+    # The API refuses what its lanes do not declare, and the script says so.
+    assert module.main(["admit.py", "replica-1-c", "example/app", "no-such-lane"]) == 1
+    assert capsys.readouterr().out.rsplit("\n", 2)[-2].startswith("422 ")
+    assert stored("replica-1-c") == []
+
+
+@pytest.mark.skipif(
+    not CLUSTER,
+    reason="needs a booted replica: run `replica/replica.sh up`, then set "
+    "SORTYARD_REPLICA_CLUSTER to its kind cluster's name (slow.yml does)",
+)
+def test_the_replica_admits_an_item_on_the_engine_on_postgres_and_sees_it_merged_then_again_after_the_kernel_pod_is_deleted_mid_item() -> (  # noqa: E501
+    None
+):
+    """The replica admits an item on the engine on Postgres and sees it merged, then again
+    after the kernel pod is deleted mid-item."""
+    assert CLUSTER is not None
+    kubectl = ["kubectl", "--context", f"kind-{CLUSTER}", "--namespace", "sortyard"]
+
+    def deployment(name: str) -> dict[str, Any]:
+        out = subprocess.run(
+            [*kubectl, "get", "deployment", name, "-o", "json"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        ).stdout
+        found: dict[str, Any] = json.loads(out)
+        return found
+
+    # The engine the kernel runs on stores to Postgres, and is the chart's.
+    engine = {e["name"]: e for e in container_of(deployment("sortyard-engine"), "engine")["env"]}
+    assert engine["DB"]["value"] == "postgres12"
+    assert engine["POSTGRES_SEEDS"]["value"] == "sortyard-postgres"
+    served = {e["name"]: e for e in container_of(deployment("sortyard-kernel"), "kernel")["env"]}
+    assert served["SORTYARD_ENGINE_TARGET"]["value"] == "sortyard-engine:7233"
+
+    done = subprocess.run(
+        [str(SCRIPT), "lane"],
+        env={**os.environ, "SORTYARD_REPLICA_CLUSTER": CLUSTER},
+        capture_output=True,
+        text=True,
+        timeout=1500,
+    )
+    out = done.stdout
+    assert done.returncode == 0, out[-3000:] + done.stderr[-6000:]
+    # Two items, each merged in Sortyard (the script waited for that) and on GitHub, as a
+    # pull request of the commit a worker Job pushed.
+    merged = re.findall(r"^ +(replica-\d+-[ab]) merged: (\{.*\})$", out, re.MULTILINE)
+    assert [item[-1] for item, _ in merged] == ["a", "b"], out
+    for item, report in merged:
+        told = json.loads(report)
+        assert told["branch"] == f"sortyard/{item}"
+        assert told["merged"] is True and told["pushed"] is True and told["open"] is False
+    # The kernel pod was deleted while the second item was in work, and another pod took over.
+    # Mid-item: the script read the item in `building` with its build Job running, then deleted
+    # the pod (it fails before deleting otherwise).
+    deleted = re.search(
+        r"deleted (pod/\S+) with (\S+) in '([\w-]*)' \(worker Jobs running: (\d+)\)", out
+    )
+    assert deleted is not None, out
+    assert deleted[2] == merged[1][0] and deleted[3] == "building" and int(deleted[4]) >= 1
+    pods = subprocess.run(
+        [*kubectl, "get", "pods", "-l", "app.kubernetes.io/component=kernel", "-o", "name"],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    ).stdout.split()
+    assert pods and deleted[1] not in pods
+    assert "engine: 2 item workflows in Postgres" in out

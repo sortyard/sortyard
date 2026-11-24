@@ -103,3 +103,86 @@ chart's own Postgres has a default; an external database must name its Secret. *
 {{- required "postgres.auth.existingSecret is required when engine.enabled=true and postgres.enabled=false: the name of a Secret with key `password` for the external database (or set engine.database.host and engine.database.existingSecret to give the engine its own)" .Values.postgres.auth.existingSecret -}}
 {{- end -}}
 {{- end -}}
+
+{{- /*
+The kernel service (templates/kernel.yaml). Its files are two ConfigMaps: the lane capability
+files (mounted by the API too), and the kernel's own (worker configuration, decision policy,
+the init container's script).
+*/ -}}
+{{- define "sortyard.kernel.fullname" -}}
+{{- printf "%s-kernel" (include "sortyard.fullname" .) -}}
+{{- end -}}
+
+{{- define "sortyard.lanes.fullname" -}}
+{{- printf "%s-lanes" (include "sortyard.fullname" .) -}}
+{{- end -}}
+
+{{- /* The lane capability files, one key per lane: <name>.toml. */ -}}
+{{- define "sortyard.lanes.data" -}}
+{{- if not .Values.kernel.lanes -}}
+{{- fail "kernel.lanes is required when kernel.enabled=true: at least one lane capability file (name: text)" -}}
+{{- end -}}
+{{- range $name, $text := .Values.kernel.lanes }}
+{{- if not (regexMatch "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" $name) }}
+{{- fail (printf "kernel.lanes: %q is not a file name of lower-case letters, digits and dashes" $name) }}
+{{- end }}
+{{- if not $text }}
+{{- fail (printf "kernel.lanes.%s is empty: it is the text of a lane capability file" $name) }}
+{{- end }}
+{{ printf "%s.toml" $name }}: {{ toJson $text }}
+{{- end }}
+{{- end -}}
+
+{{- /* The worker configuration file (sortyard.services.kernel reads it), as TOML: a JSON string
+or array of strings is the same TOML value. */ -}}
+{{- define "sortyard.kernel.workerConfig" -}}
+{{- $w := .Values.kernel.worker -}}
+{{- with $w.gitUrl }}
+git-url = {{ toJson . }}
+{{- end }}
+{{- with $w.command }}
+command = {{ toJson . }}
+{{- end }}
+{{- with $w.deadlineSeconds }}
+deadline = {{ int . }}
+{{- end }}
+{{- with $w.ttlSeconds }}
+ttl = {{ int . }}
+{{- end }}
+{{- with $w.tokenAgeSeconds }}
+token-age = {{ int . }}
+{{- end }}
+
+[agents]
+{{- range $mode := list "build" "fix" "review" }}
+{{- $argv := index $w.agents $mode }}
+{{- if not $argv }}
+{{- fail (printf "kernel.worker.agents.%s is required when kernel.enabled=true: the agent command (an argv) for %s work" $mode $mode) }}
+{{- end }}
+{{ $mode }} = {{ toJson $argv }}
+{{- end }}
+
+[secrets]
+{{- range $name, $ref := $w.secrets }}
+{{ toJson $name }} = { secret = {{ toJson (required (printf "kernel.worker.secrets.%s.secret is required" $name) $ref.secret) }}, key = {{ toJson (required (printf "kernel.worker.secrets.%s.key is required" $name) $ref.key) }} }
+{{- end }}
+
+[services]
+{{- range $name, $url := $w.services }}
+{{ toJson $name }} = {{ toJson $url }}
+{{- end }}
+{{- end -}}
+
+{{- /* The Secret (key `password`) the kernel reads the database password from: the same as the
+API's, and with an external Postgres it must be named. */ -}}
+{{- define "sortyard.kernel.database.secretName" -}}
+{{- if .Values.postgres.enabled -}}
+{{- include "sortyard.postgres.secretName" . -}}
+{{- else -}}
+{{- required "postgres.auth.existingSecret is required when kernel.enabled=true and postgres.enabled=false: the name of a Secret with key `password` for the external database" .Values.postgres.auth.existingSecret -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "sortyard.kernel.workers.namespace" -}}
+{{- .Values.kernel.workers.namespace | default .Release.Namespace -}}
+{{- end -}}

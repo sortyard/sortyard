@@ -81,3 +81,8 @@ jobs:
         run: |
           docker run --rm ghcr.io/sortyard/sortyard:ci sortyard-conductor --once
           docker run --rm ghcr.io/sortyard/sortyard:ci sortyard-api --help
+          # The kernel and worker entry points, with no configuration: the kernel names what is
+          # missing and exits 2, the worker says how it is used. And git, which a worker needs.
+          docker run --rm ghcr.io/sortyard/sortyard:ci sh -c 'sortyard-kernel; test $? -eq 2'
+          docker run --rm -e SORTYARD_RESULT=/tmp/result ghcr.io/sortyard/sortyard:ci sh -c 'sortyard-worker | grep -q usage'
+          docker run --rm ghcr.io/sortyard/sortyard:ci git --version

@@ -1,0 +1,18 @@
+# The replica's one lane (the format: src/sortyard/kernel/lane_example.toml). replica.sh gives
+# this file to the chart as kernel.lanes.replica, with the image placeholder replaced by the worker
+# image it built and loaded into the cluster, by the digest the cluster knows it under.
+version = 1
+lane = "replica"
+resolver = "replica"
+runner-pool = "replica-runners"
+slots = 2
+
+# The worker image is the CI image (section 3.3): the same reference, pinned by digest.
+[images]
+worker = "__WORKER_IMAGE__"
+ci = "__WORKER_IMAGE__"
+
+# The fake GitHub hosts this repository. It runs no checks on a pull request.
+[[repositories]]
+name = "replica/app"
+checks = []
