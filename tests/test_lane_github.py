@@ -81,7 +81,7 @@ class World:
     def open(self, item: str = ITEM) -> FakePull:
         """What the executor leaves behind: the item's branch pushed and its pull request."""
         self.fake.push(self.repo, branch_of(item))
-        token = self.port.token(REPO, {"pull_requests": "write"})
+        token = self.port.token(REPO, {"pull_requests": "write", "contents": "read"})
         self.port.open_pull(token, REPO, branch=branch_of(item), base="main", title=item)
         return self.repo.pull_of(branch_of(item))
 

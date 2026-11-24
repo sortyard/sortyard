@@ -33,14 +33,14 @@ import pytest
 from sortyard.engine import Engine
 from sortyard.kernel.item import workflow_id
 from sortyard.kernel.preflight import close_gap
-from sortyard.kernel.store import Items, PgGapRegistry
+from sortyard.kernel.store import Items, ItemSpec, PgGapRegistry
 from sortyard.lane.github import GitHubError, HttpGitHub, branch_of
 from sortyard.lane.jobs import ITEM_LABEL
 from sortyard.lane.runtime import ensure_pull
 from sortyard.lane.worker import item_label
 from sortyard.services import kernel
 from tests.api_harness import ITEM, WS
-from tests.fake_github import APP_ID, PEM
+from tests.fake_github import APP_ID, KEY, PEM, FakeGitHub, serving
 from tests.kernel_harness import until
 from tests.pg import requires_postgres
 from tests.runtime_harness import OTHER_REPO, REPO, Service, World, drive, world
@@ -546,6 +546,24 @@ def test_an_outcome_observed_for_an_earlier_stay_of_the_same_state_is_not_applie
             assert w.path("S") == [*HAPPY[:4], "fixing", "checking", *HAPPY[4:]]
 
     asyncio.run(scenario())
+
+
+def test_the_pull_request_is_opened_with_a_token_github_lets_open_it() -> None:
+    """The token `ensure_pull` mints is one GitHub opens a pull request with: GitHub refuses
+    pull_requests:write alone ("not all refs are readable", SORTYARD-178), so it reads contents
+    too, and nothing more is asked for than finding and opening one needs."""
+    fake = FakeGitHub(APP_ID, KEY.public_key())
+    with serving(fake) as url:
+        repo = fake.repo(REPO)
+        fake.push(repo, branch_of("P"))
+        spec = ItemSpec(WS, "P", "A pull request", "lane", REPO, "main", (), {"outcome": "x"})
+        ensure_pull(HttpGitHub(APP_ID, PEM, base_url=url), spec)
+    (pull,) = repo.pulls
+    assert (pull.title, pull.base, pull.branch) == ("A pull request", "main", "sortyard/P")
+    assert [status for name, status, _ in fake.replies if name == "pulls/create"] == [201]
+    (minted,) = [body for name, _, body in fake.replies if name.startswith("apps/create")]
+    assert minted["permissions"] == {"pull_requests": "write", "contents": "read"}
+    fake.verify()
 
 
 @requires_postgres
