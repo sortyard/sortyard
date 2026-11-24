@@ -270,13 +270,16 @@ Worked example (a first change): make `/v1/info` report something new.
   service's docstring). The chart is the only place they are set in a deployment, from the one
   `charts/sortyard/values.yaml`. A second values file in the chart is refused by a test.
 - **Kernel size.** The hand-written kernel (`src/sortyard/engine`, `kernel` and `lane`) stays
-  under 5,000 code lines: lines that hold code, not blank lines, comment lines or docstrings
-  ([SY-DEC-010](DECISIONS.md)). `tests/test_kernel_size.py` holds the rule and the budget, and
-  fails when the kernel imports a `sortyard` package that is not counted;
-  `python -m tests.test_kernel_size` prints the figure and the raw `wc -l` by package. A new
-  failure class is a row in `item_states.toml` or `decision_policy.toml`, not a module. Make
-  room by removing what repeats, never by cutting an explanation or moving code out of the
-  counted packages.
+  under 5,000 lines of Python as `wc -l` counts them, comments and docstrings included: the
+  same count as the conductor's 37,797 it is measured against ([SY-DEC-010](DECISIONS.md)).
+  `tests/test_kernel_size.py` holds the rule and the budget, and fails when a counted package
+  imports anything but the standard library, a declared dependency or a counted package;
+  `python -m tests.test_kernel_size` prints the figure by package, with code lines beside it
+  (not budgeted). A new failure class is a row in `item_states.toml` or
+  `decision_policy.toml`, not a module. Make room by removing what repeats, never by cutting
+  an explanation or moving code out of the counted packages. `src/sortyard/services` imports
+  the kernel and is not counted, so it holds wiring and entry points only: a state, an owner,
+  an adapter, a decision or a retry belongs in a counted package.
 - **Generated code.** `src/sortyard/models/_generated.py` comes only from `codegen.py`.
 - **Security posture.** Read-only adapters, least privilege (`runAsNonRoot`, read-only root
   filesystem, dropped capabilities, no service-account token unless needed). Secrets come in by
