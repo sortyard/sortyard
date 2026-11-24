@@ -11,7 +11,7 @@ What counts as a hand (the build team's reading of "no hand action"; no owner wo
 
 - **A request.** A transition whose cause is `request` or that carries one, and the decision
   that answers it (its question's cause is `request`). A request is the one way a person moves
-  an item: `requestItemChange` is the only operation that is not a read.
+  an item: after admission, `requestItemChange` is the only operation that writes to one.
 - **An operator action.** An Event whose actor is not the system, or an entry of the audit log
   by which a person acted on the item after admitting it (a request the workflow never put to
   a decision included). Admitting the item is how it starts, not a hand.
@@ -21,7 +21,9 @@ the table, and a wait on a capability gap that closed without a person.
 
 The run: items in the order they ended (merged, or ended without merging, as a withdrawn
 item does). A merged item with no hand adds one; any other item that ended restarts the count
-at zero, so a run is never counted across an item that needed a hand. Items still open are
+at zero, so a run is never counted across an item that needed a hand. An item that ended
+without merging breaks the run even with no person involved: the build team's reading of "ten
+in a row" (admitted to merged), stricter than "an item that needed a hand". Items still open are
 listed by count and do not touch the run.
 
   sortyard-exit-report --workspace WS --project P --since ISO [--until ISO] [--json]

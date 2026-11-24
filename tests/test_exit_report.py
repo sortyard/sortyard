@@ -13,6 +13,7 @@ from contextlib import redirect_stdout
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import psycopg
 import pytest
 
 from sortyard.api import store
@@ -90,6 +91,9 @@ WITHDRAWN: list[tuple[str, dict[str, Any]]] = [
 ]
 
 
+OPERATOR = {"kind": "operator", "id": "op-joe"}
+
+
 @pytest.fixture
 def connect() -> Iterator[Connect]:
     yield from database()
@@ -146,8 +150,16 @@ def test_the_report_counts_the_longest_run_of_merged_items_with_no_request_and_b
     # Still open: listed by count only.
     through(connect, clock, "open", STRAIGHT[:3])
 
+    with connect() as conn:
+        # Admitting an item is how it starts, not a hand.
+        store.audit(conn, WS, OPERATOR, "create", "item", "w-03", None, {"id": "w-03"})
+        # A person's request in another tenant, naming an item id this tenant also has.
+        store.audit(
+            conn, OTHER_WS, OPERATOR, "create", "item_request", "req-x", None, {"item_id": "w-03"}
+        )
     found = exit_report(connect)
     by_item = {entry["item"]: entry for entry in found["items"]}
+    assert by_item["w-03"]["hands_off"] and not by_item["w-03"]["operator_acts"]
     assert list(by_item) == names
     assert found["still_open"] == 1
     # must_catch: an item whose timeline holds a transition caused by a request is not
@@ -183,6 +195,16 @@ def test_the_report_counts_the_longest_run_of_merged_items_with_no_request_and_b
     hand = next(entry for entry in found["items"] if entry["item"] == "w-10")
     assert hand["operator_action"] and not hand["requested"] and not hand["hands_off"]
     assert found["longest_hands_off_run"] == {"length": 6, "items": [*names[11:], "w-late"]}
+
+    # Any other act of a person on the item after admitting it is a hand too.
+    with connect() as conn:
+        store.audit(conn, WS, OPERATOR, "update", "item", "w-13", None, {"title": "renamed"})
+    found = exit_report(connect)
+    acted = next(entry for entry in found["items"] if entry["item"] == "w-13")
+    assert acted["operator_action"] and not acted["hands_off"]
+    assert [act["action"] for act in acted["operator_acts"]] == ["update item"]
+    # The ten are now 4, 2 and 3; the longest run left is the first five.
+    assert found["longest_hands_off_run"] == {"length": 5, "items": names[:5]}
 
     # An item that ended without merging (withdrawn on a request) breaks the run too, and is
     # never counted as merged.
@@ -242,11 +264,24 @@ def test_the_report_lists_each_item_with_its_transitions_by_owner_and_cause(
     )
 
     # The command prints the same, from a read-only session.
+    # The command's session is read-only: a write on it is refused.
+    seen: list[Any] = []
+
+    def recording() -> Any:
+        conn = connect()
+        seen.append(conn)
+        return conn
+
     printed = io.StringIO()
     with redirect_stdout(printed):
         code = main(
             ["--workspace", WS, "--project", PROJECT, "--since", WINDOW[0].isoformat()],
-            connect=connect,
+            connect=recording,
         )
     assert code == 0
+    assert seen and seen[0].read_only
+    with connect() as conn:
+        conn.read_only = True
+        with pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
+            conn.execute("INSERT INTO sortyard.item_link VALUES ('ws-a', 'x', 'y')")
     assert printed.getvalue().split("\n", 1)[1] == text.split("\n", 1)[1]
