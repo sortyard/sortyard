@@ -487,6 +487,10 @@ def test_a_red_run_before_the_fix_merged_is_not_answered_while_the_merge_runs() 
         w.api.merge(triage(w.api)[-1])
         w.github.push(w.repo, "main")
         w.github.workflow_run(w.repo, w.workflow, "cancelled")
+        now = [0.0]
+        w.observer.clock = lambda: now[0]
+        assert w.observe() == []
+        now[0] += red_main.HEAD_GRACE_SECONDS  # not the grace: the cancelled run is the verdict
         assert w.observe() == []
         assert len(triage(w.api)) == 2
         w.verify()

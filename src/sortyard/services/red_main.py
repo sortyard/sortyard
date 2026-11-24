@@ -491,8 +491,11 @@ class Observer:
         token = self.github.token(repository, READ)
         branch = self.github.default_branch(token, repository)
         # Read after the open items: a fix the queue already shows merged has moved the head.
-        head = self.github.head(token, repository, branch)
-        settled = self.settled(repository, head)
+        try:
+            head = self.github.head(token, repository, branch)
+            settled = self.settled(repository, head)
+        except GitHubError:  # unknown: no admission of an older commit's run this pass
+            head, settled = "", False
         acts: list[Act] = []
         for workflow in self.github.live_workflows(token, repository, branch):
             try:

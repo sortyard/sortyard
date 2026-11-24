@@ -540,7 +540,9 @@ provenance; where they conflict, the amendment wins.
   - A red run of a commit the branch has moved past is answered only after the new head has
     gone `HEAD_GRACE_SECONDS` (300) without a run of its own: the second estate drill admitted
     a second item 6 s after a fix merged, before GitHub listed the merge's run. A workflow that
-    skips the new head (a path filter) is still answered, after the grace.
+    skips the new head (a path filter) is still answered, after the grace, measured from when
+    the observer first read that head; on a repository whose head moves more often than the
+    grace, such a red run waits until the head stays put.
   - A newest run that stays queued or waiting (an environment approval) holds the verdict until
     it ends; an open item meanwhile keeps the kernel's own limits. No limit of the observer's
     own ends that wait (review of sortyard/sortyard#42).
