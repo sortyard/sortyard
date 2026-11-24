@@ -37,6 +37,7 @@ from sortyard.lane.jobs import (
 from sortyard.lane.worker import (
     BRIEF_DIR,
     BRIEF_ENV,
+    LIMIT_ENV,
     STATE_DIR,
     STATE_ENV,
     TOKEN_DIR,
@@ -256,6 +257,41 @@ def test_the_executor_launches_one_job_per_dispatch_and_a_repeated_call_launches
         other = job_name(TENANT, "ITEM-2", 3)
         assert w.cluster.names("job") == sorted([name, other]) and name != other
         assert w.cluster.get("job", other)["spec"]["activeDeadlineSeconds"] == w.config.deadline
+
+
+def test_the_brief_and_the_agent_container_carry_the_limit_of_the_stay_it_was_launched_for() -> (
+    None
+):
+    """the brief and the agent container carry the limit of the stay the Job was launched for:
+    the same figure as the Job's deadline, on every tier, and the configured deadline when the
+    call names no limit."""
+    with world(WorkerConfig(agents=AGENTS, deadline=5400)) as w:
+        launcher = w.launcher()
+        launched = {
+            ("ONE-HOUR", "building", 3600): 3600,
+            ("TWO-HOURS", "building", 7200.0): 7200,
+            ("FIXING", "fixing", 2700): 2700,
+            ("REVIEW", "reviewing", 1800): 1800,
+            ("NO-LIMIT", "building", None): 5400,  # the configured deadline
+            ("BELOW-ONE", "building", 0.5): 5400,
+        }
+        for (item, state, limit), _ in launched.items():
+            over = {} if limit is None else {"limit_seconds": limit}
+            launcher.launch(call(item, state, 2, **over))
+        for (item, _state, _limit), seconds in launched.items():
+            name = job_name(TENANT, item, 2)
+            job = w.cluster.get("job", name)
+            brief = json.loads(w.cluster.get("configmap", name)["data"][BRIEF_KEY])
+            (clone,) = job["spec"]["template"]["spec"]["initContainers"]
+            agent, push = job["spec"]["template"]["spec"]["containers"]
+            told = {v["name"]: v.get("value") for v in agent["env"]}
+            assert job["spec"]["activeDeadlineSeconds"] == seconds, item
+            assert brief["limit_seconds"] == seconds, item
+            assert told[LIMIT_ENV] == str(seconds), item
+            assert str(seconds) in brief["text"] and LIMIT_ENV in brief["text"]
+            # Only the agent is told: clone and push are bounded by the Job alone.
+            assert LIMIT_ENV not in {v["name"] for v in clone["env"] + push["env"]}
+        assert w.cluster.unstartable(job_name(TENANT, "ONE-HOUR", 2)) == []
 
 
 def test_a_job_that_ends_unobserved_leaves_nothing_once_the_next_dispatch_launches() -> None:

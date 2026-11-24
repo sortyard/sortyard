@@ -124,6 +124,33 @@ def test_the_entry_point_runs_the_agent_command_without_the_github_token_and_pus
             assert BASIC.encode() not in path.read_bytes(), path
 
 
+def test_the_agent_is_told_the_seconds_the_job_has_and_its_work_is_pushed_when_it_stops_there(
+    tmp_path: pathlib.Path,
+) -> None:
+    """The agent command gets the brief's limit in SORTYARD_LIMIT_SECONDS; an agent that
+    commits what it has and stops at that limit still has its work pushed and reported. One
+    that ignores the figure, or a brief that names none, changes nothing else."""
+    bare = make_remote(tmp_path)
+    timed = brief(bare, "build", agent_command(tmp_path, "commit:partial.txt"), limit_seconds=3600)
+    status, text = run_worker(tmp_path / "job", timed)
+    head = remote_head(bare, BRANCH)
+    assert (status, json.loads(text)) == (0, {"outcome": "built", "head": head})
+    assert seen(tmp_path)["env"]["SORTYARD_LIMIT_SECONDS"] == "3600"
+
+    other = make_remote(tmp_path / "other")
+    plain = brief(other, "build", agent_command(tmp_path, "commit:new.txt"))
+    status, text = run_worker(tmp_path / "job2", plain)
+    assert (status, json.loads(text)["outcome"]) == (0, "built")
+    assert "SORTYARD_LIMIT_SECONDS" not in seen(tmp_path)["env"]
+
+    # A review's agent, whose output the worker reads as its answer, is told the same.
+    push_branch(tmp_path, other, "feature.txt")
+    review = brief(other, "review", agent_command(tmp_path, "review"), limit_seconds=1800)
+    status, text = run_worker(tmp_path / "job3", review)
+    assert (status, json.loads(text)["outcome"]) == (0, "findings")
+    assert seen(tmp_path)["env"]["SORTYARD_LIMIT_SECONDS"] == "1800"
+
+
 def test_the_token_is_withheld_when_it_arrives_in_the_environment(tmp_path: pathlib.Path) -> None:
     """The token delivered as an environment variable is removed from the agent's environment."""
     bare = make_remote(tmp_path)
