@@ -321,6 +321,24 @@ build, in one job, `test`: the one required status check on `main` (strict, up t
 `main`). The replica boot runs nightly and on demand in
 [`.github/workflows/slow.yml`](.github/workflows/slow.yml).
 
+### Published image
+
+[`.github/workflows/publish.yml`](.github/workflows/publish.yml) builds the `Dockerfile` for
+every commit on `main` (and on demand, on `main`) and pushes it as
+`<registry>/sortyard/sortyard:<full commit sha>`. The registry is not named in this repository:
+it is the repository variable `ACR_REGISTRY`. The login is the secrets `ACR_PUSH_USERNAME` and
+`ACR_PUSH_PASSWORD`, which exist only in the environment `publish`; its deployment branches are
+limited to `main`, so a run on any other branch is not given them. The job never runs for a
+pull request. After the push it pulls
+the image by digest, smoke-tests it, and writes `image=<registry>/sortyard/sortyard@sha256:...`
+and the commit to the job summary (and as job outputs).
+
+A deployment names the image by that digest, never by a tag: set `image.repository` to
+`<registry>/sortyard/sortyard` and `image.digest` to the `sha256:...` value, and every Sortyard
+container (API, kernel and its init container, shadow conductor) is rendered as
+`repository@sha256:...`. A value that is not `sha256:` plus 64 lower-case hex characters fails
+the render. With `image.digest` empty the chart names the image by tag, as before.
+
 ## Layout
 
 | Path | What |
