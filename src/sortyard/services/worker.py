@@ -152,7 +152,7 @@ def _without_token() -> dict[str, str]:
 def _agent_env(brief: Mapping[str, Any]) -> dict[str, str]:
     """The agent's environment: this container's less the token, and the brief's limit."""
     limit = brief.get("limit_seconds")
-    return {**_without_token(), **({LIMIT_ENV: str(limit)} if isinstance(limit, int) else {})}
+    return {**_without_token(), **({LIMIT_ENV: str(limit)} if type(limit) is int else {})}
 
 
 def git(*args: str, cwd: pathlib.Path, url: str = "") -> str:

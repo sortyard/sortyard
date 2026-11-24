@@ -143,6 +143,13 @@ def test_the_agent_is_told_the_seconds_the_job_has_and_its_work_is_pushed_when_i
     assert (status, json.loads(text)["outcome"]) == (0, "built")
     assert "SORTYARD_LIMIT_SECONDS" not in seen(tmp_path)["env"]
 
+    # A review's agent, whose output the worker reads as its answer, is told the same.
+    push_branch(tmp_path, other, "feature.txt")
+    review = brief(other, "review", agent_command(tmp_path, "review"), limit_seconds=1800)
+    status, text = run_worker(tmp_path / "job3", review)
+    assert (status, json.loads(text)["outcome"]) == (0, "findings")
+    assert seen(tmp_path)["env"]["SORTYARD_LIMIT_SECONDS"] == "1800"
+
 
 def test_the_token_is_withheld_when_it_arrives_in_the_environment(tmp_path: pathlib.Path) -> None:
     """The token delivered as an environment variable is removed from the agent's environment."""
