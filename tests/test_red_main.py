@@ -490,3 +490,28 @@ def test_a_red_run_before_the_fix_merged_is_not_answered_while_the_merge_runs() 
         assert w.observe() == []
         assert len(triage(w.api)) == 2
         w.verify()
+
+
+def test_a_red_run_of_a_commit_the_branch_moved_past_waits_for_the_new_head_to_run() -> None:
+    """Found on the estate (SORTYARD-204 drill 2, 2026-11-24): the fix merged at 22:34:26, its
+    run was created at 22:34:30, and a pass at 22:34:32 did not see it yet; the newest run was
+    still the old red one and a second item was admitted. A red run of a commit the branch has
+    moved past is answered only once the new head has had the grace period to get a run of its
+    own, which a workflow that skips some pushes never does."""
+    with world() as w:
+        now = [1000.0]
+        w.observer.clock = lambda: now[0]
+        w.github.workflow_run(w.repo, w.workflow, "failure")
+        w.observe()
+        (item,) = triage(w.api)
+        w.api.merge(item)
+        w.github.push(w.repo, "main")  # the fix is on main; its run is not listed yet
+        w.github.workflow_run(w.repo, w.workflow, "failure", event="workflow_dispatch", at=None)
+        w.repo.actions[-1]["head"] = w.repo.actions[-2]["head"]  # a red run of the old commit
+        assert w.observe() == []
+        now[0] += red_main.HEAD_GRACE_SECONDS - 1
+        assert w.observe() == []
+        # The new head never got a run (a workflow that skips the push): the red stands.
+        now[0] += 1
+        assert [a.what for a in w.observe()] == ["admitted"]
+        w.verify()
