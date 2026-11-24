@@ -503,3 +503,50 @@ provenance; where they conflict, the amendment wins.
   - To reverse: drop SORTYARD-204 as a blocker of SORTYARD-179 with a new record here, or move
     the lane back (`to-legacy`). After a move back, 177 and 188 come back in Backlog; to build
     them under legacy, register noncelogic/walwarden in its control-plane registry.
+
+## SY-DEC-014 — The red-main observer sits outside the kernel and talks to it through the API (2026-11-24)
+
+- **Context:** SORTYARD-204 (SY-V3-RED-MAIN-OWNED; SY-DEC-013 option 3) asks that a red default
+  branch, or a failing scheduled run, of a lane repository be answered by exactly one kernel
+  triage item. Win criterion 10 (HARNESS-V3 section 6) keeps the counted kernel (`engine`,
+  `kernel`, `lane`) under 5,000 lines; on 2026-11-24 `main` counts 4,981, and those 19 lines are
+  SORTYARD-190's. The lead's placement decision on SORTYARD-204 (2026-11-24, origin: harness,
+  not an owner ask) puts the observer outside the counted packages.
+- **Choice:** `sortyard-red-main` (`src/sortyard/services/red_main.py`), its own Deployment
+  (`redMain.enabled`), is a client of the public API, as an operator tool is:
+  - It reads GitHub as the App (one token per repository per pass, `actions: read` and
+    `contents: read`) through the kernel's GitHub client, and admits triage items with
+    `admitItem`, records evidence and withdraws with `requestItemChange`.
+  - It owns only "is there an open triage item for this red workflow". The kernel owns the item
+    once admitted, as any other. The deduplication key (repository, workflow) is in the item's
+    spec (`incident`) and is read back through `getProjectQueue` and `getItem`; it needs no list
+    of ended items (SORTYARD-192), since only an open item answers a red run.
+  - An item's id is fixed by the run it answers (`red-main-<digest of repository and
+    workflow>-<run id>`), so two observers, or one restarted mid-pass, admit one item: the API
+    answers 200 to the same admission.
+  - Evidence is a request with the answer `resume` and the run in its reason: it is put on the
+    item's timeline, the shipped policy has no rule for it, and the decision state's default
+    (`resume`) returns the item to the stay it was in, with the same dispatch and deadline
+    (held by `tests/test_item_workflow.py`, "a request goes to the decision and the stay it
+    interrupted carries on"). It is read back from the timeline, so a restarted observer does
+    not record a run twice; a withdrawal is read back the same way, and one not granted (a
+    binding whose role is not operator) is reported every pass, not asked again.
+  - A failing run re-run green keeps its id and creation time; that run green ends the
+    incident too.
+  - It gets its API token by issuing itself a short-lived operator token for the watched lane's
+    role binding from the database, as `sortyard-api --issue-operator-token` does: it holds the
+    database credential the API holds. A long-lived token kept in a Secret was the alternative;
+    it would need rotating by hand and live for days.
+- **What this changes in the rules:** AGENTS.md says `src/sortyard/services` holds wiring and
+  entry points only. This module holds a decision (when a red run gets an item) and is the one
+  recorded exception: it holds no item state, writes nothing but through the API, and could run
+  anywhere an operator token reaches the API. Moving it into the kernel would cost about 300
+  counted lines the budget does not have.
+- **Limits, recorded:** the triage attempt limit and the CI-only re-run of CIH-001/002 are not
+  in scope (ticket notes). A triage item withdrawn by hand while the run is still the newest red
+  one is not admitted again (the API refuses a withdrawn id) until a newer red run. The agent
+  that builds the fix gets the run's URL and head, not its log: the worker token cannot read
+  Actions logs. A workflow deleted from the default branch leaves its open item to the kernel's
+  own limits.
+- **To reverse:** set `redMain.enabled=false`; open triage items are withdrawn by request like
+  any item.

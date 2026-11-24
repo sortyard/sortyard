@@ -9,7 +9,8 @@ held to it by `tests/test_github_contract.py`.
 - Commit: `c9c95fe34ced05fe076001f5c55704742bc8e7f8` (read 2026-11-23)
 - Description version: `1.1.4` (OpenAPI 3.0.3); the client sends `X-GitHub-Api-Version: 2022-11-28`
 
-What is kept: for each operation the port calls (the `OPERATIONS` list in `extract.py`), its
+What is kept: for each operation the port calls, and each read the red-main observer makes
+(`src/sortyard/services/red_main.py`; the `OPERATIONS` list in `extract.py`), its
 parameters, its request body schema and its response schemas, and every component schema those
 refer to. Schemas are as published, except that descriptions and examples are dropped.
 

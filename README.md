@@ -274,6 +274,28 @@ release namespace). To run them in another cluster, set `kernel.workers.sameClus
 Role is rendered and the pod holds no token of its own cluster. One replica runs; a pod that
 is deleted loses nothing, since the engine and Postgres hold every item's state.
 
+### Red-main observer
+
+`sortyard-red-main` answers a red default branch of a lane repository with one triage item
+(SY-V3-RED-MAIN-OWNED, DECISIONS.md SY-DEC-014). For each lane listed in `redMain.lanes` it
+reads every repository the lane declares, as the GitHub App (actions and contents, read), and
+looks at the newest finished run on the default branch, from a push, a schedule or a run by
+hand, of each workflow whose file is on that branch. A red run newer than the lane's `since`,
+with no open triage item for that repository and workflow, is admitted as an item on the lane
+through the API; a later red run is recorded on that item as evidence; a green run before the
+item merges withdraws it as moot. The item is then built, reviewed and merged like any other.
+
+It acts as an operator of the lane's project: give it an operator and a role binding scoped to
+that project (in the bootstrap file), and name the binding in the values. It issues itself
+short-lived tokens for that binding from the database.
+
+```sh
+helm upgrade sortyard charts/sortyard --reuse-values --set redMain.enabled=true \
+  --set redMain.workspace=<workspace> \
+  --set-json 'redMain.lanes=[{"lane":"<lane>","project":"<project>","roleBinding":"<binding>","since":"<RFC 3339 time>"}]'
+kubectl logs -f deployment/sortyard-red-main
+```
+
 ### Worker image
 
 A worker Job runs three containers of the lane's worker image (`sortyard-worker clone`,
