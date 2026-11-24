@@ -422,3 +422,84 @@ provenance; where they conflict, the amendment wins.
   agent container a failed result, not a forged one; dropping all capabilities and
   `allowPrivilegeEscalation: false` in the manifest are for a follow-up.
   `tests/test_worker_entry.py` holds the behaviour.
+
+## SY-DEC-013 — Who owns the Walwarden board's alert and decision items after the lane move (2026-11-24)
+
+- **Context:** the rehearsal of the Walwarden lane move (SORTYARD-179, estate-gitops pull
+  request 8) reported 13 open WALWARDEN items `NOT MOVED`: 11 with no task spec (7, 8, 9, 11,
+  13, 14, 15, 32, 148, 176, 187) and 177 and 188, held by a Plane link to 176
+  (PREMISE-DECISIONS). After the move the legacy driver is off for the whole lane (`build: off`,
+  `tasks: off`). Read 2026-11-24 in noncelogic/k3s-harness `control-plane/conductor` at
+  `d3e7f6b`:
+  1. plane-sync still projects a board whose driver has build off. Its product sync
+     (`plane_sync_sweep._sync`, `plane_sync_sources.source_items`) is not gated on the driver,
+     so the alert items `main is red: <workflow>`, `Scheduled run failing: <workflow>` and
+     `Health: <repo>` are still opened on a red run and closed on a green one. On the SORTYARD
+     board, whose build went off on 2026-11-23 at 09:53Z (meta-harness `0e11baf8`), plane-sync
+     updated such items, and its stranded-build item, later that day (85, 86, 87 and 133,
+     between 11:53Z and 22:19Z).
+  2. The answer to a red run is gated on the driver: `queue_triage` returns at once for a board
+     that is not driven (`plane_sync_red_main.py`), so no triage item, no CI-only re-run and no
+     fix build follow. The file-verify sweep and the stranded-build ship step are gated the same
+     way.
+  3. The kernel has no red-main handling (SY-DEC-011).
+- **Options:** for the answer to a red main or a failing scheduled run on a moved lane:
+  1. Move now, and leave red runs shown on the board and answered by nobody until the kernel
+     has red-main handling. A red `main` of walwarden-context turns `gate1` red on every pull
+     request brought up to date (reasoning from `gate1` being required and strict, not an
+     observed incident), so the whole lane would stall with no owner.
+  2. Have the legacy conductor go on answering red runs for a board whose build is off. That is
+     two systems driving one lane, which section 6 of HARNESS-V3 and the brief rule out.
+  3. The kernel answers red runs on its own lanes (SORTYARD-204, SY-V3-RED-MAIN-OWNED: one triage
+     item per red workflow, admitted on the lane, ended by a green run), and the move waits for
+     it.
+- **Choice:** option 3. The real `to-kernel --apply` of the walwarden lane waits for
+  SORTYARD-204 Done, as it waits for SORTYARD-194 (SY-DEC-011). SORTYARD-204 is linked as a
+  blocker of SORTYARD-179. Option 1 leaves a state with no owning service, against the owner's
+  zero-stall mandate and "PLEASE PLEASE STOP BREAKING PRODUCTS" (2026-11-24). Option 2 breaks the
+  one-system-per-lane rule. This is the build team's choice under the brief; it carries no other
+  owner decision.
+- **The 13 items, as decided on SORTYARD-203 (a board comment on each, 2026-11-24):**
+  - 7, 8, 9, 11 and 148 are cancelled as stale: their workflows are no longer in the
+    repositories (walwarden has only `deploy.yml`, walwarden-context only `ci.yml`), so they
+    could never close themselves.
+  - 13 (deploy) is done: three deploy runs on `main` succeeded after the failing hand-started
+    run. 14 (a finished build with no pull request) and 187 (an invisible filing) are done: both
+    named only WALWARDEN-170, which is cancelled. 32 (sitemap) is done: its live done-test
+    passes.
+  - 15 (`Health: walwarden`) stays on the board. plane-sync owns its state (fact 1). Its one
+    failing line today is the hand-started deploy run of 2026-11-21, which plane-sync counts as
+    the scheduled kind; the deploy runs on `main` after it are green, so it is not a red main and
+    clears on the next successful hand-started deploy run (not dispatched for this: it deploys
+    production). A new red run is answered by SORTYARD-204. 13 stays Done while plane-sync's
+    cached copy of it is unchanged; if that cache is lost, it reopens on the same old run, with
+    the same reading. The move tool reports 15 `NOT MOVED` (`no-spec`), named on SORTYARD-179
+    with these owners. So is any later alert item the sync files.
+  - 176 is decided (I42, no owner gates): the access to noncelogic/walwarden is provided by the
+    kernel lane, which declares that repository and whose push probe passed (SORTYARD-197). 176 is
+    closed. 177 and 188 state the dependency as the capability need
+    `repository:noncelogic/walwarden`, which the kernel checks. They wait in Backlog, which the
+    legacy release does not pick up; the legacy driver cannot build that repository anyway. The
+    Plane link from 177 to 176 is removed. The move admits them.
+- **Other open items found on the way:**
+  - 174 (not one of the 13; it moved in the rehearsal) is cancelled as superseded by 177, so the
+    inventory is built once.
+  - 189 (WW-PR-DEPLOY-GATE, filed after the rehearsal) had a spec that did not parse as YAML; it
+    is re-serialized unchanged, and the move admits it.
+  - 4, 5 and 6 are projected pull requests the owner opened by hand (walwarden 1148, 1096 and
+    1034, August 2026). They are not conductor work and stay with their author, but the move
+    tool's drain waits for every started item, so it would never end: filed as SORTYARD-206
+    (SY-V3-DRAIN-CONDUCTOR-WORK-ONLY). Closing them is not the build team's call.
+  - The estate kernel has no project or operator for walwarden, on purpose until the move, so the
+    to-kernel plan stops at its first kernel read (HTTP 403). Filed as SORTYARD-205
+    (SY-V3-WALWARDEN-OPERATOR), applied as the move's first step.
+- **Consequences:**
+  - SORTYARD-179's real move waits on SORTYARD-194, 203, 204, 205 and 206 Done (each linked as
+    a blocker of 179).
+  - The board's alert items are only as current as plane-sync's projection. On 2026-11-24 the
+    last five boards in the `repos.yaml` order, WALWARDEN and SORTYARD among them, had not been
+    projected since 2026-11-23 about 22:19Z, because each pass spent its budget first. Filed on
+    the harness board as HARNESS-4177 (PLANE-SYNC-TAIL-BOARDS-REACHED).
+  - To reverse: drop SORTYARD-204 as a blocker of SORTYARD-179 with a new record here, or move
+    the lane back (`to-legacy`). After a move back, 177 and 188 come back in Backlog; to build
+    them under legacy, register noncelogic/walwarden in its control-plane registry.
