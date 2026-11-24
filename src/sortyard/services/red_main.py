@@ -15,9 +15,13 @@ file is on the default branch (`.github/workflows/`). Then, by workflow:
   is recorded on the item as evidence, a request (`requestItemChange`) whose answer is
   `resume` (carry on) and whose reason names the run. It is put on the item's timeline; no
   second item is admitted.
-- **green** newer than the failure while the item is open (not merged): the item is withdrawn
-  as moot (`requestItemChange` with the answer `withdraw`, which the shipped decision policy
-  grants an operator).
+- **green** newer than the failure, or the failing run itself turned green by a re-run, while
+  the item is open (not merged): the item is withdrawn as moot (`requestItemChange` with the
+  answer `withdraw`, which the shipped decision policy grants an operator: the role binding
+  must have the role operator).
+
+Each pass looks at the newest finished run only: two red runs inside one interval record the
+later one as evidence.
 
 Other conclusions (cancelled, skipped, neutral) are passed over for the next older run.
 
@@ -416,17 +420,19 @@ class Observer:
 
     def run_once(self) -> list[Act]:
         acts: list[Act] = []
+        # What one lane, repository or workflow cannot read ends only that part of the pass.
+        unread = (GitHubError, ApiError, ValueError, KeyError, TypeError, psycopg.Error)
         for watch in self.watches:
             api = self.apis[watch.lane]
             try:
                 opened = self.open_items(api, watch)
-            except ApiError as error:
-                acts.append(Act("unread", "", detail=str(error)))
+            except unread as error:
+                acts.append(Act("unread", "", detail=f"lane {watch.lane}: {error}"))
                 continue
             for repository in watch.repositories:
                 try:
                     acts += self.repository(api, watch, repository, opened)
-                except (GitHubError, ApiError) as error:
+                except unread as error:
                     acts.append(Act("unread", repository, detail=str(error)))
         for act in acts:
             log.info("%s %s %s %s %s", act.what, act.repository, act.workflow, act.item, act.detail)
@@ -463,17 +469,36 @@ class Observer:
         branch = self.github.default_branch(token, repository)
         acts: list[Act] = []
         for workflow in self.github.live_workflows(token, repository, branch):
-            run = self.github.newest_verdict(token, repository, workflow, branch)
-            if run is None:
-                continue
-            here = opened.get((repository, workflow.path))
-            if run.red and here is None and run.created_at > watch.since:
-                acts.append(self.admit(api, watch, repository, run))
-            elif run.red and here is not None and run.id != here.run:
-                acts += self.evidence(api, here, repository, run)
-            elif not run.red and here is not None and run.created_at > here.failed_at:
-                acts += self.withdraw(api, here, repository, run)
+            try:
+                acts += self.workflow(api, watch, repository, workflow, token, branch, opened)
+            except (GitHubError, ApiError, ValueError, KeyError, TypeError) as error:
+                acts.append(Act("unread", repository, workflow.path, detail=str(error)))
         return acts
+
+    def workflow(
+        self,
+        api: KernelApi,
+        watch: Watch,
+        repository: str,
+        workflow: Workflow,
+        token: Token,
+        branch: str,
+        opened: Mapping[tuple[str, str], Open],
+    ) -> list[Act]:
+        run = self.github.newest_verdict(token, repository, workflow, branch)
+        if run is None:
+            return []
+        here = opened.get((repository, workflow.path))
+        if run.red and here is None and run.created_at > watch.since:
+            return [self.admit(api, watch, repository, run)]
+        if run.red and here is not None and run.id != here.run:
+            return self.evidence(api, here, repository, run)
+        # Green after the failure: a newer run, or the failing run itself re-run green (a re-run
+        # keeps the run's id and its created_at).
+        newer = here is not None and (run.created_at > here.failed_at or run.id == here.run)
+        if not run.red and here is not None and newer:
+            return self.withdraw(api, here, repository, run)
+        return []
 
     def admit(self, api: KernelApi, watch: Watch, repository: str, run: Run) -> Act:
         body = admission(watch, repository, run)
@@ -506,8 +531,10 @@ class Observer:
 
     def withdraw(self, api: KernelApi, here: Open, repository: str, run: Run) -> list[Act]:
         mark = f"red-main moot: run {run.id}"
-        if (here.item, mark) in self.sent:
-            return []
+        if self._requested(api, here.item, mark):
+            # Asked before and still open: the request was not granted (the binding's role is
+            # not operator, or it arrived as the item moved). Said every pass, asked once.
+            return [Act("not-withdrawn", repository, run.workflow.path, here.item, run.id)]
         reason = (
             f"{mark}: the workflow {run.workflow.name} ({run.workflow.path}) passed on "
             f"{run.branch} at {run.head} ({run.event} run {run.id}, {run.url}), after the "

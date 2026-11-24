@@ -526,8 +526,13 @@ provenance; where they conflict, the amendment wins.
     answers 200 to the same admission.
   - Evidence is a request with the answer `resume` and the run in its reason: it is put on the
     item's timeline, the shipped policy has no rule for it, and the decision state's default
-    (`resume`) returns the item to the stay it was in. It is read back from the timeline, so a
-    restarted observer does not record a run twice.
+    (`resume`) returns the item to the stay it was in, with the same dispatch and deadline
+    (held by `tests/test_item_workflow.py`, "a request goes to the decision and the stay it
+    interrupted carries on"). It is read back from the timeline, so a restarted observer does
+    not record a run twice; a withdrawal is read back the same way, and one not granted (a
+    binding whose role is not operator) is reported every pass, not asked again.
+  - A failing run re-run green keeps its id and creation time; that run green ends the
+    incident too.
   - It gets its API token by issuing itself a short-lived operator token for the watched lane's
     role binding from the database, as `sortyard-api --issue-operator-token` does: it holds the
     database credential the API holds. A long-lived token kept in a Secret was the alternative;

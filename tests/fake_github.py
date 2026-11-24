@@ -2,8 +2,9 @@
 
 The fake holds repositories, branches, pull requests, check runs and installation tokens, and
 the Actions workflows, workflow runs and workflow files the red-main observer reads
-(`workflow`, `workflow_run`, `delete_file`), and answers in GitHub's JSON. It is held to GitHub's published API description, vendored as
-`tests/contracts/github/fragment.json` (`Contract`):
+(`workflow`, `workflow_run`, `delete_file`), and answers in GitHub's JSON. It is held to
+GitHub's published API description, vendored as `tests/contracts/github/fragment.json`
+(`Contract`):
 
 - a call to a path or method outside the fragment, an undocumented query parameter or body
   field, a body that does not match the documented request schema, or a missing API header is

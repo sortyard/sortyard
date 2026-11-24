@@ -236,7 +236,7 @@ redMain:
   # Seconds between two passes over the watched repositories.
   intervalSeconds: 60
   # The watched lanes. Each names a lane of kernel.lanes (every repository it declares is
-  # watched), the project its triage items go to, an operator role binding for that project
+  # watched), the project its triage items go to, a role binding with the role operator
   # (the observer issues itself short-lived tokens for it from the database), and `since`: when
   # the lane took its repositories (RFC 3339, quoted); an older red run files nothing.
   #   - lane: canary

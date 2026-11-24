@@ -403,3 +403,58 @@ def test_the_observer_gets_its_operator_token_from_the_database_and_the_api_take
         assert reply.status == 200 and reply.body == {"items": []}
     with pytest.raises(ValueError, match="no role binding"):
         red_main.OperatorTokens(lambda: psycopg.connect(deployment.conninfo), "rb-none")()
+
+
+def test_a_failing_run_re_run_green_withdraws_its_item_and_two_workflows_have_an_item_each() -> (
+    None
+):
+    """A re-run keeps the run's id and its created_at: the failing run itself turned green
+    ends the incident. Two red workflows of one repository are two incidents, and a green run
+    of one withdraws only its own item."""
+    with world() as w:
+        other = w.github.workflow(w.repo, ".github/workflows/health.yml", "health")
+        flaky = w.github.workflow_run(w.repo, w.workflow, "failure")
+        w.github.workflow_run(w.repo, other, "failure")
+        assert sorted(str(a.workflow) for a in w.observe() if a.what == "admitted") == [
+            CI,
+            other["path"],
+        ]
+        assert len(w.api.open_ids()) == 2
+        (run,) = [r for r in w.repo.actions if r["id"] == flaky]
+        run["conclusion"] = "success"  # re-run, green
+        acts = w.observe()
+        assert [(a.what, a.workflow, a.run) for a in acts] == [("withdrawn", CI, flaky)]
+        (still,) = w.api.open_ids()
+        assert w.api.items[still].admitted["spec"]["incident"]["workflow"] == other["path"]
+        w.verify()
+
+
+def test_a_withdraw_the_policy_does_not_grant_is_reported_and_a_withdrawn_run_is_not_refiled() -> (
+    None
+):
+    """A binding whose role is not operator asks for the withdrawal once, and each pass says
+    the item is still open; an item withdrawn by hand while its run is the newest red one is
+    not admitted again (the API refuses its id) and nothing else is filed."""
+    with world() as w:
+        w.github.workflow_run(w.repo, w.workflow, "failure")
+        w.observe()
+        (item,) = triage(w.api)
+        admin = w.api.token("admin", PROJECT)
+        w.observer.apis = {LANE: KernelApi(w.api.url, WS, lambda: admin)}
+        w.github.workflow_run(w.repo, w.workflow, "success")
+        assert [a.what for a in w.observe()] == ["withdrawn"]
+        assert w.api.items[item].state == "admitted"  # decided as resume: not granted
+        assert [a.what for a in w.observe()] == ["not-withdrawn"]
+        assert [a.what for a in w.again().run_once()] == ["not-withdrawn"]
+        assert len(w.api.seen("requestItemChange")) == 1
+        w.verify()
+    with world() as w:
+        w.github.workflow_run(w.repo, w.workflow, "failure")
+        w.observe()
+        (item,) = triage(w.api)
+        operator = w.api.token("operator", PROJECT)
+        KernelApi(w.api.url, WS, lambda: operator).request(item, "withdraw", "by hand")
+        (act,) = w.observe()
+        assert act.what == "refused" and "ended-item" in act.detail
+        assert triage(w.api) == [item] and w.api.open_ids() == []
+        w.verify()
