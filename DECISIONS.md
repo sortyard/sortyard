@@ -271,3 +271,87 @@ provenance; where they conflict, the amendment wins.
     repeats, not to cut the explanation; a comment or docstring that says why stays.
   - To reverse: set the rule's values in `tests/test_kernel_size.py` and amend this record in
     the same change.
+
+## SY-DEC-011 — What the Walwarden lane move accepts, and what guards a walwarden merge (2026-11-24)
+
+- **Context:** declaring the estate walwarden lane (SORTYARD-197, noncelogic/estate-gitops
+  pull request 5) left gaps between what the lane says and what really checks a change. Facts 1
+  and 2 and the probe gap are in estate-gitops `sortyard-kernel/README.md` under "Known gaps";
+  fact 3 is in SORTYARD-197's report on SORTYARD-179. The move of the lane (SORTYARD-179) needs
+  each one either accepted for the move or fixed first. Facts, read 2026-11-24:
+  1. The kernel requires `images.ci` to equal `images.worker` (`worker-image-is-ci-image`,
+     `src/sortyard/kernel/capabilities.py`), so the lane repeats the worker image (Node 24) as
+     its CI image. The real CI is not an image: the required check `gate1` of
+     noncelogic/walwarden-context (strict) runs on `[self-hosted, aks]` runners with
+     `setup-node` Node 22 and pnpm 10.28.2. Tests that need Docker, a database or a browser run
+     in neither the worker nor `gate1`.
+  2. noncelogic/walwarden has no branch protection and no pull-request CI. Its only workflow,
+     `deploy.yml`, runs on every push to `main`. Its first job
+     (`classifyProductionDeploymentScope.sh`) skips the rest when every changed path is on the
+     repository's trusted canary list; otherwise it deploys production:
+     - a gate job runs `npm run test:deploy`, `npm run test:deploy:azure` and `npm run typecheck`;
+     - after the gate, `migrate` (`prisma migrate deploy` on the production database) runs
+       beside the image build and **before** promote, with no rollback;
+     - promote switches both sites, rolling the sites (not the database) back on a failed
+       promote;
+     - a live proof runs after promote; its failure rolls nothing back.
+
+     The lane declares `checks = []` for walwarden, so the kernel merges a walwarden pull
+     request on review alone. So does the legacy driver today: pull request 1166 of walwarden,
+     merged by the conductor on 2026-11-23, carries only the old Vercel statuses, and the legacy
+     pipeline is `PR ─▶ one review ─▶ auto-merge` (meta-harness `operations/task-pickup.md`,
+     section 1). The lane sets `workflow-files = true`, so a pull request can also change
+     `deploy.yml` itself, which the push then runs.
+  3. The kernel does not tie a lane to a project. Admission checks that the lane exists and
+     that the item's repository is one of the lane's (`src/sortyard/kernel/admission.py`), so
+     an operator of another project could admit an item on the walwarden lane. Nothing does.
+  4. The runner-pool probe checks only that the worker cluster answers for Jobs, not that a
+     runner of the `aks` pool is there.
+- **Options:** for the walwarden merge guard (fact 2), the one that decides whether the move
+  can break the product:
+  1. The lane waits on a check. There is no pull-request check to wait on; a declared check
+     that never reports leaves every walwarden item in `merging` until its decision
+     (SY-DEC-009). It needs a pull-request workflow in walwarden first.
+  2. The review state is the guard, as under the legacy driver, with the deploy workflow after
+     the merge as it is. This rests on the review verdict being the reviewer's own. The
+     independent review of the estate worker image showed that code run during a review can
+     write the verdict file (SORTYARD-194, SY-V3-REVIEW-ANSWER-SEALED), so a pull request
+     could approve itself and go straight to the production database and sites, its own
+     `deploy.yml` changes included.
+  3. Hold the walwarden repository out of the lane (walwarden-context only). That splits the
+     board across two systems, which section 6 of HARNESS-V3 and the brief rule out (a lane
+     lives on one system at a time).
+- **Choice:**
+  - **Fact 2: option 2, gated on SORTYARD-194.** The walwarden lane is not moved to the kernel
+    (`to-kernel --apply`) until SORTYARD-194 is Done. With the verdict sealed, the kernel's
+    guard on a walwarden merge equals the legacy driver's: one independent review, which is
+    also the only guard on a migration, on a change to `deploy.yml`, and on a change that
+    passes the deploy gate but breaks the live sites. The stronger guard, option 1, is filed
+    as WALWARDEN-189 (WW-PR-DEPLOY-GATE: the deploy gate, and the migrations on a throwaway
+    database, run on every pull request). When it lands, the lane's walwarden entry declares
+    that check by a reviewed estate-gitops change. It is not a precondition of the move,
+    because it would hold the move for a guard the legacy driver does not have either.
+  - **Fact 1: accepted for the move.** The image is not what gates a walwarden-context merge;
+    `gate1` is, and GitHub requires it, so it runs on the same runners with Node 22 whichever
+    system drives the item. A change that passes in the Node 24 worker but fails on Node 22
+    turns `gate1` red and goes back to fixing; it cannot merge. The cost is a fix round, not a
+    broken product. Filed as SORTYARD-201 (SY-V3-LANE-CI-NOT-AN-IMAGE), so the lane file stops
+    stating a CI image it does not have.
+  - **Fact 3: accepted for the move.** Only operators admit items, and the move tool admits
+    under the project `walwarden`. Filed as SORTYARD-202 (SY-V3-LANE-PROJECT-BOUND).
+  - **Fact 4: accepted for the move.** If the `aks` runners are gone, `gate1` never reports and
+    walwarden-context items wait in `merging` until their decision (SY-DEC-009): a stall, not a
+    broken product, and the same `gate1` stalls the legacy driver.
+  - These are the build team's choices under the brief ("PLEASE PLEASE STOP BREAKING
+    PRODUCTS", the owner, 2026-11-24); they carry no other owner decision.
+- **Consequences:**
+  - SORTYARD-179's real move waits on SORTYARD-194 and SORTYARD-203 Done, in addition to its
+    rehearsal record and the announcement the move tool checks.
+  - After the move, a walwarden pull request merges on one sealed review and is checked by the
+    deploy workflow only after the merge, as today. A gate failure stops the deploy before the
+    migration and promote and leaves `main` red; a bad migration or a live-proof failure is not
+    rolled back by the workflow. The kernel has no red-main handling, and the legacy driver's
+    `red-main` items are board items without a task spec, which the move tool reports
+    `no-spec` and does not move (SORTYARD-203 gives them an owner before the move).
+  - To reverse: move the lane back (`to-legacy`, until the day-28 verdict), or declare a check
+    for walwarden once WALWARDEN-189 lands.
