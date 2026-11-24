@@ -345,8 +345,8 @@ provenance; where they conflict, the amendment wins.
   - These are the build team's choices under the brief ("PLEASE PLEASE STOP BREAKING
     PRODUCTS", the owner, 2026-11-24); they carry no other owner decision.
 - **Consequences:**
-  - SORTYARD-179's real move waits on SORTYARD-194 Done, in addition to its rehearsal record and
-    the announcement the move tool checks.
+  - SORTYARD-179's real move waits on SORTYARD-194 and SORTYARD-203 Done, in addition to its
+    rehearsal record and the announcement the move tool checks.
   - After the move, a walwarden pull request merges on one sealed review and is checked by the
     deploy workflow only after the merge, as today. A gate failure stops the deploy before the
     migration and promote and leaves `main` red; a bad migration or a live-proof failure is not
