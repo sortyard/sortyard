@@ -16,7 +16,7 @@ from __future__ import annotations
 import re
 import tomllib
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import timedelta
 from importlib import resources
 from typing import Any
@@ -363,6 +363,10 @@ def load(text: str) -> StateTable:
     return StateTable(version, reasons, states, initial[0], text)
 
 
+# The fields of a `State` that a record carries as they are.
+_PLAIN = ("reason", "owner", "initial", "queue", "decision", "terminal")
+
+
 def to_record(table: StateTable) -> dict[str, Any]:
     """The checked table as plain JSON values, for handing to a workflow.
 
@@ -378,14 +382,8 @@ def to_record(table: StateTable) -> dict[str, Any]:
     for state in table.states.values():
         limit, default = state.limit, state.default
         states[state.name] = {
-            "reason": state.reason,
-            "owner": state.owner,
+            **{key: getattr(state, key) for key in (*_PLAIN, "lifecycle")},
             "next": dict(state.next),
-            "initial": state.initial,
-            "queue": state.queue,
-            "decision": state.decision,
-            "terminal": state.terminal,
-            "lifecycle": state.lifecycle,
             "limit": limit
             and {
                 "kind": limit.kind,
@@ -393,17 +391,7 @@ def to_record(table: StateTable) -> dict[str, Any]:
                 "duration": seconds(limit.duration),
                 "by_tier": {tier: seconds(value) for tier, value in limit.by_tier.items()},
             },
-            "default": default
-            and {
-                "kind": default.kind,
-                "text": default.text,
-                "to": default.to,
-                "retries": default.retries,
-                "answer": default.answer,
-                "reverse": default.reverse,
-                "on_repeat": default.on_repeat,
-                "action": default.action,
-            },
+            "default": default and asdict(default),  # read back as `Default(**default)`
         }
     return {
         "version": table.version,
@@ -424,8 +412,7 @@ def from_record(record: Mapping[str, Any]) -> StateTable:
         limit, default = raw["limit"], raw["default"]
         states[name] = State(
             name,
-            raw["reason"],
-            owner=raw["owner"],
+            **{key: raw[key] for key in _PLAIN},
             limit=limit
             and Limit(
                 limit["kind"],
@@ -437,10 +424,6 @@ def from_record(record: Mapping[str, Any]) -> StateTable:
             ),
             default=default and Default(**default),
             next=raw["next"],
-            initial=raw["initial"],
-            queue=raw["queue"],
-            decision=raw["decision"],
-            terminal=raw["terminal"],
             lifecycle=raw.get("lifecycle"),
         )
     return StateTable(record["version"], record["reasons"], states, record["initial"], "")

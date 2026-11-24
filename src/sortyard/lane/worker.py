@@ -50,6 +50,7 @@ from typing import Any
 from sortyard.kernel.capabilities import REPOSITORY, SECRET, SERVICE, WORKER_IMAGE, Lane, Need
 from sortyard.kernel.item import Owner, Payload
 from sortyard.kernel.preflight import Probe, ProbeResult
+from sortyard.lane.github import branch_of, permissions_for
 from sortyard.lane.jobs import (
     BRIEF_KEY,
     DISPATCH_LABEL,
@@ -84,6 +85,9 @@ BRIEF_ENV, TOKEN_FILE_ENV, WORK_ENV, STATE_ENV = (
 CLONE, AGENT = "clone", "agent"
 # A container's termination message is cut at 4096 bytes; the worker keeps its result under it.
 TERMINATION_LOG, RESULT_LIMIT = "/dev/termination-log", 4096
+
+# The branch a worker pushes is the one the adapters find the pull request by.
+branch = branch_of
 
 _HEAD = re.compile(r"[0-9a-f]{40}([0-9a-f]{24})?")
 _DIGEST = re.compile(r"[^@\s]+@sha256:[0-9a-f]{64}")
@@ -147,10 +151,6 @@ def job_name(tenant: str, item: str, dispatch: int) -> str:
 def item_label(tenant: str, item: str) -> str:
     """What every Job of one item of one tenant is labelled with."""
     return hashlib.sha256(f"{len(tenant)}:{tenant}:{item}".encode()).hexdigest()[:24]
-
-
-def branch(item: str) -> str:
-    return f"sortyard/{item}"
 
 
 def brief(mode: str, work: Work, call: Payload, config: WorkerConfig) -> dict[str, Any]:
@@ -316,11 +316,10 @@ class Launcher:
         """The item's work, and how to mint the token a Job of `state` needs."""
         work, mode = self._lookup(tenant, item), MODES[state]
         repository = work.lane.repositories[work.lane.check(Need(REPOSITORY, work.repository)).name]
-        permissions = {"contents": "read" if mode == REVIEW else "write"}
+        wanted = {"contents": "write"}
         if mode == REVIEW:
-            permissions["pull_requests"] = "read"
-        elif repository.workflow_files:
-            permissions["workflows"] = "write"
+            wanted = {"contents": "read", "pull_requests": "read"}
+        permissions = permissions_for(wanted, repository.workflow_files)
         return work, lambda: self._tokens(work.repository, permissions)
 
     def launch(self, call: Payload) -> None:

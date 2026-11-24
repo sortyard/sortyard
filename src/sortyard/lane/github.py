@@ -47,7 +47,7 @@ import urllib.parse
 import urllib.request
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, Protocol
+from typing import Any, ClassVar, Protocol, TypeVar
 
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
@@ -69,6 +69,14 @@ SCRATCH_PREFIX = "refs/heads/sortyard-probe/"
 CHECKS_FAILED = "checks failed: "
 # How many merges of the base on top of the reviewed commit are followed before giving up.
 BASE_MERGES = 10
+_Read = TypeVar("_Read")
+
+
+def permissions_for(wanted: Mapping[str, str], workflow_files: bool) -> dict[str, str]:
+    """The permissions to mint a token with: a token that writes contents in a repository the
+    lane declares workflow files for asks for the workflows permission too."""
+    more = workflow_files and wanted.get("contents") == "write"
+    return {**wanted, **({"workflows": "write"} if more else {})}
 
 
 class GitHubError(Exception):
@@ -278,8 +286,8 @@ class HttpGitHub:
             raise GitHubError(0, method, path, "the reply is not JSON") from None
 
     def _read(
-        self, shape: Callable[[Any], Any], method: str, path: str, token: Token, **more: Any
-    ) -> Any:
+        self, shape: Callable[[Any], _Read], method: str, path: str, token: Token, **more: Any
+    ) -> _Read:
         """A call whose reply `shape` reads; a reply it cannot read is an error with no body."""
         reply = self._call(method, path, token.value, **more)
         try:
@@ -291,10 +299,9 @@ class HttpGitHub:
         app = Token(self._app_token(), "", {})
         installation = self._installations.get(repository)
         if installation is None:
-            found = self._read(
-                lambda r: int(r["id"]), "GET", f"/repos/{repository}/installation", app
-            )
-            installation = self._installations[repository] = found
+            path = f"/repos/{repository}/installation"
+            installation = self._read(lambda r: int(r["id"]), "GET", path, app)
+            self._installations[repository] = installation
         path = f"/app/installations/{installation}/access_tokens"
         body = {"repositories": [repository.split("/", 1)[1]], "permissions": dict(permissions)}
 
@@ -305,11 +312,10 @@ class HttpGitHub:
             return Token(value, expires, dict(reply.get("permissions") or {}))
 
         try:
-            minted: Token = self._read(shape, "POST", path, app, body=body)
+            return self._read(shape, "POST", path, app, body=body)
         except GitHubError:
             self._installations.pop(repository, None)  # the installation may have changed
             raise
-        return minted
 
     def find_pull(self, token: Token, repository: str, branch: str) -> Pull | None:
         owner = repository.split("/", 1)[0]
@@ -322,24 +328,20 @@ class HttpGitHub:
         number = self._read(newest, "GET", f"/repos/{repository}/pulls", token, query=query)
         if number is None:
             return None
-        found: Pull = self._read(_pull, "GET", f"/repos/{repository}/pulls/{number}", token)
-        return found
+        return self._read(_pull, "GET", f"/repos/{repository}/pulls/{number}", token)
 
     def open_pull(
         self, token: Token, repository: str, *, branch: str, base: str, title: str, body: str = ""
     ) -> Pull:
         sent = {"head": branch, "base": base, "title": title, "body": body}
-        opened: Pull = self._read(_pull, "POST", f"/repos/{repository}/pulls", token, body=sent)
-        return opened
+        return self._read(_pull, "POST", f"/repos/{repository}/pulls", token, body=sent)
 
     def required_checks(self, token: Token, repository: str, branch: str) -> tuple[str, ...]:
         def shape(reply: Any) -> tuple[str, ...]:
             required = (reply.get("protection") or {}).get("required_status_checks") or {}
             return tuple(str(context) for context in required.get("contexts") or ())
 
-        path = f"/repos/{repository}/branches/{branch}"
-        contexts: tuple[str, ...] = self._read(shape, "GET", path, token)
-        return contexts
+        return self._read(shape, "GET", f"/repos/{repository}/branches/{branch}", token)
 
     def checks(self, token: Token, repository: str, sha: str) -> tuple[Check, ...]:
         def shape(reply: Any) -> tuple[int, list[Check]]:
@@ -376,17 +378,13 @@ class HttpGitHub:
             return str(reply["sha"])
 
         path = f"/repos/{repository}/pulls/{number}/merge"
-        sha: str = self._read(shape, "PUT", path, token, body={"sha": head, "merge_method": method})
-        return sha
+        return self._read(shape, "PUT", path, token, body={"sha": head, "merge_method": method})
 
     def parents(self, token: Token, repository: str, sha: str) -> tuple[str, ...]:
         def shape(reply: Any) -> tuple[str, ...]:
             return tuple(str(parent["sha"]) for parent in reply["parents"])
 
-        found: tuple[str, ...] = self._read(
-            shape, "GET", f"/repos/{repository}/git/commits/{sha}", token
-        )
-        return found
+        return self._read(shape, "GET", f"/repos/{repository}/git/commits/{sha}", token)
 
     def on_branch(self, token: Token, repository: str, branch: str, sha: str) -> bool:
         path = f"/repos/{repository}/compare/{branch}...{sha}"
@@ -397,9 +395,7 @@ class HttpGitHub:
         def shape(reply: Any) -> tuple[Ref, ...]:
             return tuple(Ref(str(each["ref"]), str(each["object"]["sha"])) for each in reply)
 
-        path = f"/repos/{repository}/git/matching-refs/{prefix}"
-        found: tuple[Ref, ...] = self._read(shape, "GET", path, token)
-        return found
+        return self._read(shape, "GET", f"/repos/{repository}/git/matching-refs/{prefix}", token)
 
     def create_ref(self, token: Token, repository: str, ref: str, sha: str) -> None:
         self._call("POST", f"/repos/{repository}/git/refs", token.value, {"ref": ref, "sha": sha})
@@ -465,9 +461,7 @@ class _Adapter:
     def observe(self, call: Payload) -> Observation:
         """Look at GitHub for the stay `call` describes (tenant, item, action, detail)."""
         target = self._target_of(call["tenant"], call["item"])
-        permissions = dict(self.PERMISSIONS)
-        if target.workflow_files and permissions.get("contents") == "write":
-            permissions["workflows"] = "write"
+        permissions = permissions_for(self.PERMISSIONS, target.workflow_files)
         token = self._port.token(target.repository, permissions)
         branch = branch_of(call["item"])
         pull = self._port.find_pull(token, target.repository, branch)
@@ -634,9 +628,7 @@ class RepositoryProbe:
         declared = lane.repositories.get(need.name) if need.kind == REPOSITORY else None
         if declared is None:
             return ProbeResult(False, f"lane {lane.name} declares no repository for {need.text}")
-        wanted = {"contents": "write"}
-        if declared.workflow_files:
-            wanted["workflows"] = "write"
+        wanted = permissions_for({"contents": "write"}, declared.workflow_files)
         ref = self._prefix + self._unique()
         try:
             token = self._port.token(need.name, wanted)

@@ -100,6 +100,10 @@ def _timestamp(value: str) -> str:
     return moment.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
+# The facts of a transition that an Event carries as given, and as null when not given.
+_WHEN_GIVEN = ("owner", "limit", "outcome", "default", "action", "decision", "request")
+
+
 def event_for(transition: Mapping[str, Any]) -> dict[str, Any]:
     """The ledger Event (spec/event.schema.json, less the seq the ledger assigns) of a transition.
 
@@ -111,15 +115,9 @@ def event_for(transition: Mapping[str, Any]) -> dict[str, Any]:
     tenant, item, sequence = transition["tenant"], transition["item"], transition["sequence"]
     facts = {
         "sequence": sequence,
-        "owner": transition.get("owner"),
-        "limit": transition.get("limit"),
         "reason": transition["reason"],
         "cause": transition["cause"],
-        "outcome": transition.get("outcome"),
-        "default": transition.get("default"),
-        "action": transition.get("action"),
-        "decision": transition.get("decision"),
-        "request": transition.get("request"),
+        **{key: transition.get(key) for key in _WHEN_GIVEN},
         "lifecycle": {"record_type": LIFECYCLE_RECORD_TYPE, "kind": lifecycle_kind(transition)},
     }
     return {
@@ -198,6 +196,10 @@ class Ledger:
             )
 
 
+# The columns of an item that the queue gives as they are stored.
+_AS_STORED = ("id", "title", "milestone_id", "risk_tier", "state", "owner")
+
+
 def queue(
     conn: Conn, tenant: str, project: str, now: datetime | None = None
 ) -> list[dict[str, Any]]:
@@ -247,12 +249,7 @@ def queue(
             since = row["entered_at"] or row["created_at"]
             ordered.append(
                 {
-                    "id": row["id"],
-                    "title": row["title"],
-                    "milestone_id": row["milestone_id"],
-                    "risk_tier": row["risk_tier"],
-                    "state": row["state"],
-                    "owner": row["owner"],
+                    **{key: row[key] for key in _AS_STORED},
                     "limit": row["limit_text"],
                     "reason": row["reason"],
                     "entered_at": row["entered_at"].isoformat() if row["entered_at"] else None,
