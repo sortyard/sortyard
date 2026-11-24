@@ -332,7 +332,7 @@ What an agent command may rely on, and what it must not:
   CAP_DAC_READ_SEARCH (a privileged container, or one that can open the state volume's files by
   handle), nor as a user other than root holding any capability: the seal rests on the agent
   being unable to read the entry point's memory or the key's file.
-  Decision record: [SY-DEC-011](DECISIONS.md#sy-dec-011).
+  Decision record: [SY-DEC-012](DECISIONS.md#sy-dec-012).
 
 ## Data model
 

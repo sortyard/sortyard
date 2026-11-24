@@ -31,7 +31,7 @@ GitHub token:
   `approved`, or `findings` with the first finding's key as the one finding key. An answer
   that cannot be read that way is a failed result, never an approval.
 
-What anything the agent command starts cannot do (SY-DEC-011 in DECISIONS.md): write the
+What anything the agent command starts cannot do (SY-DEC-012 in DECISIONS.md): write the
 sentinel or the answer. It runs as the entry point's user and can write every file of the
 workspace, so the sentinel is not trusted for being a file there: it is trusted for the
 digest, whose key it cannot read. The key is in no file it can open once the command starts,
@@ -42,7 +42,7 @@ root; the command runs with no-new-privileges). The answer is not in a file at a
 names the writer of each piece read from the command's standard output, and only the command's
 own process is heard (`AttestedOutput`, which a wrapper that relays a program's answer uses in
 turn). What is left to such code is to make the result fail, or to act on the command process
-itself (see SY-DEC-011 for the residual risk).
+itself (see SY-DEC-012 for the residual risk).
 
 Every result carries the head commit. A failed result (`{"outcome":"failed","reason":...}`,
 exit status 1) is no outcome: the launcher's observer gives no reply for it.
