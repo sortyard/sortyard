@@ -537,6 +537,15 @@ provenance; where they conflict, the amendment wins.
     newest commit speaks for it. The estate drill (2026-11-24) admitted a second item for a red
     run that predated the merged fix while the merge commit's run was still in progress; the
     item was withdrawn as moot when that run went green, and the rule was changed.
+  - A red run of a commit the branch has moved past is answered only after the new head has
+    gone `HEAD_GRACE_SECONDS` (300) without a run of its own: the second estate drill admitted
+    a second item 6 s after a fix merged, before GitHub listed the merge's run. A workflow that
+    skips the new head (a path filter) is still answered, after the grace, measured from when
+    the observer first read that head; on a repository whose head moves more often than the
+    grace, such a red run waits until the head stays put.
+  - A newest run that stays queued or waiting (an environment approval) holds the verdict until
+    it ends; an open item meanwhile keeps the kernel's own limits. No limit of the observer's
+    own ends that wait (review of sortyard/sortyard#42).
   - It gets its API token by issuing itself a short-lived operator token for the watched lane's
     role binding from the database, as `sortyard-api --issue-operator-token` does: it holds the
     database credential the API holds. A long-lived token kept in a Secret was the alternative;

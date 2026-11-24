@@ -73,6 +73,7 @@ import pathlib
 import signal
 import sys
 import threading
+import time
 import tomllib
 import urllib.error
 import urllib.parse
@@ -104,6 +105,9 @@ READ = {"actions": "read", "contents": "read"}
 PREFIX = "red-main-"
 EVIDENCE = "red-main evidence: run {run}"
 RUNS_PAGE = 50
+# How long a new head of the branch may go without a run of its own before a red run of an
+# older commit is answered: a run GitHub starts for a push is listed a few seconds after it.
+HEAD_GRACE_SECONDS = 300.0
 
 
 @dataclass(frozen=True)
@@ -142,6 +146,11 @@ class ActionsGitHub(HttpGitHub):
 
     def default_branch(self, token: Token, repository: str) -> str:
         return self._read(lambda r: str(r["default_branch"]), "GET", f"/repos/{repository}", token)
+
+    def head(self, token: Token, repository: str, branch: str) -> str:
+        """The commit the branch is at."""
+        path = f"/repos/{repository}/branches/{branch}"
+        return self._read(lambda r: str(r["commit"]["sha"]), "GET", path, token)
 
     def workflow_files(self, token: Token, repository: str, branch: str) -> frozenset[str]:
         """The paths of the files under .github/workflows on the branch (none: no directory)."""
@@ -420,6 +429,17 @@ class Observer:
     watches: Sequence[Watch]
     # Requests sent and not yet seen on the timeline: (item, what). Only saves a repeat.
     sent: set[tuple[str, str]] = field(default_factory=set)
+    clock: Callable[[], float] = time.monotonic
+    # By repository: the branch head last read and when it was first seen (process memory; a
+    # restart only waits the grace again).
+    heads: dict[str, tuple[str, float]] = field(default_factory=dict)
+
+    def settled(self, repository: str, head: str) -> bool:
+        """Whether the branch has been at `head` for the grace period."""
+        seen = self.heads.get(repository)
+        if seen is None or seen[0] != head:
+            self.heads[repository] = seen = (head, self.clock())
+        return self.clock() - seen[1] >= HEAD_GRACE_SECONDS
 
     def run_once(self) -> list[Act]:
         acts: list[Act] = []
@@ -470,10 +490,18 @@ class Observer:
     ) -> list[Act]:
         token = self.github.token(repository, READ)
         branch = self.github.default_branch(token, repository)
+        # Read after the open items: a fix the queue already shows merged has moved the head.
+        try:
+            head = self.github.head(token, repository, branch)
+            settled = self.settled(repository, head)
+        except GitHubError:  # unknown: no admission of an older commit's run this pass
+            head, settled = "", False
         acts: list[Act] = []
         for workflow in self.github.live_workflows(token, repository, branch):
             try:
-                acts += self.workflow(api, watch, repository, workflow, token, branch, opened)
+                acts += self.workflow(
+                    api, watch, repository, workflow, token, branch, opened, head, settled
+                )
             except (GitHubError, ApiError, ValueError, KeyError, TypeError) as error:
                 acts.append(Act("unread", repository, workflow.path, detail=str(error)))
         return acts
@@ -487,12 +515,18 @@ class Observer:
         token: Token,
         branch: str,
         opened: Mapping[tuple[str, str], Open],
+        head: str,
+        settled: bool,
     ) -> list[Act]:
         run = self.github.newest_verdict(token, repository, workflow, branch)
         if run is None:
             return []
         here = opened.get((repository, workflow.path))
-        if run.red and here is None and run.created_at > watch.since:
+        # A red run of a commit the branch has moved past is answered only once the new head
+        # has had time to get a run of its own (a merged fix's run is listed seconds after the
+        # merge; found on the estate) or never will (a workflow that skips some pushes).
+        current = run.head == head or settled
+        if run.red and here is None and run.created_at > watch.since and current:
             return [self.admit(api, watch, repository, run)]
         if run.red and here is not None and run.id != here.run:
             return self.evidence(api, here, repository, run)
