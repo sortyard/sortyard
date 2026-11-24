@@ -18,10 +18,10 @@ Three things happen here that no single adapter owns:
   every gap item the item waits on has closed, so an item whose `closed` was lost (the service
   stopped between closing the gap item and telling the item) still returns to preflight.
 - **An item that ends without merging** (withdrawn). A terminal state has no owner and no open
-  stay, so the record step cleans up: it records the transition, naming the item's branch and
-  open pull request (left open), then deletes the item's Jobs and per-job secrets. The engine
-  retries it until it succeeds, across restarts. And no look is made for a stay the item has
-  left, so a pass that read the stay before the item was withdrawn does not merge it after.
+  stay, so the record step, retried until it succeeds, cleans up: it records what the item left
+  (its branch; its pull request open, merged, closed or none), then deletes its Jobs and per-job
+  secrets, recording after them when GitHub was not read so that a retry reads again. No look is
+  made for a stay the item has left, so a pass that read it before the withdrawal does not merge.
 """
 
 from __future__ import annotations
@@ -187,16 +187,26 @@ def build(
             spec, branch = items.spec(tenant, item), branch_of(item)
         except LookupError:  # not admitted with a spec: no branch, no Job
             return ledger.record(transition)
+        with connect() as conn:  # recorded by an attempt that then stopped: the cleanup is left
+            done = conn.execute(_IN_STATE, [tenant, item, transition["state"]]).fetchone()
         try:
             token = github.token(spec.repository, {"pull_requests": "read"})
             found = github.find_pull(token, spec.repository, branch)
             pull: Any = found.number if found is not None and found.open else None
         except GitHubError as error:  # the item ends all the same; the record says why not
-            pull = f"not read: {error}"
+            found, pull = None, f"not read: {error}"
+        read, merged = not isinstance(pull, str), found is not None and found.merged
+        state = "open" if pull and read else "merged" if merged else "closed" if found else "none"
         left = {"repository": spec.repository, "branch": branch, "pull_request": pull}
-        ledger.record({**transition, "detail": {**transition["detail"], "left_open": left}})
+        left |= {"pull_state": state if read else "not read", "pull_number": found and found.number}
+        left["merge_sha"] = found.merge_sha if found is not None and merged else None
+        detail = {**transition["detail"], "left_open": left}
+        if read and not done:  # first, so the item reads as ended while its cleanup is retried
+            ledger.record({**transition, "left_open": left, "detail": detail})
         gaps.settle(tenant, item)  # it waits on no capability-gap item any more
         jobs.delete_earlier(worker.item_label(tenant, item), 2**31)
+        if not done:  # last when GitHub was not read, so that a retried step stores its read
+            ledger.record({**transition, "left_open": left, "detail": detail})
 
     def current(look: Look) -> Look:
         def guarded(stay: Payload) -> Payload | None:

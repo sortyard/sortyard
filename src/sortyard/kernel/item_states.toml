@@ -42,8 +42,9 @@
 # enters it. Only a state that means a merged change says "merged". withdrawn does not: it is
 # the terminal state of an item the kernel stopped driving (so a lane can move back to another
 # system and its open items be filed there), reached only as an answer of the decision state.
-# Its Jobs and per-job secrets are deleted when it is recorded, its pull request is left open,
-# its lane slot is free again, and what it blocks stays queued (and is reported as such).
+# Its Jobs and per-job secrets are deleted when it is recorded, its pull request is left open
+# (and recorded with its state: open, merged, closed or none), its lane slot is free again,
+# and what it blocks stays queued (and is reported as such).
 #
 # Where the numbers come from. checking 10m, reviewing 30m and merging 30m are the limits of
 # HARNESS-V3 section 3.1. That section gives preflight as "minutes" and building as "by risk
