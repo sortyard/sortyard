@@ -28,6 +28,10 @@ gap-limit = "2h"
 
 runner-pool = "example-runners"
 
+# Optional: how many of the lane's items may be out of the queue at once (dispatched and not
+# yet merged, a wait on a need included). Left out, one.
+slots = 2
+
 # Needs every task of the lane has, beyond worker-image and runner-pool.
 defaults = ["repository:example/app"]
 
@@ -37,10 +41,13 @@ worker = "registry.example/lanes/example-worker@sha256:0123456789abcdef012345678
 ci = "registry.example/lanes/example-ci@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 # Repositories the lane pushes to. workflow-files says the lane must be able to push workflow
-# files there; the probe for the repository exercises that too.
+# files there; the probe for the repository exercises that too. checks names the checks a pull
+# request there must pass before review and merge: left out, the base branch's required checks
+# (and when it requires none, every check that runs); an empty list, the repository runs none.
 [[repositories]]
 name = "example/app"
 workflow-files = true
+checks = ["test"]
 
 [[repositories]]
 name = "example/charts"

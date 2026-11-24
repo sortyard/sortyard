@@ -23,8 +23,9 @@ import psycopg
 import psycopg.conninfo
 from psycopg.types.json import Jsonb
 
-from sortyard.api import auth
+from sortyard.api import auth, handlers
 from sortyard.engine import WorkflowNotFound
+from sortyard.kernel import capabilities
 from sortyard.kernel.item import INPUT_SIGNAL, workflow_id
 from sortyard.kernel.ledger import Ledger
 from sortyard.services import api
@@ -312,6 +313,29 @@ class FakeSignals:
         self.sent.append((workflow, payload))
 
 
+class FakeStarts:
+    """Starting an item's workflow, as the API service does it: a strict fake.
+
+    As `Engine.start` does, it takes an id once and raises `ValueError` for one already used
+    (tests/test_engine_failure.py holds the real engine to that); tests/test_admission.py runs
+    admission against the real engine.
+    """
+
+    def __init__(self) -> None:
+        self.started: list[tuple[str, str, str]] = []
+
+    def __call__(self, tenant: str, item: str, risk_tier: str) -> None:
+        if (tenant, item) in {started[:2] for started in self.started}:
+            raise ValueError(f"workflow id {workflow_id(tenant, item)!r} is already used")
+        self.started.append((tenant, item, risk_tier))
+
+
+def example_kernel() -> handlers.Kernel:
+    """The kernel door of a service that runs the shipped example lane, on `FakeStarts`."""
+    lane = capabilities.load(capabilities.example_text())
+    return handlers.Kernel({lane.name: lane}, FakeStarts())
+
+
 @dataclass
 class Api:
     base: str
@@ -370,11 +394,15 @@ class Api:
         )
 
 
-def running_api(signal_item: Any = None) -> Iterator[Api]:
+def running_api(
+    signal_item: Any = None, kernel: handlers.Kernel | bool | None = True
+) -> Iterator[Api]:
     """A migrated, seeded database and the API service on it.
 
     `signal_item` is how the service reaches the workflow engine. By default it is a
-    `FakeSignals` that knows one running workflow, the seeded item's.
+    `FakeSignals` that knows one running workflow, the seeded item's. `kernel` is what
+    admission stands on: by default the example lane and `FakeStarts`; None for a service
+    that runs without one.
     """
     for database in fresh_database():
         proc = database.migrate()
@@ -392,7 +420,8 @@ def running_api(signal_item: Any = None) -> Iterator[Api]:
         Ledger(connect).create_item(tenant=WS, item=ITEM, project="proj-a", title="An item")
         signals = signal_item or FakeSignals({workflow_id(WS, ITEM)})
         config = api.Config(host="127.0.0.1", port=0, database_name=database.name)
-        server = api.make_server(config, connect=connect, signal_item=signals)
+        door = example_kernel() if kernel is True else (kernel or None)
+        server = api.make_server(config, connect=connect, signal_item=signals, kernel=door)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         handle = Api(f"http://127.0.0.1:{server.server_address[1]}", conninfo, tokens)
         try:

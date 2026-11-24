@@ -34,16 +34,28 @@ class ApiError(Exception):
     """A refusal, answered as an RFC 9457 problem (components/schemas/Problem)."""
 
     def __init__(
-        self, status: int, title: str, detail: str = "", reason_code: str | None = None
+        self,
+        status: int,
+        title: str,
+        detail: str = "",
+        reason_code: str | None = None,
+        extra: Doc | None = None,
     ) -> None:
         super().__init__(f"{status} {title}: {detail}")
         self.status = status
         self.title = title
         self.detail = detail
         self.reason_code = reason_code
+        #: Extension members of the problem (RFC 9457 section 3.2), e.g. `reasons`.
+        self.extra = extra or {}
 
     def problem(self) -> Doc:
-        body: Doc = {"type": "about:blank", "title": self.title, "status": self.status}
+        body: Doc = {
+            **self.extra,
+            "type": "about:blank",
+            "title": self.title,
+            "status": self.status,
+        }
         if self.detail:
             body["detail"] = self.detail
         if self.reason_code:

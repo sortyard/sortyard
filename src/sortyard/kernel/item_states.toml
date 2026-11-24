@@ -48,6 +48,12 @@
 # preflight and building durations, the waiting "otherwise" and the time bound on fixing (the
 # building durations again, since the same executor does the work) are provisional and carry
 # no owner decision.
+#
+# merging: section 3.1 gives its default as "update the branch and re-arm". That is what each
+# passed limit does, three times; a merge that still has not happened after four half hours
+# (checks on the head that never report, say) then goes to a decision instead of re-arming for
+# ever. That departs from the section's wording, and the count is the build team's and
+# provisional: DECISIONS.md SY-DEC-009 records the options and the choice.
 
 version = 1
 
@@ -110,7 +116,7 @@ next = { fixed = "checking" }
 [states.merging]
 owner = "merge-adapter"
 limit = "30m"
-default = { redispatch = true, action = "update-branch" }
+default = { retry = 3, then = "decision", action = "update-branch" }
 reason = "merge-in-progress"
 next = { merged = "merged", conflict = "fixing", moved = "checking" }
 

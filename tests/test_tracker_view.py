@@ -281,18 +281,20 @@ def test_a_request_is_answered_503_when_the_engine_cannot_be_reached() -> None:
 
 
 def test_no_endpoint_writes_item_state() -> None:
-    """Statically: the only item operation that is not a read is the request, and no API code
-    writes the item tables. (The database refuses a direct write as well:
-    tests/test_ledger_projection.py.)"""
+    """Statically: the only item operations that are not reads are the request and admission,
+    and no API code writes the item tables: admission creates an item, with no state, through
+    the kernel (sortyard.kernel.admission). (The database refuses a direct write of state as
+    well: tests/test_ledger_projection.py.)"""
     item_ops = {
         op.operation_id: op.method
         for op in permissions.OPERATIONS.values()
-        if "/items/" in op.path or op.path.endswith("/queue")
+        if "/items" in op.path or op.path.endswith("/queue")
     }
     assert item_ops == {
         "getProjectQueue": "GET",
         "getItemTimeline": "GET",
         "requestItemChange": "POST",
+        "admitItem": "POST",
     }
     assert set(item_ops) <= set(handlers.HANDLERS)
     writes = re.compile(

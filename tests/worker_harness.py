@@ -71,7 +71,9 @@ seen.write_text(json.dumps({
 
 
 def commit(name):
-    pathlib.Path(name).write_text("made by the agent\n")
+    # The branch is in the content, so two items' commits are never the same commit.
+    branch = git("rev-parse", "--abbrev-ref", "HEAD").strip()
+    pathlib.Path(name).write_text("made by the agent on " + branch + "\n")
     git("add", name)
     git("commit", "-q", "-m", "add " + name)
 

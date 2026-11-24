@@ -13,6 +13,10 @@ Item change requests (`.../items/{item_id}/requests`) are sent to the item's wor
 signal, through the workflow engine at SORTYARD_ENGINE_TARGET (host:port). Without it the
 service still serves everything else and answers those requests 503.
 
+Admission (`POST .../items`) checks an item against the lane capability files in the directory
+SORTYARD_LANES_DIR (`*.toml`, the files the kernel service reads) and starts its workflow on
+that engine. Without both settings admission is answered 503.
+
 Operator credential (interim, until OIDC sessions): ``sortyard-api --issue-operator-token
 <role-binding-id>`` prints a bearer token for an admin/operator/viewer RoleBinding.
 """
@@ -23,6 +27,7 @@ import argparse
 import json
 import logging
 import os
+import pathlib
 import signal
 import socket
 import struct
@@ -41,6 +46,8 @@ import psycopg.conninfo
 from sortyard import __version__
 from sortyard.api import auth, handlers, routing
 from sortyard.engine.blocking import BlockingEngine
+from sortyard.kernel import capabilities
+from sortyard.kernel.item import start_item
 from sortyard.services import SERVICES
 
 log = logging.getLogger("sortyard.api")
@@ -65,6 +72,8 @@ class Config:
     #: host:port of the workflow engine. Unset: the service runs without one, and a change
     #: request for an item is answered 503.
     engine_target: str | None = None
+    #: The directory of lane capability files (`*.toml`). Unset: admission is answered 503.
+    lanes_dir: str | None = None
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> Config:
@@ -78,6 +87,7 @@ class Config:
             database_password=env.get("SORTYARD_DATABASE_PASSWORD") or None,
             token_ttl_seconds=int(env.get("SORTYARD_API_TOKEN_TTL_SECONDS", cls.token_ttl_seconds)),
             engine_target=env.get("SORTYARD_ENGINE_TARGET") or None,
+            lanes_dir=env.get("SORTYARD_LANES_DIR") or None,
         )
 
     def conninfo(self) -> str:
@@ -107,6 +117,18 @@ def postgres_answers(host: str, port: int, timeout: float) -> bool:
 Connect = Callable[[], "psycopg.Connection[Any]"]
 
 
+def load_lanes(directory: str) -> dict[str, capabilities.Lane]:
+    """Every lane capability file (`*.toml`) of a directory, by lane name. A file that breaks
+    a rule, or a lane declared twice, is an error: the service does not start on it."""
+    lanes: dict[str, capabilities.Lane] = {}
+    for path in sorted(pathlib.Path(directory).glob("*.toml")):
+        lane = capabilities.load(path.read_text())
+        if lane.name in lanes:
+            raise capabilities.CapabilityError("duplicate", f"lane {lane.name!r} in {path.name}")
+        lanes[lane.name] = lane
+    return lanes
+
+
 class Server(ThreadingHTTPServer):
     daemon_threads = True
 
@@ -115,14 +137,22 @@ class Server(ThreadingHTTPServer):
         config: Config,
         connect: Connect | None = None,
         signal_item: handlers.SignalItem | None = None,
+        kernel: handlers.Kernel | None = None,
     ) -> None:
         self.config = config
         self.connect: Connect = connect or (lambda: psycopg.connect(config.conninfo()))
         self.signal_item = signal_item
+        self.kernel = kernel
         self._engine: BlockingEngine | None = None
         if signal_item is None and config.engine_target:
-            self._engine = BlockingEngine(config.engine_target)
-            self.signal_item = self._engine.signal
+            engine = self._engine = BlockingEngine(config.engine_target)
+            self.signal_item = engine.signal
+            if kernel is None and config.lanes_dir:
+
+                def start(tenant: str, item: str, risk_tier: str) -> None:
+                    engine.call(lambda e: start_item(e, item, tenant=tenant, risk_tier=risk_tier))
+
+                self.kernel = handlers.Kernel(load_lanes(config.lanes_dir), start)
         super().__init__((config.host, config.port), Handler)
 
     def server_close(self) -> None:
@@ -176,6 +206,7 @@ class Handler(BaseHTTPRequestHandler):
             self.server.connect,
             self.server.config.token_ttl_seconds,
             self.server.signal_item,
+            self.server.kernel,
         )
         if answer is None:
             self._json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
@@ -201,8 +232,9 @@ def make_server(
     config: Config,
     connect: Connect | None = None,
     signal_item: handlers.SignalItem | None = None,
+    kernel: handlers.Kernel | None = None,
 ) -> Server:
-    return Server(config, connect, signal_item)
+    return Server(config, connect, signal_item, kernel)
 
 
 def issue_operator_token(config: Config, role_binding_id: str, ttl_seconds: int) -> int:

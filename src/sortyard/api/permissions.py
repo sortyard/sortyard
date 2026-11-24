@@ -54,7 +54,7 @@ def _op(
 
 _OPERATIONS = [
     # Work: the kernel's tracker view (HARNESS-V3 §3.2). Two reads of the projection and one
-    # request; nothing here writes item state.
+    # request; nothing here writes item state (admission creates an item with none).
     _op(
         "getProjectQueue",
         "GET",
@@ -68,6 +68,8 @@ _OPERATIONS = [
         "admin operator viewer conductor grooming-agent",
     ),
     _op("requestItemChange", "POST", "/items/{item_id}/requests", "admin operator"),
+    # Admission (HARNESS-V3 §3.5 step 4): the one way an item enters the kernel.
+    _op("admitItem", "POST", "/items", "admin operator grooming-agent"),
     # Work: tasks (§3.3)
     _op("listTasks", "GET", "/tasks", "admin operator viewer conductor grooming-agent"),
     _op("createTask", "POST", "/tasks", "admin operator sensor grooming-agent", "task.create"),

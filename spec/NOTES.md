@@ -158,6 +158,14 @@ in `openapi.json` and explained here (held by `spec/test_openapi.py`).
   (HARNESS-V3 section 3.2) and have no §3 schema.
 - `reason` (`requestItemChange`): why the change is asked for. It is recorded with the request
   on the item's timeline.
+- `project_id`, `title`, `risk_tier`, `milestone_id`, `lane`, `repository`, `base`, `needs`,
+  `blocked_by`, `spec` (`admitItem`): what an item is admitted with. Items are the workflow
+  kernel's projection (HARNESS-V3 section 3.2) and have no §3 schema, so these are the kernel's
+  own fields: the project whose queue lists the item, its title, its risk tier (the key the
+  state table's limits are given by), its milestone (a grouping, never an ordering), the lane
+  capability file it runs against, its one repository and base branch, the needs it lists
+  against that file, the items it is blocked by, and its spec (an `outcome` and at least one
+  named `acceptance` test; the rest is handed to the worker as written).
 - `agent_role` (`issueServiceAccountToken`): the §7 agent role (`conductor`, `build-worker`,
   `sensor`, `grooming-agent`) the issued service-account token carries. It is a property of the
   token, not of a §3 object: the RoleBinding's `role` names human roles only, and agent roles

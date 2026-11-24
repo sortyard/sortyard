@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
-from collections.abc import Coroutine
+from collections.abc import Callable, Coroutine
 from typing import Any, TypeVar
 
 from sortyard.engine._temporal import DEFAULT_TASK_QUEUE, Engine
@@ -71,6 +71,15 @@ class BlockingEngine:
             await (await self._connected()).signal(workflow_id, name, payload)
 
         self._run(send())
+
+    def call(self, use: Callable[[Engine], Coroutine[Any, Any, T]]) -> T:
+        """Run `use` with the connected engine, for example to start a workflow. Raises what
+        it raises, and `EngineUnavailable` or `TimeoutError` as `signal` does."""
+
+        async def run() -> T:
+            return await use(await self._connected())
+
+        return self._run(run())
 
     def close(self) -> None:
         with self._lock:

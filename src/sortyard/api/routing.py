@@ -77,6 +77,7 @@ def dispatch(
     connect: Callable[[], Conn],
     token_ttl_seconds: int = auth.DEFAULT_TTL_SECONDS,
     signal_item: handlers.SignalItem | None = None,
+    kernel: handlers.Kernel | None = None,
 ) -> Answer | None:
     """The answer to one request, or None when no operation has this route."""
     path, _, query_string = target.partition("?")
@@ -106,6 +107,7 @@ def dispatch(
                 raw_body,
                 token_ttl_seconds,
                 signal_item,
+                kernel,
             )
     except psycopg.Error as exc:
         log.exception("database error in %s", op.operation_id)
@@ -122,6 +124,7 @@ def _authorized(
     raw_body: bytes,
     token_ttl_seconds: int,
     signal_item: handlers.SignalItem | None,
+    kernel: handlers.Kernel | None,
 ) -> Answer:
     principal = auth.authenticate(conn, token)
     if principal is None:
@@ -152,6 +155,7 @@ def _authorized(
             body=body,
             token_ttl_seconds=token_ttl_seconds,
             signal_item=signal_item,
+            kernel=kernel,
         )
         if body is None and method_takes_body(op):
             raise ApiError(400, "Bad Request", "a JSON body is required", "malformed")
@@ -172,5 +176,5 @@ _BODY_REQUIRED = {
     "unblockTask", "cancelTask", "requeueTask", "createLane", "updateLane", "createPolicy",
     "proposePolicyVersion", "createDecision", "answerDecision", "submitStageRunResult",
     "createAlert", "instructIntegrator", "createRoleBinding", "issueServiceAccountToken",
-    "requestItemChange",
+    "requestItemChange", "admitItem",
 }  # fmt: skip

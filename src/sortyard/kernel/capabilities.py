@@ -1,8 +1,9 @@
 """The lane capability file: what a lane's work needs to run (HARNESS-V3 section 3.3).
 
 A lane declares, as data, the worker image by digest, the CI image by digest, the repositories
-it pushes to, the secrets it reads by name, the services it calls, its runner pool, and who
-resolves a need that fails. This module turns that file into typed values and refuses a file
+it pushes to (and the checks a pull request there must pass), the secrets it reads by name, the
+services it calls, its runner pool, how many of its items may be in work at once (`slots`), and
+who resolves a need that fails. This module turns that file into typed values and refuses a file
 that breaks one of the section's two rules:
 
 - **The worker image is the CI image.** Both are pinned by digest and the digests are equal.
@@ -49,6 +50,7 @@ _TOP_KEYS = frozenset(
         "resolver",
         "gap-limit",
         "runner-pool",
+        "slots",
         "defaults",
         "images",
         "repositories",
@@ -57,7 +59,7 @@ _TOP_KEYS = frozenset(
     }
 )
 _ENTRY_KEYS: Mapping[str, frozenset[str]] = {
-    "repositories": frozenset({"name", "workflow-files"}),
+    "repositories": frozenset({"name", "workflow-files", "checks"}),
     "secrets": frozenset({"name", "optional"}),
     "services": frozenset({"name"}),
 }
@@ -121,10 +123,15 @@ class Image:
 
 @dataclass(frozen=True)
 class Repository:
-    """A repository the lane pushes to; `workflow_files` when that includes workflow files."""
+    """A repository the lane pushes to; `workflow_files` when that includes workflow files.
+
+    `checks` names the checks a pull request there must pass: none given means the base
+    branch's required checks, an empty list that the repository runs no pull-request checks.
+    """
 
     name: str
     workflow_files: bool = False
+    checks: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -143,6 +150,7 @@ class Lane:
     gap_limit: timedelta | None = None
     gap_limit_text: str | None = None
     version: int = 1
+    slots: int = 1  # how many of the lane's items may be in work at once
 
     def declares(self, need: Need) -> bool:
         if need.kind in _UNNAMED:
@@ -264,7 +272,19 @@ def load(text: str) -> Lane:
             raise _fail(
                 "malformed-file", lane, f"repository {entry['name']!r}: workflow-files is a boolean"
             )
-        repositories[entry["name"]] = Repository(entry["name"], workflow_files)
+        checks = entry.get("checks")
+        if checks is not None and not (
+            isinstance(checks, list) and all(isinstance(c, str) and c for c in checks)
+        ):
+            raise _fail(
+                "malformed-file", lane, f"repository {entry['name']!r}: checks is a list of names"
+            )
+        repositories[entry["name"]] = Repository(
+            entry["name"], workflow_files, None if checks is None else tuple(checks)
+        )
+    slots = raw.get("slots", 1)
+    if type(slots) is not int or slots < 1:
+        raise _fail("malformed-file", lane, f"slots must be a whole number above 0, not {slots!r}")
 
     gap_limit_text = raw.get("gap-limit")
     gap_limit: timedelta | None = None
@@ -287,6 +307,7 @@ def load(text: str) -> Lane:
         gap_limit=gap_limit,
         gap_limit_text=None if gap_limit_text is None else str(gap_limit_text),
         version=1,
+        slots=slots,
     )
     defaults = raw.get("defaults", [])
     if not isinstance(defaults, list):

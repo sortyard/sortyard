@@ -15672,6 +15672,289 @@
         "x-sortyard-mcp-tool": "get_project_queue"
       }
     },
+    "/v1/workspaces/{workspace_id}/items": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/workspace_id"
+        }
+      ],
+      "post": {
+        "operationId": "admitItem",
+        "summary": "Admit an item: check its spec, create it and start its workflow",
+        "tags": [
+          "Work"
+        ],
+        "description": "The one way an item enters the workflow kernel (HARNESS-V3 section 3.5, step 4). The item is checked before anything is created: its spec states an outcome and names at least one acceptance test, its lane is known and declares its repository and every need, every blocked_by link resolves to an item of this workspace, and its risk tier is one the state table has limits for. An item that fails is refused with every reason (`reasons`) and nothing is created. Otherwise the item, its links and its spec are stored and its workflow is started; the scheduler dispatches it when everything it is blocked by is merged and its lane has a free slot. Admitting the same id again with the same content changes nothing and answers 200; with other content it is refused (409), since a spec is written once.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "project_id",
+                  "title",
+                  "lane",
+                  "repository",
+                  "spec"
+                ],
+                "properties": {
+                  "id": {
+                    "$ref": "common.schema.json#/$defs/id",
+                    "description": "The item's id; its branch is sortyard/<id>."
+                  },
+                  "project_id": {
+                    "x-sortyard-api-defined": true,
+                    "description": "The project whose queue lists the item.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "title": {
+                    "x-sortyard-api-defined": true,
+                    "description": "The item's title; its pull request carries it.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "risk_tier": {
+                    "x-sortyard-api-defined": true,
+                    "description": "low, medium or high: sets the limits the state table gives by risk tier. Default medium.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "milestone_id": {
+                    "x-sortyard-api-defined": true,
+                    "description": "A grouping and a preferred shipping order; it never orders the queue.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "lane": {
+                    "x-sortyard-api-defined": true,
+                    "description": "The lane the item runs on: the name of a lane capability file.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "repository": {
+                    "x-sortyard-api-defined": true,
+                    "description": "The one repository the change goes to, as owner/name. The lane must declare it.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "base": {
+                    "x-sortyard-api-defined": true,
+                    "description": "The base branch. Default main.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "needs": {
+                    "x-sortyard-api-defined": true,
+                    "description": "What the item needs beyond its lane's defaults, as references into the lane capability file (secret:NAME, service:NAME, repository:owner/name).",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "blocked_by": {
+                    "x-sortyard-api-defined": true,
+                    "description": "Items of this workspace that must be merged before this one is dispatched.",
+                    "type": "array",
+                    "items": {
+                      "$ref": "common.schema.json#/$defs/id"
+                    }
+                  },
+                  "spec": {
+                    "x-sortyard-api-defined": true,
+                    "description": "The item's spec. It states an `outcome` and lists `acceptance`: at least one test, each {test, name}. Anything else in it is handed to the worker as written.",
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The item was admitted before with the same content; nothing changed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "project_id",
+                    "lane",
+                    "repository",
+                    "base",
+                    "needs",
+                    "blocked_by",
+                    "workflow_id"
+                  ],
+                  "properties": {
+                    "id": {
+                      "$ref": "common.schema.json#/$defs/id"
+                    },
+                    "project_id": {
+                      "$ref": "common.schema.json#/$defs/id"
+                    },
+                    "lane": {
+                      "type": "string"
+                    },
+                    "repository": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "needs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "blocked_by": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "common.schema.json#/$defs/id"
+                      }
+                    },
+                    "workflow_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Admitted: the item is stored and its workflow started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "project_id",
+                    "lane",
+                    "repository",
+                    "base",
+                    "needs",
+                    "blocked_by",
+                    "workflow_id"
+                  ],
+                  "properties": {
+                    "id": {
+                      "$ref": "common.schema.json#/$defs/id"
+                    },
+                    "project_id": {
+                      "$ref": "common.schema.json#/$defs/id"
+                    },
+                    "lane": {
+                      "type": "string"
+                    },
+                    "repository": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "needs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "blocked_by": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "common.schema.json#/$defs/id"
+                      }
+                    },
+                    "workflow_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "description": "Refused: the body is malformed, or the item fails admission. For a failed admission `reasons` lists every failure as `rule: what`, and nothing was created.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Problem"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "reasons": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The service runs without a workflow engine or lane capability files, or the engine did not answer. Nothing was created.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "operatorSession": [
+              "admin"
+            ]
+          },
+          {
+            "operatorSession": [
+              "operator"
+            ]
+          },
+          {
+            "serviceAccountToken": [
+              "grooming-agent"
+            ]
+          }
+        ],
+        "x-sortyard-roles": [
+          "admin",
+          "operator",
+          "grooming-agent"
+        ],
+        "x-sortyard-mcp-tool": "admit_item"
+      }
+    },
     "/v1/workspaces/{workspace_id}/items/{item_id}/timeline": {
       "parameters": [
         {

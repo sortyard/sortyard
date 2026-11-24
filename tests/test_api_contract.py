@@ -186,6 +186,19 @@ def target(op_id: str, role: str = "admin") -> tuple[str, Any]:
 
 
 BODIES: dict[str, Any] = {
+    "admitItem": {
+        "id": "item-admitted",
+        "project_id": "proj-a",
+        "title": "An admitted item",
+        "lane": "example",
+        "repository": "example/app",
+        "needs": ["secret:EXAMPLE_DEPLOY_TOKEN"],
+        "blocked_by": ["item-1"],
+        "spec": {
+            "outcome": "the contract test admits an item",
+            "acceptance": [{"test": "tests/test_api_contract.py", "name": "it is admitted"}],
+        },
+    },
     "requestItemChange": {"answer": "resume", "reason": "the contract test asks"},
     "createTask": task("task-new", origin="sensor", state="backlog"),
     "updateTask": {"title": "Renamed"},
@@ -290,6 +303,7 @@ SCENARIO: list[tuple[str, str, int]] = [
     ("getProjectQueue", "grooming-agent", 200),
     ("getItemTimeline", "viewer", 200),
     ("requestItemChange", "operator", 202),
+    ("admitItem", "grooming-agent", 201),
     ("listTasks", "viewer", 200),
     ("getTask", "conductor", 200),
     ("createTask", "sensor", 201),

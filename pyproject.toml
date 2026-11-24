@@ -41,12 +41,14 @@ sortyard-sensor-runner = "sortyard.services.sensor_runner:main"
 sortyard-integrator = "sortyard.services.integrator:main"
 # What a worker Job runs (SY-V3-WORKER-LAUNCHER); not one of the six services.
 sortyard-worker = "sortyard.services.worker:main"
+# The kernel service (SY-V3-LANE-RUNTIME): the engine worker and the observer loop.
+sortyard-kernel = "sortyard.services.kernel:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-sortyard = ["py.typed", "models/schemas.json", "kernel/item_states.toml", "kernel/lane_example.toml"]
+sortyard = ["py.typed", "models/schemas.json", "kernel/item_states.toml", "kernel/lane_example.toml", "kernel/decision_policy.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
