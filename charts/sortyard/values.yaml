@@ -141,6 +141,80 @@ engine:
     limits:
       memory: 1Gi
 
+# The kernel service (company/HARNESS-V3.md section 3.1; `sortyard-kernel`): the engine worker
+# and the observer loop that take an item from admitted to merged. It needs engine.enabled.
+# With it enabled the API mounts the lane capability files too, so it can admit items.
+# Every credential it uses is a Secret reference, and each one is required: the render fails
+# when one is missing. Nothing here is a credential's value.
+kernel:
+  enabled: false
+  # Seconds between two passes of the observer loop over the open stays.
+  observerIntervalSeconds: 15
+  # How long the pod waits at start for the engine to answer before it fails and is restarted.
+  engineWaitSeconds: 300
+  # The lane capability files, by file name without `.toml`: each value is the file's text
+  # (the format: src/sortyard/kernel/lane_example.toml). At least one is required. They are
+  # mounted as files into the kernel and the API.
+  lanes: {}
+  # The decision policy file's text (the format: src/sortyard/kernel/decision_policy.toml).
+  # Empty: the policy shipped in the image, which has no rules.
+  decisionPolicy: ""
+  # How workers run in this deployment; rendered into the worker configuration file.
+  worker:
+    # The agent command (an argv) for each kind of work. All three are required. The worker
+    # image of every lane must contain the command (README, "Worker image").
+    agents:
+      build: []
+      fix: []
+      review: []
+    # The clone URL of a repository; `{repository}` is replaced by owner/name.
+    # Empty: https://github.com/{repository}.git
+    gitUrl: ""
+    # The entry point the worker containers run. Empty: ["sortyard-worker"].
+    command: []
+    # Seconds. 0 leaves the service's default: the deadline of a Job whose state has no limit
+    # (7200), how long a finished Job is kept (86400), and how old a running Job's GitHub token
+    # may get before it is replaced (1800).
+    deadlineSeconds: 0
+    ttlSeconds: 0
+    tokenAgeSeconds: 0
+    # Lane secret name -> the Secret and key that hold it in the worker namespace:
+    #   MODEL_API_KEY: {secret: models, key: api-key}
+    # A name not listed is read from the Secret named after it (lower case, dashes), key = name.
+    secrets: {}
+    # Lane service name -> the URL its preflight probe calls.
+    services: {}
+  github:
+    # The GitHub App the lanes' tokens are minted from. Required.
+    appId: ""
+    # Required: the name of an existing Secret holding the App's private key (PEM).
+    appKeySecret: ""
+    appKeySecretKey: private-key.pem
+    # Empty: https://api.github.com
+    apiUrl: ""
+  workers:
+    # The namespace worker Jobs run in. Empty: the release namespace.
+    namespace: ""
+    # true: the Jobs run in the cluster of this release. The kernel uses its own service
+    # account, and a Role in the worker namespace grants it what the jobs port calls and no
+    # more. false: the Jobs run in another cluster, reached through clusterSecret; no Role is
+    # rendered and the pod gets no service-account token.
+    sameCluster: true
+    # Required when sameCluster is false: the name of an existing Secret with the keys
+    # `server` (the URL of that cluster's API server), `token` (a bearer token allowed what
+    # the Role below grants, in the worker namespace) and `ca.crt` (the CA of the server's
+    # certificate).
+    clusterSecret: ""
+    # false: the server's certificate is verified against the image's trust store, and the
+    # Secret needs no `ca.crt`.
+    clusterCA: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
 # The shadow conductor (design §8 Phase 1): `sortyard-conductor --shadow` reads the production
 # conductor's input path READ-ONLY and records what it would claim/refuse in the DecisionLog.
 # Off by default; it needs the input path configured. Runbook: README "Shadow conductor".

@@ -1,0 +1,290 @@
+{{- if .Values.kernel.enabled }}
+{{- /*
+The kernel service (company/HARNESS-V3.md section 3.1): `sortyard-kernel`, the engine worker
+with every owner of the item state table and the observer loop. It keeps nothing that matters
+in memory: stopped at any point and started again, the engine resumes every workflow from its
+history and the observer reads the open stays back from Postgres.
+
+Its settings are the environment variables and mounted files sortyard.services.kernel reads.
+The lane capability files, the decision policy and the worker configuration are values, mounted
+as files. Every credential is a Secret reference and required: the database password, the
+GitHub App's private key and, when the worker Jobs run in another cluster, that cluster's
+access. With the Jobs in this cluster the kernel uses its own service account, bound to a Role
+in the worker namespace that grants what the jobs port (src/sortyard/lane/jobs.py) calls and
+nothing else.
+*/ -}}
+{{- $k := .Values.kernel }}
+{{- if not .Values.engine.enabled }}
+{{- fail "kernel.enabled=true requires engine.enabled=true: the kernel service runs on the workflow engine" }}
+{{- end }}
+{{- $name := include "sortyard.kernel.fullname" . }}
+{{- $selector := dict "root" . "component" "kernel" }}
+{{- $workerNamespace := include "sortyard.kernel.workers.namespace" . }}
+{{- $appKeySecret := required "kernel.github.appKeySecret is required when kernel.enabled=true: the name of a Secret holding the GitHub App's private key" $k.github.appKeySecret }}
+{{- $appKeyKey := required "kernel.github.appKeySecretKey is required: the key of the GitHub App's private key in kernel.github.appKeySecret" $k.github.appKeySecretKey }}
+{{- $appId := required "kernel.github.appId is required when kernel.enabled=true: the id of the GitHub App" $k.github.appId }}
+{{- $dbSecret := include "sortyard.kernel.database.secretName" . }}
+{{- $clusterSecret := "" }}
+{{- if $k.workers.sameCluster }}
+{{- if $k.workers.clusterSecret }}
+{{- fail "kernel.workers.clusterSecret applies only with kernel.workers.sameCluster=false; with it true the kernel uses its own service account" }}
+{{- end }}
+{{- else }}
+{{- $clusterSecret = required "kernel.workers.clusterSecret is required when kernel.workers.sameCluster=false: the name of a Secret with the keys server, token and ca.crt for the cluster the worker Jobs run in" $k.workers.clusterSecret }}
+{{- end }}
+{{- $lanes := include "sortyard.lanes.data" . | trim }}
+{{- $workerConfig := printf "%s\n" (include "sortyard.kernel.workerConfig" . | trim) }}
+{{- $waitEngine := .Files.Get "kernel/wait_engine.py" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "sortyard.lanes.fullname" . }}
+  labels:
+    {{- include "sortyard.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kernel
+data:
+  {{- $lanes | nindent 2 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "sortyard.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kernel
+data:
+  worker.toml: {{ toJson $workerConfig }}
+  {{- with $k.decisionPolicy }}
+  decision-policy.toml: {{ toJson . }}
+  {{- end }}
+  wait_engine.py: |
+    {{- $waitEngine | nindent 4 }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "sortyard.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kernel
+automountServiceAccountToken: false
+{{- if $k.workers.sameCluster }}
+---
+# What the jobs port calls in the worker namespace, and nothing else (tests/test_chart.py holds
+# this list to the requests the port really makes): a Job per dispatch with its brief
+# (ConfigMap) and its per-job token (Secret), the result read from the Job's pod, and the
+# metadata of the Secrets a lane declares. No access outside the namespace, no pod logs, no exec.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}
+  namespace: {{ $workerNamespace }}
+  labels:
+    {{- include "sortyard.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kernel
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["create", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "get", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}
+  namespace: {{ $workerNamespace }}
+  labels:
+    {{- include "sortyard.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kernel
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $name }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "sortyard.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kernel
+spec:
+  # One replica. Every replica would run the observer loop, and two loops would each ask
+  # GitHub and the cluster about every open stay and each mint tokens for the same Jobs: twice
+  # the outside calls for nothing, since the engine takes an outcome once per dispatch. One
+  # pod away loses nothing: the next one resumes from the engine and Postgres. Recreate, so
+  # the old pod has stopped looking before the new one starts.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "sortyard.selector" $selector | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sortyard.labels" . | nindent 8 }}
+        app.kubernetes.io/component: kernel
+      annotations:
+        # The files are read once, at start: a change to them starts a new pod.
+        checksum/files: {{ list $lanes $workerConfig $k.decisionPolicy $waitEngine | join "\n" | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ $name }}
+      # The pod's own token is the cluster access only when the Jobs run in this cluster.
+      automountServiceAccountToken: {{ $k.workers.sameCluster }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      initContainers:
+        # The service ends when the engine does not answer; the pod waits for it first.
+        - name: wait-engine
+          image: {{ include "sortyard.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["python", "/etc/sortyard/kernel/wait_engine.py"]
+          env:
+            - name: SORTYARD_ENGINE_TARGET
+              value: {{ include "sortyard.engine.target" . | quote }}
+            - name: SORTYARD_ENGINE_NAMESPACE
+              value: default
+            - name: SORTYARD_ENGINE_WAIT_SECONDS
+              value: {{ $k.engineWaitSeconds | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            {{- toYaml $k.resources | nindent 12 }}
+          volumeMounts:
+            - name: kernel
+              mountPath: /etc/sortyard/kernel
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      containers:
+        - name: kernel
+          image: {{ include "sortyard.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["sortyard-kernel"]
+          env:
+            - name: SORTYARD_ENGINE_TARGET
+              value: {{ include "sortyard.engine.target" . | quote }}
+            # The namespace the engine schema Job creates.
+            - name: SORTYARD_ENGINE_NAMESPACE
+              value: default
+            - name: SORTYARD_DATABASE_HOST
+              value: {{ include "sortyard.postgres.host" . | quote }}
+            - name: SORTYARD_DATABASE_PORT
+              value: {{ include "sortyard.postgres.port" . | quote }}
+            - name: SORTYARD_DATABASE_NAME
+              value: {{ .Values.postgres.database | quote }}
+            - name: SORTYARD_DATABASE_USER
+              value: {{ .Values.postgres.auth.username | quote }}
+            - name: SORTYARD_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $dbSecret }}
+                  key: password
+            - name: SORTYARD_LANES_DIR
+              value: /etc/sortyard/lanes
+            - name: SORTYARD_WORKER_CONFIG
+              value: /etc/sortyard/kernel/worker.toml
+            {{- if $k.decisionPolicy }}
+            - name: SORTYARD_DECISION_POLICY
+              value: /etc/sortyard/kernel/decision-policy.toml
+            {{- end }}
+            - name: SORTYARD_OBSERVER_INTERVAL_SECONDS
+              value: {{ $k.observerIntervalSeconds | quote }}
+            - name: SORTYARD_GITHUB_APP_ID
+              value: {{ $appId | quote }}
+            - name: SORTYARD_GITHUB_APP_KEY_FILE
+              value: {{ printf "/var/run/sortyard/github-app/%s" $appKeyKey | quote }}
+            {{- with $k.github.apiUrl }}
+            - name: SORTYARD_GITHUB_API_URL
+              value: {{ . | quote }}
+            {{- end }}
+            - name: SORTYARD_JOBS_NAMESPACE
+              value: {{ $workerNamespace | quote }}
+            {{- if $clusterSecret }}
+            # The worker Jobs run in another cluster: its API server, a token and its CA.
+            - name: SORTYARD_KUBE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $clusterSecret }}
+                  key: server
+            - name: SORTYARD_KUBE_TOKEN_FILE
+              value: /var/run/sortyard/cluster/token
+            {{- if $k.workers.clusterCA }}
+            - name: SORTYARD_KUBE_CA_FILE
+              value: /var/run/sortyard/cluster/ca.crt
+            {{- end }}
+            {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            {{- toYaml $k.resources | nindent 12 }}
+          volumeMounts:
+            - name: lanes
+              mountPath: /etc/sortyard/lanes
+              readOnly: true
+            - name: kernel
+              mountPath: /etc/sortyard/kernel
+              readOnly: true
+            - name: github-app
+              mountPath: /var/run/sortyard/github-app
+              readOnly: true
+            {{- if $clusterSecret }}
+            - name: cluster
+              mountPath: /var/run/sortyard/cluster
+              readOnly: true
+            {{- end }}
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: lanes
+          configMap:
+            name: {{ include "sortyard.lanes.fullname" . }}
+        - name: kernel
+          configMap:
+            name: {{ $name }}
+        - name: github-app
+          secret:
+            secretName: {{ $appKeySecret }}
+            items:
+              - key: {{ $appKeyKey }}
+                path: {{ $appKeyKey }}
+        {{- if $clusterSecret }}
+        - name: cluster
+          secret:
+            secretName: {{ $clusterSecret }}
+            items:
+              - key: token
+                path: token
+              {{- if $k.workers.clusterCA }}
+              - key: ca.crt
+                path: ca.crt
+              {{- end }}
+        {{- end }}
+        - name: tmp
+          emptyDir: {}
+{{- end }}

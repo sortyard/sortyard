@@ -33,6 +33,11 @@ spec:
       labels:
         {{- include "sortyard.labels" . | nindent 8 }}
         app.kubernetes.io/component: api
+      {{- if .Values.kernel.enabled }}
+      annotations:
+        # The lane capability files are read once, at start: a change starts a new pod.
+        checksum/lanes: {{ include "sortyard.lanes.data" . | trim | sha256sum }}
+      {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -69,6 +74,11 @@ spec:
             - name: SORTYARD_ENGINE_TARGET
               value: {{ include "sortyard.engine.target" . | quote }}
             {{- end }}
+            {{- if .Values.kernel.enabled }}
+            # Admission checks an item against the lane capability files the kernel reads.
+            - name: SORTYARD_LANES_DIR
+              value: /etc/sortyard/lanes
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /readyz
@@ -86,3 +96,13 @@ spec:
               drop: ["ALL"]
           resources:
             {{- toYaml .Values.api.resources | nindent 12 }}
+          {{- if .Values.kernel.enabled }}
+          volumeMounts:
+            - name: lanes
+              mountPath: /etc/sortyard/lanes
+              readOnly: true
+      volumes:
+        - name: lanes
+          configMap:
+            name: {{ include "sortyard.lanes.fullname" . }}
+          {{- end }}

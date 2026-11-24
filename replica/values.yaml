@@ -2,7 +2,8 @@
 #
 # Only what a laptop cluster must differ in is set here. Topology (Deployments, StatefulSet,
 # migration Job), routing (ClusterIP Services) and auth shape (the generated Postgres password
-# Secret; the shadow's read-only Plane API key Secret) are the chart's own. The image tag is
+# Secret; the shadow's read-only Plane API key Secret; the kernel's GitHub App key Secret and
+# its Role) are the chart's own. The image tag is
 # set on the command line from the image the script just built.
 
 postgres:
@@ -12,6 +13,28 @@ postgres:
 # The workflow engine server on the chart's Postgres, as the chart renders it.
 engine:
   enabled: true
+
+# The kernel service, as the chart renders it, with its Role: the worker Jobs run in this
+# cluster and namespace. What is set here is only what names the replica's outside: the fake
+# GitHub (replica/fake-github.yaml) as the GitHub API and the git host, the GitHub App key
+# Secret replica.sh makes, and the scripted agent of the replica's worker image
+# (replica/worker/). The one lane capability file (replica/lane.toml) is given on the command
+# line, since it names the worker image by the digest the cluster holds it under.
+kernel:
+  enabled: true
+  # A short pass, so the replica's two items take seconds, not minutes.
+  observerIntervalSeconds: 2
+  worker:
+    gitUrl: http://sortyard-fake-github:8080/git/{repository}.git
+    agents:
+      # The build waits 15 s before it commits, so the kernel pod can be deleted mid-build.
+      build: ["python", "/opt/sortyard-replica/agent.py", "build", "15"]
+      fix: ["python", "/opt/sortyard-replica/agent.py", "fix"]
+      review: ["python", "/opt/sortyard-replica/agent.py", "review"]
+  github:
+    appId: "4242"
+    appKeySecret: sortyard-replica-github-app
+    apiUrl: http://sortyard-fake-github:8080
 
 # The shadow conductor, configured the way production runs it (source: plane) but pointed at
 # the fake providers in replica/fakes.yaml instead of the real Plane and production conductor.
