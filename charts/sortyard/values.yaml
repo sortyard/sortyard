@@ -169,6 +169,8 @@ kernel:
       review: []
     # The clone URL of a repository; `{repository}` is replaced by owner/name.
     # Empty: https://github.com/{repository}.git
+    # No credential belongs in this URL (or in any URL below): it is rendered into a ConfigMap
+    # and into every Job's brief. The worker authenticates with the token minted for its Job.
     gitUrl: ""
     # The entry point the worker containers run. Empty: ["sortyard-worker"].
     command: []
@@ -194,6 +196,8 @@ kernel:
     apiUrl: ""
   workers:
     # The namespace worker Jobs run in. Empty: the release namespace.
+    # The chart does not create it: a namespace other than the release's must exist before
+    # the install, or the Role and its binding cannot be made there.
     namespace: ""
     # true: the Jobs run in the cluster of this release. The kernel uses its own service
     # account, and a Role in the worker namespace grants it what the jobs port calls and no

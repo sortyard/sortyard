@@ -430,6 +430,12 @@ merged_on_github() {
     echo "    $1 merged: $pull"
 }
 
+# active_worker_jobs: how many worker Jobs have a pod that has not ended.
+active_worker_jobs() {
+    k get jobs --selector app.kubernetes.io/managed-by=sortyard \
+        -o jsonpath='{range .items[*]}{.status.active}{"\n"}{end}' | grep -c '^[1-9]' || true
+}
+
 # lane: the kernel takes an item from admitted to merged on the engine on Postgres, through
 # real worker Jobs and the fake GitHub; and again with the kernel pod deleted mid-item.
 lane() {
@@ -445,16 +451,21 @@ lane() {
     say "lane: admit $second, delete the kernel pod while its build Job runs, see it merged"
     admit "$second"
     wait_item "$second" building
-    pod=$(k get pods --selector app.kubernetes.io/component=kernel -o name)
-    k delete "$pod" --wait=false >/dev/null
-    # Where the item was when its kernel pod was deleted: dispatched, and not yet merged.
-    state=$(item_state "$second")
-    active=$(k get jobs --selector app.kubernetes.io/managed-by=sortyard \
-        -o jsonpath='{range .items[*]}{.status.active}{end}')
-    [[ $state != merged ]] ||
-        die "item $second was already merged when the kernel pod was deleted: not mid-item"
-    echo "    deleted $pod with $second in '$state' (worker Jobs running: ${active:-0})"
+    # Mid-item means: the item is in `building` and its build Job is running in the cluster at
+    # the moment the kernel pod is deleted. Both are read first, and the run fails otherwise.
     local _
+    for _ in $(seq 1 30); do
+        active=$(active_worker_jobs)
+        ((active > 0)) && break
+        sleep 1
+    done
+    pod=$(k get pods --selector app.kubernetes.io/component=kernel -o name)
+    state=$(item_state "$second")
+    active=$(active_worker_jobs)
+    [[ $state == building ]] && ((active > 0)) ||
+        die "item $second is in '$state' with $active worker Job(s) running: not mid-build"
+    k delete "$pod" --wait=false >/dev/null
+    echo "    deleted $pod with $second in '$state' (worker Jobs running: $active)"
     for _ in $(seq 1 "$TIMEOUT"); do
         k get "$pod" >/dev/null 2>&1 || break
         sleep 1

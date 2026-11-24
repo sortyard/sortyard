@@ -490,6 +490,8 @@ def test_up_runs_the_lane_after_the_smoke_test_and_the_lane_checks_both_sides() 
         'wait_item "$first" merged',
         'merged_on_github "$first"',
         'admit "$second"',
+        # Mid-item is checked, not assumed: in `building` with a worker Job running, or fail.
+        "[[ $state == building ]] && ((active > 0)) ||",
         'k delete "$pod"',
         'wait_item "$second" merged',
         'merged_on_github "$second"',
@@ -686,9 +688,13 @@ def test_the_replica_admits_an_item_on_the_engine_on_postgres_and_sees_it_merged
         assert told["branch"] == f"sortyard/{item}"
         assert told["merged"] is True and told["pushed"] is True and told["open"] is False
     # The kernel pod was deleted while the second item was in work, and another pod took over.
-    deleted = re.search(r"deleted (pod/\S+) with (\S+) in '([\w-]*)'", out)
+    # Mid-item: the script read the item in `building` with its build Job running, then deleted
+    # the pod (it fails before deleting otherwise).
+    deleted = re.search(
+        r"deleted (pod/\S+) with (\S+) in '([\w-]*)' \(worker Jobs running: (\d+)\)", out
+    )
     assert deleted is not None, out
-    assert deleted[2] == merged[1][0] and deleted[3] not in ("", "admitted", "merged")
+    assert deleted[2] == merged[1][0] and deleted[3] == "building" and int(deleted[4]) >= 1
     pods = subprocess.run(
         [*kubectl, "get", "pods", "-l", "app.kubernetes.io/component=kernel", "-o", "name"],
         check=True,

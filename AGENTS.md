@@ -127,7 +127,7 @@ python3 -m venv .venv && . .venv/bin/activate   # "ensurepip is not available"? 
 pip install -e '.[dev]'
 python -m sortyard.models.codegen --check       # generated models match spec/
 ruff check . && ruff format --check .           # lint + format (line length 100)
-mypy                                            # strict, over src/, tests/ and replica/
+mypy                                            # strict: src/, tests/, replica/, the chart's kernel script
 pytest tests                                    # chart/replica-render tests need helm; DB tests need Postgres
 ```
 
