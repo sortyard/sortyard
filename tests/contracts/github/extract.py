@@ -16,7 +16,8 @@ import pathlib
 import sys
 from typing import Any
 
-# (method, path) of every GitHub endpoint src/sortyard/lane/github.py calls.
+# (method, path) of every GitHub endpoint src/sortyard/lane/github.py calls, and the reads of
+# src/sortyard/services/red_main.py (the last four).
 OPERATIONS = (
     ("get", "/repos/{owner}/{repo}/installation"),
     ("post", "/app/installations/{installation_id}/access_tokens"),
@@ -32,6 +33,10 @@ OPERATIONS = (
     ("delete", "/repos/{owner}/{repo}/git/refs/{ref}"),
     ("get", "/repos/{owner}/{repo}/git/commits/{commit_sha}"),
     ("get", "/repos/{owner}/{repo}/compare/{basehead}"),
+    ("get", "/repos/{owner}/{repo}"),
+    ("get", "/repos/{owner}/{repo}/contents/{path}"),
+    ("get", "/repos/{owner}/{repo}/actions/workflows"),
+    ("get", "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs"),
 )
 PROSE = ("description", "example", "examples", "summary", "externalDocs")
 SCHEMAS = "#/components/schemas/"
@@ -71,7 +76,8 @@ def main(source: str, commit: str) -> None:
 
     def body(node: Any) -> Any:
         content = resolve(node).get("content", {}).get("application/json")
-        return schema(content["schema"]) if content else None
+        # A response may document its media type with no schema (a redirect, not modified).
+        return schema(content["schema"]) if content and "schema" in content else None
 
     paths: dict[str, Any] = {}
     for method, path in OPERATIONS:

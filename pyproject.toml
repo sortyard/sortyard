@@ -43,6 +43,9 @@ sortyard-integrator = "sortyard.services.integrator:main"
 sortyard-worker = "sortyard.services.worker:main"
 # The kernel service (SY-V3-LANE-RUNTIME): the engine worker and the observer loop.
 sortyard-kernel = "sortyard.services.kernel:main"
+# The red-main observer (SY-V3-RED-MAIN-OWNED): a red default branch of a lane repository is
+# answered by one triage item admitted through the API.
+sortyard-red-main = "sortyard.services.red_main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

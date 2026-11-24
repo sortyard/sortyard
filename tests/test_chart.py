@@ -21,7 +21,7 @@ from sortyard.engine.testing import local_engine
 from sortyard.kernel import policy
 from sortyard.lane.jobs import DISPATCH_LABEL, ITEM_LABEL, KubeJobs
 from sortyard.lane.worker import WorkerConfig, manifest
-from sortyard.services import kernel
+from sortyard.services import kernel, red_main
 from sortyard.services.api import load_lanes
 from tests import pg
 from tests.chart_mounts import as_started, container_of, named
@@ -1127,6 +1127,95 @@ def test_the_kernel_needs_the_engine_a_lane_the_agent_commands_and_the_app() -> 
     }
     for message, args in refused.items():
         assert message in render_fails(*ENGINE, *with_lane, *args), message
+
+
+WATCHED: dict[str, Any] = {
+    "lane": "walwarden",
+    "project": "proj-app",
+    "roleBinding": "rb-red-main",
+    "since": "2026-11-24T22:00:00Z",
+}
+RED_MAIN: dict[str, Any] = {
+    "enabled": True,
+    "workspace": "ws-estate",
+    "lanes": [WATCHED],
+}
+
+
+def red_main_values(tmp_path: pathlib.Path, **over: Any) -> tuple[str, ...]:
+    """A render with the kernel and the red-main observer on, `over` laid on redMain."""
+    args = kernel_values(tmp_path)
+    values = yaml.safe_load(pathlib.Path(args[-1]).read_text())
+    values["redMain"] = merged(RED_MAIN, over)
+    path = tmp_path / f"red-main-{len(list(tmp_path.glob('red-main-*')))}.yaml"
+    path.write_text(yaml.safe_dump(values))
+    return (*args[:-1], str(path))
+
+
+def test_red_main_enabled_renders_the_observer_and_nothing_else_new(tmp_path: pathlib.Path) -> None:
+    """redMain.enabled renders the observer's Deployment and its watch file, and changes nothing
+    else; the service starts on what the Deployment gives it."""
+    docs = render(*red_main_values(tmp_path))
+    on, kernel_only = keyed(docs), keyed(render(*kernel_values(tmp_path)))
+    assert set(on) - set(kernel_only) == {
+        ("Deployment", "sy-sortyard-red-main"),
+        ("ConfigMap", "sy-sortyard-red-main"),
+    }
+    assert all(on[key] == kernel_only[key] for key in kernel_only)
+    deploy = on[("Deployment", "sy-sortyard-red-main")]
+    assert deploy["spec"]["replicas"] == 1 and deploy["spec"]["strategy"] == {"type": "Recreate"}
+    pod = deploy["spec"]["template"]["spec"]
+    # No Kubernetes access: no service account token, no Role.
+    assert pod["automountServiceAccountToken"] is False and "serviceAccountName" not in pod
+    made = container_of(deploy, "red-main")
+    assert made["command"] == ["sortyard-red-main"]
+    assert made["image"] == container_of(on[("Deployment", "sy-sortyard-api")], "api")["image"]
+    assert made["securityContext"]["readOnlyRootFilesystem"] is True
+    env = env_of(made)
+    api = env_of(container_of(on[("Deployment", "sy-sortyard-api")], "api"))
+    for name in (n for n in api if n.startswith("SORTYARD_DATABASE_")):
+        assert env[name] == api[name], name
+    assert env["SORTYARD_API_URL"]["value"] == "http://sy-sortyard-api:8080"
+    secrets = {**APP_SECRET, "sy-sortyard-postgres": {"password": "a-database-password"}}
+    started = as_started(docs, deploy, "red-main", tmp_path, secrets)
+    assert set(red_main.REQUIRED) <= set(started)
+    observer, interval = red_main.build(started)  # the App key loads, the watch file parses
+    assert interval == 60
+    (watch,) = observer.watches
+    assert (watch.lane, watch.project, watch.role_binding) == (
+        "walwarden",
+        "proj-app",
+        "rb-red-main",
+    )
+    assert watch.repositories == tuple(
+        sorted(load_lanes(started["SORTYARD_LANES_DIR"])["walwarden"].repositories)
+    )
+    # Off, nothing of it is rendered.
+    assert not [
+        d
+        for d in render(*red_main_values(tmp_path, enabled=False))
+        if "red-main" in d["metadata"]["name"]
+    ]
+
+
+def test_red_main_needs_the_kernel_a_workspace_and_watched_lanes_the_kernel_declares(
+    tmp_path: pathlib.Path,
+) -> None:
+    """What the observer cannot start on is refused at render, with the value named."""
+    assert "requires kernel.enabled=true" in render_fails(
+        *RELEASE, *ENGINE, "--set", "redMain.enabled=true", "--set", "redMain.workspace=ws"
+    )
+    refused: dict[str, dict[str, Any]] = {
+        "redMain.workspace is required": {"workspace": ""},
+        "redMain.lanes is required": {"lanes": []},
+        'lane "nowhere" is not one of kernel.lanes': {"lanes": [{**WATCHED, "lane": "nowhere"}]},
+        "is not an RFC 3339 time with its offset": {
+            "lanes": [{**WATCHED, "since": "2026-11-24 22:00"}]
+        },
+        "redMain.lanes[].roleBinding is required": {"lanes": [{**WATCHED, "roleBinding": ""}]},
+    }
+    for message, over in refused.items():
+        assert message in render_fails(*red_main_values(tmp_path, **over)), message
 
 
 def test_kernel_enabled_false_renders_the_same_manifests_as_before(tmp_path: pathlib.Path) -> None:

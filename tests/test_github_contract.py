@@ -27,6 +27,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from sortyard.lane.github import GitHubError, HttpGitHub, Token
+from sortyard.services.red_main import READ, ActionsGitHub
 from tests.fake_github import APP_ID, KEY, PEM, FakeGitHub, FakeRepo, serving
 
 REPO = "walwarden/app"
@@ -34,11 +35,12 @@ ALL = {"contents": "write", "pull_requests": "write", "checks": "read"}
 
 
 @contextmanager
-def github(clock: Callable[[], float] = time.time) -> Iterator[tuple[FakeGitHub, HttpGitHub]]:
-    """The fake, served over HTTP, and the real client pointed at it."""
+def github(clock: Callable[[], float] = time.time) -> Iterator[tuple[FakeGitHub, ActionsGitHub]]:
+    """The fake, served over HTTP, and the real client pointed at it (with the red-main
+    observer's reads, which use the same client)."""
     fake = FakeGitHub(APP_ID, KEY.public_key(), clock=clock)
     with serving(fake) as url:
-        yield fake, HttpGitHub(APP_ID, PEM, base_url=url, clock=clock)
+        yield fake, ActionsGitHub(APP_ID, PEM, base_url=url, clock=clock)
 
 
 def refused(call: Callable[[], Any]) -> int:
@@ -114,6 +116,17 @@ def test_every_fake_response_matches_the_published_github_schema_for_its_endpoin
         )
         assert refused(lambda: port.token("walwarden/other", {"administration": "write"})) == 422
         assert refused(lambda: port.token("nobody/nothing", {"contents": "read"})) == 404
+        # The red-main observer's reads (src/sortyard/services/red_main.py).
+        repo = fake.repos[REPO]
+        workflow = fake.workflow(repo, ".github/workflows/ci.yml", "ci")
+        fake.workflow_run(repo, workflow, "failure")
+        reads = port.token(REPO, READ)
+        assert port.default_branch(reads, REPO) == "main"
+        (live,) = port.live_workflows(reads, REPO, "main")
+        run = port.newest_verdict(reads, REPO, live, "main")
+        assert run is not None and run.red and run.workflow == live
+        assert port.workflow_files(reads, REPO, "no-such-branch") == frozenset()  # a 404
+        assert refused(lambda: port.live_workflows(narrow, REPO, "main")) == 404
     fake.verify()
     # Every operation of the vendored fragment was served, and each reply matches its schema
     # (checked here again, apart from the fake's own check).

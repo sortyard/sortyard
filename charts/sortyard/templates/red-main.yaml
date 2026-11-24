@@ -1,0 +1,146 @@
+{{- if .Values.redMain.enabled }}
+{{- /*
+The red-main observer (SY-V3-RED-MAIN-OWNED, SY-DEC-014): `sortyard-red-main`. For every
+repository of a watched lane it reads the default branch's workflow runs as the GitHub App, and
+answers a red one with one triage item admitted through the API. It is a client of the API, not
+part of the kernel: it needs the kernel (the lane capability files and the App) and the API
+Service, and the database only to issue itself a short-lived operator token for each watched
+lane's role binding. Only the lanes listed in redMain.lanes are watched.
+*/ -}}
+{{- $r := .Values.redMain }}
+{{- if not .Values.kernel.enabled }}
+{{- fail "redMain.enabled=true requires kernel.enabled=true: the observer admits items the kernel builds, on the kernel's lanes" }}
+{{- end }}
+{{- $k := .Values.kernel }}
+{{- $name := printf "%s-red-main" (include "sortyard.fullname" .) }}
+{{- $selector := dict "root" . "component" "red-main" }}
+{{- $workspace := required "redMain.workspace is required when redMain.enabled=true: the workspace the triage items are admitted in" $r.workspace }}
+{{- if not $r.lanes }}
+{{- fail "redMain.lanes is required when redMain.enabled=true: at least one watched lane" }}
+{{- end }}
+{{- $watch := "version = 1\n" }}
+{{- range $r.lanes }}
+{{- if not (hasKey $.Values.kernel.lanes (required "redMain.lanes[].lane is required" .lane)) }}
+{{- fail (printf "redMain.lanes: lane %q is not one of kernel.lanes" .lane) }}
+{{- end }}
+{{- $since := required "redMain.lanes[].since is required: when the lane took its repositories (RFC 3339, with its offset)" .since }}
+{{- if not (regexMatch "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$" $since) }}
+{{- fail (printf "redMain.lanes: since %q is not an RFC 3339 time with its offset" $since) }}
+{{- end }}
+{{- $watch = printf "%s\n[[lanes]]\nlane = %s\nproject = %s\nrole-binding = %s\nsince = %s\nrisk-tier = %s\n" $watch (toJson .lane) (toJson (required "redMain.lanes[].project is required" .project)) (toJson (required "redMain.lanes[].roleBinding is required: an operator role binding to the project" .roleBinding)) $since (toJson (.riskTier | default "medium")) }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "sortyard.labels" . | nindent 4 }}
+    app.kubernetes.io/component: red-main
+data:
+  watch.toml: {{ toJson $watch }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "sortyard.labels" . | nindent 4 }}
+    app.kubernetes.io/component: red-main
+spec:
+  # One replica, Recreate: two would read GitHub twice for nothing. A second one could not file
+  # a second item for one red run (the item's id is fixed by the run), only repeat a request.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "sortyard.selector" $selector | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sortyard.labels" . | nindent 8 }}
+        app.kubernetes.io/component: red-main
+      annotations:
+        # The files are read once, at start: a change to them starts a new pod.
+        checksum/files: {{ list $watch (include "sortyard.lanes.data" . | trim) | join "\n" | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: red-main
+          image: {{ include "sortyard.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["sortyard-red-main"]
+          env:
+            - name: SORTYARD_RED_MAIN_CONFIG
+              value: /etc/sortyard/red-main/watch.toml
+            - name: SORTYARD_LANES_DIR
+              value: /etc/sortyard/lanes
+            - name: SORTYARD_API_URL
+              value: {{ printf "http://%s-api:%v" (include "sortyard.fullname" .) .Values.api.service.port | quote }}
+            - name: SORTYARD_WORKSPACE
+              value: {{ $workspace | quote }}
+            - name: SORTYARD_RED_MAIN_INTERVAL_SECONDS
+              value: {{ $r.intervalSeconds | quote }}
+            - name: SORTYARD_DATABASE_HOST
+              value: {{ include "sortyard.postgres.host" . | quote }}
+            - name: SORTYARD_DATABASE_PORT
+              value: {{ include "sortyard.postgres.port" . | quote }}
+            - name: SORTYARD_DATABASE_NAME
+              value: {{ .Values.postgres.database | quote }}
+            - name: SORTYARD_DATABASE_USER
+              value: {{ .Values.postgres.auth.username | quote }}
+            - name: SORTYARD_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sortyard.kernel.database.secretName" . }}
+                  key: password
+            - name: SORTYARD_GITHUB_APP_ID
+              value: {{ required "kernel.github.appId is required" $k.github.appId | quote }}
+            - name: SORTYARD_GITHUB_APP_KEY_FILE
+              value: {{ printf "/var/run/sortyard/github-app/%s" $k.github.appKeySecretKey | quote }}
+            {{- with $k.github.apiUrl }}
+            - name: SORTYARD_GITHUB_API_URL
+              value: {{ . | quote }}
+            {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            {{- toYaml $r.resources | nindent 12 }}
+          volumeMounts:
+            - name: watch
+              mountPath: /etc/sortyard/red-main
+              readOnly: true
+            - name: lanes
+              mountPath: /etc/sortyard/lanes
+              readOnly: true
+            - name: github-app
+              mountPath: /var/run/sortyard/github-app
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: watch
+          configMap:
+            name: {{ $name }}
+        - name: lanes
+          configMap:
+            name: {{ include "sortyard.lanes.fullname" . }}
+        - name: github-app
+          secret:
+            secretName: {{ required "kernel.github.appKeySecret is required" $k.github.appKeySecret }}
+            items:
+              - key: {{ $k.github.appKeySecretKey }}
+                path: {{ $k.github.appKeySecretKey }}
+        - name: tmp
+          emptyDir: {}
+{{- end }}

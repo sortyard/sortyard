@@ -1,7 +1,8 @@
 """A strict fake of the part of GitHub's REST API the GitHub port calls, served over real HTTP.
 
 The fake holds repositories, branches, pull requests, check runs and installation tokens, and
-answers in GitHub's JSON. It is held to GitHub's published API description, vendored as
+the Actions workflows, workflow runs and workflow files the red-main observer reads
+(`workflow`, `workflow_run`, `delete_file`), and answers in GitHub's JSON. It is held to GitHub's published API description, vendored as
 `tests/contracts/github/fragment.json` (`Contract`):
 
 - a call to a path or method outside the fragment, an undocumented query parameter or body
@@ -55,7 +56,13 @@ LEVELS = {"read": 1, "write": 2}
 # description does not repeat per endpoint; their body is the basic error.
 GENERAL = (401, 403, 404)
 # What an installation is granted unless a test says otherwise.
-GRANTED = {"contents": "write", "pull_requests": "write", "checks": "read", "workflows": "write"}
+GRANTED = {
+    "contents": "write",
+    "pull_requests": "write",
+    "checks": "read",
+    "workflows": "write",
+    "actions": "read",
+}
 # The permission each endpoint needs, from the REST reference's fine-grained permission notes.
 NEEDS = {
     "pulls/list": ("pull_requests", "read"),
@@ -70,6 +77,11 @@ NEEDS = {
     "git/delete-ref": ("contents", "write"),
     "git/get-commit": ("contents", "read"),
     "repos/compare-commits": ("contents", "read"),
+    # Every installation token reads a repository's metadata; no permission is asked for it.
+    "repos/get": ("metadata", "read"),
+    "repos/get-content": ("contents", "read"),
+    "actions/list-repo-workflows": ("actions", "read"),
+    "actions/list-workflow-runs": ("actions", "read"),
 }
 # What GitHub asks of a token beyond the reference's note, as it answers in practice: it
 # refuses to open a pull request for a token that cannot read the repository's contents, with
@@ -123,12 +135,12 @@ class Contract:
         self._components = _json_schema(raw["components"])
         self.operations: list[Operation] = []
         for template, methods in raw["paths"].items():
-            # A ref or a branch may hold slashes; no other path parameter does.
+            # A ref, a branch or a file path may hold slashes; no other path parameter does.
             pattern = re.sub(
                 r"\{(\w+)\}",
                 lambda m: (
                     f"(?P<{m[1]}>.+)"
-                    if m[1] in ("ref", "branch", "basehead")
+                    if m[1] in ("ref", "branch", "basehead", "path")
                     else f"(?P<{m[1]}>[^/]+)"
                 ),
                 template,
@@ -178,9 +190,11 @@ class Contract:
         ]
         for name, value in query.items():
             schema = operation.query.get(name, {})
-            typed: Any = (
-                int(value) if schema.get("type") == "integer" and value.isdigit() else value
-            )
+            typed: Any = value
+            if schema.get("type") == "integer" and value.isdigit():
+                typed = int(value)
+            elif schema.get("type") == "boolean" and value in ("true", "false"):
+                typed = value == "true"
             found += [f"query {name} {e}" for e in self.errors(schema, typed)]
         if body is None and operation.body_required:
             found.append("no body where one is required")
@@ -244,6 +258,10 @@ class FakeRepo:
     strict: set[str] = field(default_factory=set)
     pulls: list[FakePull] = field(default_factory=list)
     runs: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    # Actions: the workflows GitHub lists, the files on the default branch, the workflow runs.
+    workflows: list[dict[str, Any]] = field(default_factory=list)
+    files: set[str] = field(default_factory=set)
+    actions: list[dict[str, Any]] = field(default_factory=list)
 
     def pull_of(self, branch: str) -> FakePull:
         return [pull for pull in self.pulls if pull.branch == branch][-1]
@@ -358,6 +376,47 @@ class FakeGitHub:
         runs = [each for each in repo.runs.get(sha, []) if again or each["name"] != name]
         repo.runs[sha] = [run, *runs] if listed_first else [*runs, run]
 
+    def workflow(
+        self, repo: FakeRepo, path: str, name: str = "", state: str = "active"
+    ) -> dict[str, Any]:
+        """A workflow GitHub lists, with its file on the default branch."""
+        self._count += 1
+        found = {"id": 900 + self._count, "name": name or path.rsplit("/", 1)[-1], "path": path}
+        repo.workflows.append({**found, "state": state})
+        repo.files.add(path)
+        return found
+
+    def delete_file(self, repo: FakeRepo, path: str) -> None:
+        """The workflow file leaves the default branch; GitHub keeps listing the workflow."""
+        repo.files.discard(path)
+
+    def workflow_run(
+        self,
+        repo: FakeRepo,
+        workflow: Mapping[str, Any],
+        conclusion: str | None,
+        *,
+        event: str = "push",
+        branch: str = "main",
+        at: str | None = None,
+    ) -> int:
+        """A run of a workflow; with no conclusion it is still in progress. `at` is when it
+        was created (default: one second after the one made before it)."""
+        self._count += 1
+        identifier = 50_000 + self._count
+        run = {
+            "id": identifier,
+            "workflow": dict(workflow),
+            "conclusion": conclusion,
+            "event": event,
+            "branch": branch,
+            "head": repo.refs.get(f"refs/heads/{branch}", "0" * 40),
+            "at": at
+            or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(1_767_225_600 + self._count)),
+        }
+        repo.actions.append(run)
+        return identifier
+
     def verify(self) -> None:
         assert not self.violations, self.violations
 
@@ -442,7 +501,10 @@ class FakeGitHub:
         if repo.full_name not in repos:
             raise Refused(404, "Not Found")
         permission, level = NEEDS[operation.id]
-        if LEVELS.get(permissions.get(permission, ""), 0) < LEVELS[level]:
+        if (
+            permission != "metadata"
+            and LEVELS.get(permissions.get(permission, ""), 0) < LEVELS[level]
+        ):
             raise Refused(403, "Resource not accessible by integration")
         if operation.id in ALSO_NEEDS:
             (permission, level), error = ALSO_NEEDS[operation.id]
@@ -734,6 +796,85 @@ class FakeGitHub:
             ],
         }
 
+    def _repos_get(self, repo: FakeRepo, params: Any, query: Any, body: Any) -> Any:
+        found = self._repository(repo.full_name)
+        return 200, {**found, "has_discussions": False, "network_count": 0, "subscribers_count": 0}
+
+    def _repos_get_content(
+        self, repo: FakeRepo, params: Mapping[str, str], query: Mapping[str, str], body: Any
+    ) -> Any:
+        """A directory of the default branch: the files directly in it."""
+        if query.get("ref", "main") != "main":
+            raise Refused(404, "No commit found for the ref")
+        directory = params["path"].strip("/")
+        inside = sorted(f for f in repo.files if f.rsplit("/", 1)[0] == directory)
+        if not inside:
+            raise Refused(404, "Not Found")
+        url = f"{self.url}/repos/{repo.full_name}/contents"
+        return 200, [
+            {
+                "type": "file",
+                "size": 1,
+                "name": path.rsplit("/", 1)[1],
+                "path": path,
+                "sha": hashlib.sha1(path.encode()).hexdigest(),
+                "url": f"{url}/{path}",
+                "git_url": None,
+                "html_url": None,
+                "download_url": None,
+                "_links": {"git": None, "html": None, "self": f"{url}/{path}"},
+            }
+            for path in inside
+        ]
+
+    def _actions_list_repo_workflows(
+        self, repo: FakeRepo, params: Any, query: Mapping[str, str], body: Any
+    ) -> Any:
+        url = f"{self.url}/repos/{repo.full_name}/actions/workflows"
+        listed = [
+            {
+                **each,
+                "node_id": f"W_{each['id']}",
+                "url": f"{url}/{each['id']}",
+                "html_url": f"{url}/{each['id']}",
+                "badge_url": f"{url}/{each['id']}/badge.svg",
+                "created_at": WHEN,
+                "updated_at": WHEN,
+            }
+            for each in repo.workflows
+        ]
+        size, page = int(query.get("per_page", 30)), int(query.get("page", 1))
+        return 200, {
+            "total_count": len(listed),
+            "workflows": listed[(page - 1) * size : page * size],
+        }
+
+    def _actions_list_workflow_runs(
+        self, repo: FakeRepo, params: Mapping[str, str], query: Mapping[str, str], body: Any
+    ) -> Any:
+        """Newest first, filtered as GitHub filters: branch, event, status (or conclusion)."""
+        wanted = params["workflow_id"]
+        runs = [
+            run
+            for run in repo.actions
+            if wanted in (str(run["workflow"]["id"]), run["workflow"]["path"].rsplit("/", 1)[-1])
+            and query.get("branch", run["branch"]) == run["branch"]
+            and query.get("event", run["event"]) == run["event"]
+            and (
+                "status" not in query
+                or query["status"] == ("completed" if run["conclusion"] else "in_progress")
+                or query["status"] == run["conclusion"]
+            )
+        ]
+        runs.sort(key=lambda run: (run["at"], run["id"]), reverse=True)
+        size, page = int(query.get("per_page", 30)), int(query.get("page", 1))
+        return 200, {
+            "total_count": len(runs),
+            "workflow_runs": [
+                self._run(repo, run) for run in runs[(page - 1) * size : page * size]
+            ],
+        }
+
     def _git_list_matching_refs(
         self, repo: FakeRepo, params: Mapping[str, str], query: Any, body: Any
     ) -> Any:
@@ -784,6 +925,44 @@ class FakeGitHub:
         if pull.blocked or any(runs.get(name) != "success" for name in required):
             return True, "blocked"
         return True, "clean"
+
+    def _run(self, repo: FakeRepo, run: Mapping[str, Any]) -> dict[str, Any]:
+        url = f"{self.url}/repos/{repo.full_name}/actions/runs/{run['id']}"
+        who = {"name": "bot", "email": "bot@example.test"}
+        workflow = run["workflow"]
+        return {
+            "id": run["id"],
+            "name": workflow["name"],
+            "node_id": f"WR_{run['id']}",
+            "head_branch": run["branch"],
+            "head_sha": run["head"],
+            "path": workflow["path"],
+            "display_title": "a change",
+            "run_number": run["id"] - 50_000,
+            "event": run["event"],
+            "status": "completed" if run["conclusion"] else "in_progress",
+            "conclusion": run["conclusion"],
+            "workflow_id": workflow["id"],
+            "url": url,
+            "html_url": url,
+            "created_at": run["at"],
+            "updated_at": run["at"],
+            "head_commit": {
+                "id": run["head"],
+                "tree_id": run["head"],
+                "message": "a change",
+                "timestamp": run["at"],
+                "author": who,
+                "committer": who,
+            },
+            "head_repository": self._repository(repo.full_name),
+            "repository": self._repository(repo.full_name),
+            "pull_requests": [],
+            **{f"{name}_url": f"{url}/{name}" for name in ("jobs", "logs", "cancel", "rerun")},
+            "check_suite_url": f"{url}/check-suite",
+            "artifacts_url": f"{url}/artifacts",
+            "workflow_url": f"{self.url}/repos/{repo.full_name}/actions/workflows/{workflow['id']}",
+        }
 
     def _ref(self, repo: FakeRepo, name: str) -> dict[str, Any]:
         url, sha = f"{self.url}/repos/{repo.full_name}/git", repo.refs[name]
