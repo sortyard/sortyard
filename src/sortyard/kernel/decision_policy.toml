@@ -1,0 +1,31 @@
+# The decision policy (company/HARNESS-V3.md section 3.1, SY-V3-LANE-RUNTIME).
+#
+# The decision step of the item workflow (sortyard.kernel.policy) answers a question from this
+# file when a rule matches it. What no rule covers gets no answer here, and the item's own
+# default and then the state table's default apply, as the item workflow already does.
+#
+# A rule matches a question on any of these keys; a key left out matches everything:
+#
+#   state    the state the item came to the decision from
+#   cause    why: "outcome", "limit", "owner-failed", "unknown-outcome", "request"
+#   outcome  the outcome that led here, for cause "outcome"
+#   action   the word the state's default handed on, for cause "limit"
+#
+# and gives:
+#
+#   answer   one of the decision state's answers in the state table (resume, rebuild, wait)
+#   reverse  how to reverse it; recorded with the decision
+#
+# The first matching rule answers. An example:
+#
+#   [[rules]]
+#   state = "building"
+#   outcome = "no-change"
+#   answer = "wait"
+#   reverse = "Send the item a decision request with the answer rebuild."
+#
+# The shipped policy has no rules: which answer a question deserves is the operator's to
+# write, and until a rule is written the table's defaults decide.
+
+version = 1
+rules = []

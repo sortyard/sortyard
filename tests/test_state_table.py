@@ -203,7 +203,9 @@ def test_the_shipped_table_declares_every_section_3_1_state_and_no_blocked_state
     assert default("checking") == ("retry", "decision", 1)
     assert default("reviewing") == ("redispatch", None, 0)
     assert default("fixing") == ("to", "decision", 0)
-    assert default("merging") == ("redispatch", None, 0)
+    # Update the branch and re-arm, three times; then a decision, not a fourth re-arm.
+    assert default("merging") == ("retry", "decision", 3)
+    assert table.state("merging").default.action == "update-branch"  # type: ignore[union-attr]
     assert default("waiting") == ("to", "decision", 0)
     building, fixing, waiting = (table.state(n).limit for n in ("building", "fixing", "waiting"))
     assert building is not None and set(building.by_tier) == {"low", "medium", "high"}

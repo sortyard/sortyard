@@ -85,7 +85,7 @@ def test_the_entry_point_runs_the_agent_command_without_the_github_token_and_pus
     assert head is not None and head != base
     assert result == {"outcome": "built", "head": head}
     assert git("rev-parse", f"{head}^", cwd=bare) == base
-    assert git("show", f"{head}:new.txt", cwd=bare) == "made by the agent"
+    assert git("show", f"{head}:new.txt", cwd=bare) == f"made by the agent on {BRANCH}"
     assert remote_head(bare, "main") == base
     # What the agent was given: the brief text, the clone on the work branch, at the base.
     agent = seen(tmp_path)

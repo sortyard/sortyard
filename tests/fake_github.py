@@ -275,9 +275,9 @@ class FakeGitHub:
 
     # What a test arranges.
 
-    def commit(self, repo: FakeRepo, parents: list[str]) -> str:
+    def commit(self, repo: FakeRepo, parents: list[str], sha: str | None = None) -> str:
         self._count += 1
-        sha = hashlib.sha1(str(self._count).encode()).hexdigest()
+        sha = sha or hashlib.sha1(str(self._count).encode()).hexdigest()
         repo.commits[sha] = parents
         return sha
 
@@ -289,12 +289,20 @@ class FakeGitHub:
         repo.refs["refs/heads/main"] = self.commit(repo, [])
         return repo
 
-    def push(self, repo: FakeRepo, branch: str, parents: list[str] | None = None) -> str:
+    def push(
+        self,
+        repo: FakeRepo,
+        branch: str,
+        parents: list[str] | None = None,
+        sha: str | None = None,
+    ) -> str:
         """A new commit on a branch (on its head, or on main's for a new branch, unless
-        `parents` says otherwise); an open pull request of the branch gets it as its head."""
+        `parents` says otherwise); an open pull request of the branch gets it as its head.
+        `sha` names the commit when the test has a real one (a worker pushed it to a git
+        remote on disk, and the hosting side of GitHub is this fake)."""
         ref = f"refs/heads/{branch}"
         on = repo.refs.get(ref, repo.refs["refs/heads/main"])
-        sha = repo.refs[ref] = self.commit(repo, [on] if parents is None else parents)
+        sha = repo.refs[ref] = self.commit(repo, [on] if parents is None else parents, sha)
         for pull in repo.pulls:
             if pull.open and pull.branch == branch:
                 pull.head = sha

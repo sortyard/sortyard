@@ -23,11 +23,22 @@ from sortyard.api import auth, store
 from sortyard.api.auth import Principal
 from sortyard.api.store import ApiError, Conn, Doc, conflict, forbidden, not_found, unprocessable
 from sortyard.engine import EngineUnavailable, WorkflowNotFound
-from sortyard.kernel import ledger
+from sortyard.kernel import admission, ledger
+from sortyard.kernel.capabilities import Lane
 from sortyard.kernel.item import INPUT_SIGNAL, workflow_id
 from sortyard.models import schema
 
 SignalItem = Callable[[str, str, Any], None]
+
+
+@dataclass(frozen=True)
+class Kernel:
+    """What admission needs beyond the database: the lanes this deployment runs, and how to
+    start an item's workflow (tenant, item, risk tier). `start_item` raises `ValueError` when
+    the item's workflow was started before."""
+
+    lanes: Mapping[str, Lane]
+    start_item: Callable[[str, str, str], None]
 
 
 @dataclass
@@ -42,6 +53,8 @@ class Request:
     #: Delivers a signal to a workflow (workflow id, signal name, payload); None when the
     #: service runs without an engine.
     signal_item: SignalItem | None = None
+    #: None when the service runs without an engine or without lane capability files.
+    kernel: Kernel | None = None
 
     @property
     def actor(self) -> Doc:
@@ -1146,7 +1159,8 @@ def issue_service_account_token(req: Request) -> Reply:
 #
 # The item workflow owns item state and sortyard.kernel.ledger records it. These operations
 # read that projection. The one that is not a read sends the workflow a request and writes
-# nothing: no operation here, or anywhere in this module, changes an item's state.
+# nothing: no operation here, or anywhere in this module, changes an item's state. Admission
+# creates an item with no state (sortyard.kernel.admission) and starts its workflow.
 
 
 @handles("getProjectQueue")
@@ -1217,3 +1231,82 @@ def request_item_change(req: Request) -> Reply:
         reason,
     )
     return Reply(202, {"id": request_id, "item_id": item_id, "answer": answer, "reason": reason})
+
+
+_ADMIT_TEXT = ("id", "project_id", "title", "lane", "repository")
+_ADMIT_OPTIONAL = {"risk_tier": "medium", "base": "main", "milestone_id": None}
+_ADMIT_LISTS = ("needs", "blocked_by")
+
+
+@handles("admitItem")
+def admit_item(req: Request) -> Reply:
+    body = object_body(req)
+    closed(body, {*_ADMIT_TEXT, *_ADMIT_OPTIONAL, *_ADMIT_LISTS, "spec"}, [*_ADMIT_TEXT, "spec"])
+    text: dict[str, Any] = {key: non_empty_string(body, key) for key in _ADMIT_TEXT}
+    for key, default in _ADMIT_OPTIONAL.items():
+        text[key] = body.get(key, default)
+        if text[key] is not None and not (isinstance(text[key], str) and text[key]):
+            raise unprocessable(f"{key} must be a non-empty string")
+    lists = {key: body.get(key, []) for key in _ADMIT_LISTS}
+    for key, value in lists.items():
+        if not isinstance(value, list) or not all(isinstance(each, str) for each in value):
+            raise unprocessable(f"{key} must be a list of strings")
+    if not isinstance(body["spec"], dict):
+        raise unprocessable("spec must be an object")
+    if not re.match(store.ID_PATTERN, text["id"]):
+        raise unprocessable("id is not a valid id")
+    in_project_scope(req.principal, text["project_id"])
+    if req.kernel is None:
+        raise ApiError(
+            503, "Service Unavailable", "this service runs without a workflow kernel", "engine"
+        )
+    asked = admission.Admission(
+        tenant=req.workspace_id,
+        item=text["id"],
+        project=text["project_id"],
+        title=text["title"],
+        lane=text["lane"],
+        repository=text["repository"],
+        spec=body["spec"],
+        base=text["base"],
+        needs=tuple(lists["needs"]),
+        blocked_by=tuple(lists["blocked_by"]),
+        risk_tier=text["risk_tier"],
+        milestone=text["milestone_id"],
+    )
+    try:
+        created = admission.admit(req.conn, req.kernel.lanes, asked)
+    except admission.Different as different:
+        raise conflict(str(different), "different_item") from None
+    except admission.Refused as refused:
+        raise ApiError(
+            422,
+            "Unprocessable Content",
+            str(refused),
+            "admission",
+            {"reasons": refused.reasons},
+        ) from None
+    # Inside the transaction: an engine that does not take the start leaves no item behind.
+    try:
+        req.kernel.start_item(req.workspace_id, asked.item, asked.risk_tier)
+    except ValueError:
+        pass  # started by an earlier admission of the same item
+    except (EngineUnavailable, TimeoutError):
+        raise ApiError(
+            503, "Service Unavailable", "the workflow engine did not answer", "engine"
+        ) from None
+    admitted = {
+        "id": asked.item,
+        "project_id": asked.project,
+        "lane": asked.lane,
+        "repository": asked.repository,
+        "base": asked.base,
+        "needs": list(asked.needs),
+        "blocked_by": sorted(set(asked.blocked_by)),
+        "workflow_id": workflow_id(req.workspace_id, asked.item),
+    }
+    if created:
+        store.audit(
+            req.conn, req.workspace_id, req.actor, "create", "item", asked.item, None, admitted
+        )
+    return Reply(201 if created else 200, admitted)

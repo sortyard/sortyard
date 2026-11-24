@@ -633,6 +633,37 @@ def test_an_outcome_the_state_does_not_know_waits_out_the_limit_then_gets_the_de
     assert len(fakes.calls_for("merging")) == 2  # once per limit, not in a loop
 
 
+def test_a_merge_that_never_happens_re_arms_a_bounded_number_of_times_then_is_decided() -> None:
+    """Merging whose outcome never comes (checks on the head that never report) updates the
+    branch and re-arms at each limit, three times, and then goes to a decision: it does not
+    re-arm for ever."""
+    wait = {"answer": "wait", "reverse": "send the item another answer"}
+    fakes = Fakes(script={"merging": [SILENT] * 8}, decisions=[wait])
+    half_hour = timedelta(minutes=30)
+
+    async def scenario() -> None:
+        async with kernel(fakes) as k:
+            identifier = await k.start()
+            for dispatched in (1, 2, 3, 4):
+                one_timer(await k.idle_in(identifier, "merging"), half_hour)
+                assert len(fakes.calls_for("merging")) == dispatched
+                await k.clock.advance(half_hour)
+            await k.idle_in(identifier, "waiting")
+
+    asyncio.run(scenario())
+    merging = fakes.calls_for("merging")
+    # The first call merges; each one after a passed limit is told to update the branch.
+    assert [call["action"] for call in merging] == [None, *["update-branch"] * 3]
+    assert len({call["dispatch"] for call in merging}) == 4
+    assert fakes.states()[-6:] == [*["merging"] * 4, "decision", "waiting"]
+    (question,) = fakes.questions
+    assert (question["state"], question["cause"], question["action"]) == (
+        "merging",
+        "limit",
+        "update-branch",
+    )
+
+
 def test_a_decision_that_repeats_waits_on_a_named_need_instead_of_going_round_again() -> None:
     # The executor reports "no change" every time and no policy answers, so the table's default
     # (resume) sends the item straight back to the same build.
