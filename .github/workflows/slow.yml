@@ -23,7 +23,7 @@ jobs:
     # through real worker Jobs and the fake GitHub, the second with its pod deleted mid-item.
     # Then the acceptance test of tests/test_replica.py runs that lane again and reads the result.
     name: local replica (kind)
-    runs-on: ubuntu-latest
+    runs-on: sortyard-ci
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -71,7 +71,7 @@ jobs:
     # runs the containers of the rendered chart with docker: the same server image, the same
     # schema Job, the same settings. With the target set no server test is skipped.
     name: engine server on Postgres (failure tests)
-    runs-on: ubuntu-latest
+    runs-on: sortyard-ci
     timeout-minutes: 20
     env:
       SORTYARD_ENGINE_SERVER_TARGET: 127.0.0.1:7233

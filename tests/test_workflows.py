@@ -91,7 +91,7 @@ class Run:
 
 
 class Runner:
-    """Runs the job's scripts the way the hosted runner does, against the stand-in docker."""
+    """Runs the job's scripts the way the runner does, against the stand-in docker."""
 
     def __init__(self, tmp: pathlib.Path) -> None:
         self.tmp = tmp
@@ -190,12 +190,12 @@ def test_publish_never_runs_for_a_pull_request() -> None:
     assert not on["workflow_dispatch"], "no inputs: nothing a caller chooses reaches the job"
 
 
-def test_publish_can_only_read_the_repository_and_runs_one_job_on_the_hosted_runner() -> None:
+def test_publish_can_only_read_the_repository_and_runs_one_job_on_the_estate_runners() -> None:
     assert workflow()["permissions"] == {"contents": "read"}
     assert len(workflow()["jobs"]) == 1
     made = job()
     assert "permissions" not in made
-    assert made["runs-on"] == "ubuntu-latest"
+    assert made["runs-on"] == "sortyard-ci"
     assert not {"container", "services", "strategy", "if", "continue-on-error", "uses"} & set(made)
 
 

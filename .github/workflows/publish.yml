@@ -32,7 +32,7 @@ concurrency:
 jobs:
   image:
     name: publish image
-    runs-on: ubuntu-latest
+    runs-on: sortyard-ci
     # Where the push credentials are, and what limits them to main.
     environment: publish
     timeout-minutes: 20
