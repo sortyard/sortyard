@@ -182,7 +182,11 @@ class ActionsGitHub(HttpGitHub):
     def newest_verdict(
         self, token: Token, repository: str, workflow: Workflow, branch: str
     ) -> Run | None:
-        """The newest finished run on the branch, of the events above, that is red or green."""
+        """The verdict of the newest run on the branch of the events above: that run when it is
+        red or green; none while it has not finished. One that finished neither (cancelled,
+        skipped) gives way to the newest red or green run of the same commit. An older commit's
+        run never speaks for the branch: right after a fix merges, the run of the merge is the
+        newest, and the red runs before it are history (SORTYARD-204, found on the estate)."""
 
         def shape(reply: Any) -> list[Run]:
             return [
@@ -190,7 +194,8 @@ class ActionsGitHub(HttpGitHub):
                     id=int(each["id"]),
                     workflow=workflow,
                     event=str(each["event"]),
-                    conclusion=str(each["conclusion"]),
+                    # A run that has not finished has no conclusion: it is neither red nor green.
+                    conclusion=str(each["conclusion"]) if each["status"] == "completed" else "",
                     head=str(each["head_sha"]),
                     branch=str(each["head_branch"]),
                     url=str(each["html_url"]),
@@ -204,19 +209,17 @@ class ActionsGitHub(HttpGitHub):
             "GET",
             f"/repos/{repository}/actions/workflows/{workflow.id}/runs",
             token,
-            query={
-                "branch": branch,
-                "status": "completed",
-                "exclude_pull_requests": "true",
-                "per_page": RUNS_PAGE,
-            },
+            query={"branch": branch, "exclude_pull_requests": "true", "per_page": RUNS_PAGE},
         )
-        judged = [
-            run
-            for run in runs
-            if run.event in EVENTS and run.branch == branch and run.conclusion in RED | GREEN
-        ]
-        return max(judged, key=lambda run: (run.created_at, run.id), default=None)
+        mine = sorted(
+            (run for run in runs if run.event in EVENTS and run.branch == branch),
+            key=lambda run: (run.created_at, run.id),
+            reverse=True,
+        )
+        if not mine or not mine[0].conclusion:
+            return None
+        judged = [run for run in mine if run.head == mine[0].head and run.conclusion in RED | GREEN]
+        return judged[0] if judged else None
 
 
 class ApiError(Exception):

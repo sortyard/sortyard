@@ -533,6 +533,10 @@ provenance; where they conflict, the amendment wins.
     binding whose role is not operator) is reported every pass, not asked again.
   - A failing run re-run green keeps its id and creation time; that run green ends the
     incident too.
+  - The verdict is the newest run on the branch, in progress included, and only a run of the
+    newest commit speaks for it. The estate drill (2026-11-24) admitted a second item for a red
+    run that predated the merged fix while the merge commit's run was still in progress; the
+    item was withdrawn as moot when that run went green, and the rule was changed.
   - It gets its API token by issuing itself a short-lived operator token for the watched lane's
     role binding from the database, as `sortyard-api --issue-operator-token` does: it holds the
     database credential the API holds. A long-lived token kept in a Secret was the alternative;
