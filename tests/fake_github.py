@@ -13,7 +13,8 @@ answers in GitHub's JSON. It is held to GitHub's published API description, vend
 `verify()` fails on any violation; the tests call it when they are done. It also refuses what
 GitHub refuses: a JSON web token it cannot verify with the App's public key or that lives longer
 than ten minutes, a token used on a repository it was not minted for or for a permission it
-does not carry (the permission each endpoint needs is the one GitHub's REST reference names),
+does not carry (the permission each endpoint needs is the one GitHub's REST reference names,
+and `ALSO_NEEDS` adds what GitHub asks beyond it in practice),
 a merge whose `sha` is not the head, a merge of a merged pull request.
 """
 
@@ -69,6 +70,16 @@ NEEDS = {
     "git/delete-ref": ("contents", "write"),
     "git/get-commit": ("contents", "read"),
     "repos/compare-commits": ("contents", "read"),
+}
+# What GitHub asks of a token beyond the reference's note, as it answers in practice: it
+# refuses to open a pull request for a token that cannot read the repository's contents, with
+# a 422 whose errors say why (seen on noncelogic/sortyard-canary on 2026-11-24, SORTYARD-178:
+# pull_requests:write alone was refused, with contents:read added the same call succeeded).
+ALSO_NEEDS = {
+    "pulls/create": (
+        ("contents", "read"),
+        {"resource": "PullRequest", "code": "custom", "message": "not all refs are readable"},
+    ),
 }
 APP_OPERATIONS = ("apps/get-repo-installation", "apps/create-installation-access-token")
 
@@ -198,9 +209,9 @@ class Contract:
 
 
 class Refused(Exception):
-    def __init__(self, status: int, message: str) -> None:
+    def __init__(self, status: int, message: str, errors: tuple[dict[str, Any], ...] = ()) -> None:
         super().__init__(message)
-        self.status, self.message = status, message
+        self.status, self.message, self.errors = status, message, errors
 
 
 @dataclass
@@ -389,7 +400,7 @@ class FakeGitHub:
                 try:
                     status, payload = self._serve(operation, params, lowered, query, body or {})
                 except Refused as refused:
-                    status, payload = refused.status, self._error(refused.message)
+                    status, payload = refused.status, self._error(refused.message, refused.errors)
             if self.mutate is not None:
                 payload = self.mutate(operation.id, payload)
             self.violations += [
@@ -399,8 +410,13 @@ class FakeGitHub:
             self.replies.append((operation.id, status, payload))
             return status, payload
 
-    def _error(self, message: str) -> dict[str, str]:
-        return {"message": message, "documentation_url": DOCS}
+    def _error(self, message: str, errors: tuple[dict[str, Any], ...] = ()) -> dict[str, Any]:
+        """GitHub's error body; a validation error also says which field and why (`errors`)."""
+        return {
+            "message": message,
+            "documentation_url": DOCS,
+            **({"errors": [*errors]} if errors else {}),
+        }
 
     def _serve(
         self,
@@ -428,6 +444,10 @@ class FakeGitHub:
         permission, level = NEEDS[operation.id]
         if LEVELS.get(permissions.get(permission, ""), 0) < LEVELS[level]:
             raise Refused(403, "Resource not accessible by integration")
+        if operation.id in ALSO_NEEDS:
+            (permission, level), error = ALSO_NEEDS[operation.id]
+            if LEVELS.get(permissions.get(permission, ""), 0) < LEVELS[level]:
+                raise Refused(422, "Validation Failed", (error,))
         handler: Callable[..., tuple[int, Any]] = getattr(
             self, "_" + re.sub(r"\W", "_", operation.id)
         )
