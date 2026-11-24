@@ -3,8 +3,8 @@
 `load` reads the rules (`decision_policy.toml`, shipped next to the state table, shows the
 format) and refuses a file it cannot read in full. `Policy.decide` is the item workflow's
 decision step: the first rule that matches the question answers it; when none does it returns
-nothing, and the item's own default and then the table's apply. A rule can also match what a
-request asked for (`request`) and the role of whoever sent it (`role`).
+nothing, and the item's default, then the table's, apply. A rule may match a request's answer
+(`request`) and its sender's role (`role`).
 """
 
 from __future__ import annotations

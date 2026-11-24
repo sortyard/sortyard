@@ -350,6 +350,7 @@ def test_withdrawing_an_item_mid_build_deletes_its_job_and_per_job_secret_and_le
 
             # B is withdrawn while the cluster refuses to delete Jobs, and the service is
             # stopped before the cleanup can finish.
+            stale = stays(w)["B"]  # what a pass that started before the withdrawal read
             w.cluster.refuse[("DELETE", "job")] = 500
             assert ask(w, "B").status == 202
             await drive(w, service, lambda: w.states()["B"] == "withdrawn", "B withdrawn")
@@ -377,6 +378,12 @@ def test_withdrawing_an_item_mid_build_deletes_its_job_and_per_job_secret_and_le
             ended = dict.fromkeys("ABW", "withdrawn")
             assert w.states() == {**ended, "C": "merged", "D": "admitted"}
             assert left_in_cluster(w, "A") == left_in_cluster(w, "B") == GONE
+            # A look made now with the stay read before B was withdrawn does nothing: it
+            # reaches neither the cluster nor GitHub.
+            engine = await Engine.connect(w.target)
+            quiet = (len(w.cluster.exchanges), len(w.fake.seen("pulls/create")))
+            assert await kernel.assemble(w.settings()).observer(engine).look(stale) is None
+            assert (len(w.cluster.exchanges), len(w.fake.seen("pulls/create"))) == quiet
             assert sorted(brief["item"] + ":" + brief["mode"] for brief in w.ran) == [
                 "B:build",
                 "C:build",

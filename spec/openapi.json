@@ -16128,7 +16128,7 @@
                       "format": "date-time"
                     },
                     "detail": {
-                      "description": "What the item entered its state with. For a withdrawn item, `left_open` names its repository, its branch and the number of its open pull request (null when it has none).",
+                      "description": "What the item entered its state with. For a withdrawn item, `left_open` names its repository, its branch and its pull request: the number of the open one, null when the branch has no open pull request (none was opened, or it was closed or merged outside the kernel), or a text starting `not read:` when GitHub could not be read as the item ended. It is written once and absent for an item that was not admitted with a spec.",
                       "type": "object"
                     },
                     "workflow_id": {

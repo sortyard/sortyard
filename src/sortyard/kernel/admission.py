@@ -7,8 +7,7 @@ blocked_by link resolves to an item of the same tenant, and the risk tier is one
 table has limits for. `check` gives every reason an item fails, not the first. `admit` writes
 the item, its links and its spec in the caller's transaction, or nothing: a refused item
 leaves no row. Admitting an id again with the same content changes nothing; with other
-content it is refused, since a spec is written once. An id that was withdrawn is refused too:
-the work comes back under a new id.
+content it is refused, since a spec is written once; so is an id that was withdrawn.
 
 Starting the item's workflow is the caller's next step (`sortyard.kernel.item.start_item`),
 inside the same transaction, so an item is never stored without one being started.

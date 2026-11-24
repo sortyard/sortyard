@@ -5,8 +5,8 @@ Among a lane's queued items whose blockers are merged, the one created first goe
 is link order, since an item cannot be dispatched before what it is blocked by.
 
 A lane's slot count is `slots` in its capability file. A slot is held from the grant until the
-item ends (merged or withdrawn), through every state between, a wait on a named need and a
-decision included. An item blocked by a withdrawn item stays queued: only a merge clears a link.
+item ends (merged or withdrawn), a wait on a need and a decision included; only a merge clears
+a link, so what a withdrawn item blocks stays queued.
 So a lane never has more than `slots` items out of the queue: a need that fails for the whole
 lane parks at most that many and the rest stay queued, and no build starts beside them. The
 cost is that an item waiting on a need of its own keeps one slot until its wait ends.

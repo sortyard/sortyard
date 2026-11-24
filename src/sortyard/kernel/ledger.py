@@ -206,8 +206,7 @@ def queue(
     Link order: an item comes after every item it is blocked by. Items that no link orders
     keep the order they were created in; a milestone groups items and never orders them. Age
     is the time since the item entered its state (since it was created, for one not started).
-    A blocker that ended without merging (a withdrawn one) still blocks: it stays in
-    `blocked_by` and is named with its state in `ended_blockers`.
+    A blocker that ended without merging (withdrawn) still blocks, named in `ended_blockers`.
     """
     with conn.cursor(row_factory=dict_row) as cursor:
         if now is None:
