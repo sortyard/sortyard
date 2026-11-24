@@ -1,0 +1,29 @@
+# What the replica's lane run needs before its operator can call the API: one workspace with a
+# project, an operator and that operator's role binding. replica/replica.sh applies it with
+# `sortyard-api --bootstrap -` in the API pod; replica/admit.py then gets a token for the
+# binding (`--issue-operator-token`) and admits an item. It holds no credential.
+# The format is documented in README.md ("First operator").
+
+[workspace]
+id = "ws-replica-lane"
+name = "ws-replica-lane"
+
+[[projects]]
+id = "proj-replica"
+name = "proj-replica"
+archetype = { id = "arch-saas-product", version = "1.0.0" }
+repos = []
+tracker = { kind = "internal" }
+state = "active"
+
+[[operators]]
+id = "op-replica"
+subject = "replica|operator"
+display_name = "replica operator"
+state = "active"
+
+[[role_bindings]]
+id = "rb-replica"
+principal = { kind = "operator", id = "op-replica" }
+role = "operator"
+scope = { kind = "workspace" }
