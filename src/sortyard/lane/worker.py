@@ -25,7 +25,8 @@ What a Job gets:
 
 A launch first deletes the Jobs of the item's earlier dispatches with what they created, so a
 Job whose stay closed before it ended (its limit passed) leaves nothing behind once the item
-is dispatched again. The Job's deadline is the stay's limit (`limit_seconds` of the call).
+is dispatched again. The Job's deadline is the stay's limit (`limit_seconds` of the call), and
+its brief and the agent's `SORTYARD_LIMIT_SECONDS` give that figure, so the agent can stop in time.
 
 `push` reports the result as its termination message. `observe` trusts that message only as
 far as the state can use it: an outcome the state has, a head commit, and for findings one
@@ -76,11 +77,12 @@ OUTCOMES: Mapping[str, frozenset[str]] = {
 BRIEF_DIR, TOKEN_DIR = "/var/run/sortyard/brief", "/var/run/sortyard/github"
 # The agent's workspace, and what `clone` hands `push` where the agent cannot reach.
 WORK_DIR, STATE_DIR = "/work", "/var/run/sortyard/state"
-BRIEF_ENV, TOKEN_FILE_ENV, WORK_ENV, STATE_ENV = (
+BRIEF_ENV, TOKEN_FILE_ENV, WORK_ENV, STATE_ENV, LIMIT_ENV = (
     "SORTYARD_BRIEF",
     "SORTYARD_GITHUB_TOKEN_FILE",
     "SORTYARD_WORKDIR",
     "SORTYARD_STATE",
+    "SORTYARD_LIMIT_SECONDS",
 )
 CLONE, AGENT = "clone", "agent"
 # A container's termination message is cut at 4096 bytes; the worker keeps its result under it.
@@ -156,6 +158,8 @@ def item_label(tenant: str, item: str) -> str:
 def brief(mode: str, work: Work, call: Payload, config: WorkerConfig) -> dict[str, Any]:
     """The brief of one Job: what the entry point needs, and `text`, what the agent is told."""
     item, detail = str(call["item"]), dict(call.get("detail") or {})
+    limit = call.get("limit_seconds")  # the stay's limit; the configured deadline when it has none
+    seconds = int(limit) if isinstance(limit, int | float) and limit >= 1 else config.deadline
     made: dict[str, Any] = {
         "version": 1,
         "mode": mode,
@@ -168,10 +172,12 @@ def brief(mode: str, work: Work, call: Payload, config: WorkerConfig) -> dict[st
         "branch": branch(item),
         "spec": dict(work.spec),
         "agent": list(config.agents[mode]),
+        "limit_seconds": seconds,  # the Job's deadline: what the agent has, clone and push included
     }
     lines = [
         f"Item {item} in repository {work.repository}.",
         f"Base branch: {work.base}. Work branch: {made['branch']} (checked out here).",
+        f"This Job is stopped {seconds} seconds after it starts ({LIMIT_ENV}): end before then.",
         "The item's spec:",
         json.dumps(made["spec"], indent=2, sort_keys=True),
     ]
@@ -205,7 +211,7 @@ def manifest(
 
     Three containers of the lane's worker image share the workspace. `clone` (an init
     container) and `push` hold the per-job secret and a state volume of their own; `agent`
-    holds neither, and alone gets the lane's declared secrets.
+    holds neither, and alone gets the lane's declared secrets and the deadline (`LIMIT_ENV`).
     """
     labels = {"app.kubernetes.io/managed-by": "sortyard", JOB_LABEL: name, **(labels or {})}
     brief = {"name": "brief", "mountPath": BRIEF_DIR, "readOnly": True}
@@ -244,7 +250,7 @@ def manifest(
         "automountServiceAccountToken": False,
         "initContainers": [container(CLONE, holds_token, trusted)],
         "containers": [
-            container(AGENT, lane_secrets, []),
+            container(AGENT, [*lane_secrets, {"name": LIMIT_ENV, "value": str(deadline)}], []),
             container(RESULT_CONTAINER, holds_token, trusted),
         ],
         "volumes": [
@@ -329,19 +335,17 @@ class Launcher:
         tenant, item, state = str(call["tenant"]), str(call["item"]), str(call["state"])
         dispatch = int(call["dispatch"])
         work, mint = self._mint(tenant, item, state)
-        limit = call.get("limit_seconds")
-        deadline = int(limit) if isinstance(limit, int | float) and limit >= 1 else 0
-        label = item_label(tenant, item)
+        made, label = brief(MODES[state], work, call, self._config), item_label(tenant, item)
         self._jobs.delete_earlier(label, dispatch)
         self._jobs.launch(
             manifest(
                 job_name(tenant, item, dispatch),
                 work.lane,
                 self._config,
-                deadline or self._config.deadline,
+                made["limit_seconds"],
                 {ITEM_LABEL: label, DISPATCH_LABEL: str(dispatch)},
             ),
-            brief=json.dumps(brief(MODES[state], work, call, self._config)),
+            brief=json.dumps(made),
             token=mint,
             stamp=str(int(self._clock())),
         )

@@ -12,7 +12,9 @@ GitHub token:
   directory, with a random key for this Job; a copy of the key is left in the workspace.
 - `sortyard-worker agent` (no token, no secret volume): takes the key out of the workspace
   (reads it, deletes the file), then runs the configured agent command in the clone with the
-  brief text on standard input. A review's answer is what the command's own process wrote to
+  brief text on standard input and the seconds the Job has (the brief's `limit_seconds`, the
+  Job's deadline) in `SORTYARD_LIMIT_SECONDS`; an agent that stops at that limit has its work
+  pushed like any other. A review's answer is what the command's own process wrote to
   its standard output, read from a socket and held in memory. When the command has exited,
   every process it left is killed, and only then is the sentinel written: the exit status and
   the answer, with a keyed digest of both. The container exits 0.
@@ -94,6 +96,7 @@ from typing import Any
 BRIEF_ENV, RESULT_ENV = "SORTYARD_BRIEF", "SORTYARD_RESULT"
 WORK_ENV, STATE_ENV = "SORTYARD_WORKDIR", "SORTYARD_STATE"
 TOKEN_ENV, TOKEN_FILE_ENV = "SORTYARD_GITHUB_TOKEN", "SORTYARD_GITHUB_TOKEN_FILE"
+LIMIT_ENV = "SORTYARD_LIMIT_SECONDS"
 TERMINATION_LOG = "/dev/termination-log"
 TEXT_LIMIT, RESULT_BUDGET = 600, 3500
 FAILED = "failed"
@@ -144,6 +147,12 @@ def scrub(text: str, token: str) -> str:
 
 def _without_token() -> dict[str, str]:
     return {k: v for k, v in os.environ.items() if k not in (TOKEN_ENV, TOKEN_FILE_ENV)}
+
+
+def _agent_env(brief: Mapping[str, Any]) -> dict[str, str]:
+    """The agent's environment: this container's less the token, and the brief's limit."""
+    limit = brief.get("limit_seconds")
+    return {**_without_token(), **({LIMIT_ENV: str(limit)} if isinstance(limit, int) else {})}
 
 
 def git(*args: str, cwd: pathlib.Path, url: str = "") -> str:
@@ -329,11 +338,11 @@ def _kill_descendants() -> bool:
         time.sleep(0.01)
 
 
-def _start(argv: Sequence[str], text: str, cwd: pathlib.Path, stdout: int | None) -> Any:
+def _start(
+    argv: Sequence[str], text: str, cwd: pathlib.Path, stdout: int | None, env: dict[str, str]
+) -> Any:
     """Start the agent command with `text` on its standard input, fed from a thread."""
-    child = subprocess.Popen(
-        list(argv), stdin=subprocess.PIPE, stdout=stdout, cwd=cwd, env=_without_token()
-    )
+    child = subprocess.Popen(list(argv), stdin=subprocess.PIPE, stdout=stdout, cwd=cwd, env=env)
 
     def feed() -> None:
         assert child.stdin is not None
@@ -438,14 +447,16 @@ class AttestedOutput:
         return answer
 
 
-def _run(argv: Sequence[str], text: str, cwd: pathlib.Path, capture: bool) -> tuple[int, str]:
+def _run(
+    argv: Sequence[str], text: str, cwd: pathlib.Path, capture: bool, env: dict[str, str]
+) -> tuple[int, str]:
     """Run the agent command to its exit: its exit status and, with `capture`, the end of what
     the command's own process wrote to its standard output (`AttestedOutput`). Everything
     written there is copied to our output; only the command's own pieces are its answer."""
     if not capture:
-        return _start(argv, text, cwd, None).wait(), ""
+        return _start(argv, text, cwd, None, env).wait(), ""
     with AttestedOutput(echo=sys.stdout.buffer) as output:
-        child = _start(argv, text, cwd, output.child_fd)
+        child = _start(argv, text, cwd, output.child_fd, env)
         answer = output.collect(child)
     return child.wait(), answer.decode(errors="replace")
 
@@ -469,7 +480,7 @@ def agent(brief: Mapping[str, Any], work: pathlib.Path) -> dict[str, Any]:
     try:
         argv = [str(part) for part in brief["agent"]]
         text, capture = str(brief.get("text") or ""), brief["mode"] == "review"
-        code, answer = _run(argv, text, work / CLONE_DIR, capture)
+        code, answer = _run(argv, text, work / CLONE_DIR, capture, _agent_env(brief))
         status = str(code)
     except OSError as error:
         print(f"the agent command could not be run: {error}", file=sys.stderr)

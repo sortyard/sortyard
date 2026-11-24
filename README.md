@@ -293,6 +293,14 @@ the same image), and give the agent's command line in `kernel.worker.agents`. Th
 in the item's clone with the brief on standard input, and never holds the GitHub token.
 `replica/worker/` is a complete example with a scripted agent.
 
+The agent is told how long it has. `SORTYARD_LIMIT_SECONDS` in its environment (and
+`limit_seconds` in the brief) is the Job's deadline in seconds: the limit of the stay the Job
+was launched for (a longer tier gives a longer figure), or the configured deadline
+(`kernel.worker.deadlineSeconds`, default 7200) when the stay has none. It counts from the
+start of the Job, the clone before the agent and the push after it included. An agent that
+commits its work and exits before then has that work pushed and reported as usual; one that
+ignores the figure is stopped with the Job, and nothing it did is pushed.
+
 What an agent command may rely on, and what it must not:
 
 - A review's answer is what the command's own process writes to its standard output, ending
