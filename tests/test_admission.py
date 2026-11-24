@@ -209,6 +209,10 @@ def test_an_admitted_item_has_its_spec_lane_and_needs_stored_and_its_workflow_st
                     lambda stays: [stay["item"] for stay in stays] == ["ITEM-1"],
                     "ITEM-1 in the queue",
                 )
+                # Recorded first, then the queue's owner is asked.
+                await until(
+                    lambda: asyncio.sleep(0, list(owners.calls)), bool, "the scheduler asked"
+                )
             finally:
                 worker.cancel()
                 await asyncio.gather(worker, return_exceptions=True)
