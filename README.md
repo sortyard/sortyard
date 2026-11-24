@@ -293,6 +293,31 @@ the same image), and give the agent's command line in `kernel.worker.agents`. Th
 in the item's clone with the brief on standard input, and never holds the GitHub token.
 `replica/worker/` is a complete example with a scripted agent.
 
+What an agent command may rely on, and what it must not:
+
+- A review's answer is what the command's own process writes to its standard output, ending
+  with the verdict line; the worker keeps the last 1 MiB. Its standard output is a socket, and
+  the kernel names the writer of every piece: what other processes write there (programs the
+  command runs with its output, or code that got hold of the socket) is logged and is not the
+  answer. A wrapper script must `exec` the agent, or print the answer itself. No file is read
+  for the answer, so nothing written into the workspace changes the verdict.
+- Code the command runs, such as the repository's tests, may write anything into the
+  workspace and may print to the inherited output; neither changes the verdict. It must not be
+  able to drive the agent process itself: install the agent where the agent's user cannot
+  write (as root, as below) and run on nodes that refuse ptrace of an ancestor (Yama
+  `ptrace_scope` 1 or more, the default on most distributions). The worker attests who wrote
+  the answer, not what persuaded the agent to write it.
+- When the command exits, the work is over: what it queued on its output by then is read,
+  and every process it started is killed, including ones that left its session or process
+  group. Do not leave background work behind.
+- `agent-done` in the directory above the clone is the worker's. It is written when the
+  command has ended, with a digest keyed by a secret the command cannot read. Anything else
+  put there is a failed result (no push, no approval), never a result of its own.
+- The command runs with no-new-privileges (setuid programs do not raise it), and the worker
+  does not run it at all in a container holding CAP_SYS_PTRACE or CAP_SYS_ADMIN (a privileged
+  container): the seal rests on the agent being unable to read the entry point's memory.
+  Decision record: [SY-DEC-011](DECISIONS.md#sy-dec-011).
+
 ## Data model
 
 The §3 domain objects are frozen as JSON Schemas in [`spec/`](spec/), and everything else is
