@@ -24,6 +24,8 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from sortyard.kernel.states import merged_states
+
 Conn = psycopg.Connection[Any]
 
 LIFECYCLE_RECORD_TYPE = "harness.lifecycle.v1"
@@ -204,6 +206,8 @@ def queue(
     Link order: an item comes after every item it is blocked by. Items that no link orders
     keep the order they were created in; a milestone groups items and never orders them. Age
     is the time since the item entered its state (since it was created, for one not started).
+    A blocker that ended without merging (a withdrawn one) still blocks: it stays in
+    `blocked_by` and is named with its state in `ended_blockers`.
     """
     with conn.cursor(row_factory=dict_row) as cursor:
         if now is None:
@@ -218,16 +222,21 @@ def queue(
             (tenant, project),
         ).fetchall()
         links = cursor.execute(
-            "SELECT l.item_id, l.blocked_by FROM sortyard.item_link AS l"
+            "SELECT l.item_id, l.blocked_by, b.state AS ended FROM sortyard.item_link AS l"
             " JOIN sortyard.item AS i ON i.workspace_id = l.workspace_id AND i.id = l.item_id"
+            " LEFT JOIN sortyard.item AS b ON (b.workspace_id, b.id) = (l.workspace_id,"
+            "   l.blocked_by) AND b.state_kind = 'terminal' AND NOT b.state = ANY(%s)"
             " WHERE l.workspace_id = %s AND i.project_id = %s",
-            (tenant, project),
+            (merged_states(), tenant, project),
         ).fetchall()
     waiting_on: dict[str, set[str]] = {row["id"]: set() for row in rows}
+    ended: dict[str, dict[str, str]] = {row["id"]: {} for row in rows}
     for link in links:
-        # A blocker that is done, or in another project, no longer holds anything back here.
+        # A blocker that is merged, or in another project, no longer holds anything back here.
         if link["item_id"] in waiting_on and link["blocked_by"] in waiting_on:
             waiting_on[link["item_id"]].add(link["blocked_by"])
+        elif link["item_id"] in ended and link["ended"]:
+            ended[link["item_id"]][link["blocked_by"]] = link["ended"]
     ordered: list[dict[str, Any]] = []
     placed: set[str] = set()
     remaining = list(rows)
@@ -249,7 +258,8 @@ def queue(
                     "reason": row["reason"],
                     "entered_at": row["entered_at"].isoformat() if row["entered_at"] else None,
                     "age_seconds": max(0, int((now - since).total_seconds())),
-                    "blocked_by": sorted(waiting_on[row["id"]]),
+                    "blocked_by": sorted(waiting_on[row["id"]] | set(ended[row["id"]])),
+                    "ended_blockers": ended[row["id"]],
                 }
             )
             placed.add(row["id"])

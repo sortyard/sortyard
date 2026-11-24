@@ -16,6 +16,7 @@ from typing import Any
 import pytest
 
 from sortyard.kernel.capabilities import CapabilityError, Lane, example_text, load
+from sortyard.kernel.ledger import queue
 from sortyard.kernel.scheduler import Scheduler
 from tests.api_harness import OTHER_WS, WS
 from tests.kernel_db import Connect, admitted, database, enter
@@ -164,6 +165,58 @@ def test_more_waiters_than_slots_never_puts_more_than_the_slot_count_out_of_the_
         assert offer_everyone() == [following]
         assert len(out_of_the_queue()) == 2
         assert offer_everyone() == []
+
+
+@requires_postgres
+def test_a_withdrawn_item_releases_its_slot_and_the_next_queued_item_is_dispatched(
+    connect: Connect,
+) -> None:
+    """A withdrawn item releases its slot and the next queued item is dispatched. What it
+    blocks stays queued, and the queue says it is blocked by a withdrawn item."""
+    scheduler = Scheduler(connect, LANES)
+    queued(connect, "A", "B", "C")
+    queued(connect, "D", blocked_by=("A",))
+    queued(connect, "E", blocked_by=("B",))
+    queued(connect, "F")
+    assert [ask(scheduler, item) for item in "ABCDEF"] == [True, True, False, False, False, False]
+    for item in "AB":
+        enter(connect, item, "preflight")
+        enter(connect, item, "building")
+    assert not any(ask(scheduler, item) for item in "CDEF")  # both slots are held
+    # A is withdrawn mid-build (through the decision, as its workflow goes). Its slot is free
+    # at once and goes to C, the next one created; then no further: one slot, one item.
+    enter(connect, "A", "decision")
+    assert not any(ask(scheduler, item) for item in "CDEF")  # a decision holds the slot
+    enter(connect, "A", "withdrawn")
+    assert [ask(scheduler, item) for item in "FEDC"] == [False, False, False, True]
+    enter(connect, "C", "preflight")
+    assert not any(ask(scheduler, item) for item in "DEF")
+    # B merges. E, blocked by the merged B, is dispatched. D is blocked by the withdrawn A
+    # and is not, although it is older than F and a slot is free: only a merge clears a link.
+    enter(connect, "B", "merged")
+    assert [ask(scheduler, item) for item in "DE"] == [False, True]
+    enter(connect, "E", "preflight")
+    enter(connect, "C", "merged")
+    assert [ask(scheduler, item) for item in "DF"] == [False, True]
+    enter(connect, "F", "preflight")
+    enter(connect, "E", "merged")
+    enter(connect, "F", "merged")
+    assert not ask(scheduler, "D")  # every slot free, and D still waits
+    assert granted(connect) == list("ABCEF")
+    # The queue shows D, alone, still queued, and names what holds it: A, withdrawn. A itself
+    # is not in the queue.
+    with connect() as conn:
+        (row,) = queue(conn, WS, "proj-a")
+    assert (row["id"], row["state"], row["blocked_by"]) == ("D", "admitted", ["A"])
+    assert row["ended_blockers"] == {"A": "withdrawn"}
+    # An item withdrawn from the queue itself held no slot, takes none, and is never offered
+    # one.
+    queued(connect, "G", lane=OTHER.name)
+    queued(connect, "H", lane=OTHER.name)
+    enter(connect, "G", "decision")
+    enter(connect, "G", "withdrawn")
+    assert [ask(scheduler, item) for item in "GH"] == [False, True]
+    assert granted(connect) == list("ABCEFH")
 
 
 @requires_postgres

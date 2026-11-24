@@ -261,6 +261,84 @@ def test_an_admitted_item_has_its_spec_lane_and_needs_stored_and_its_workflow_st
 
 
 @requires_postgres
+def test_get_item_returns_the_spec_lane_repository_links_and_state_of_an_item() -> None:
+    """getItem returns the spec, lane, repository, links and state of an item: enough to file
+    the item again under another id."""
+
+    async def scenario() -> None:
+        async with admitting() as (api, engine):
+            connect = functools.partial(psycopg.connect, api.conninfo)
+            api.insert(
+                "milestone",
+                {"id": "ms-1", "workspace_id": WS, "project_id": "proj-a", "name": "First"},
+            )
+            asked = body(
+                needs=["secret:MODEL_API_KEY"],
+                blocked_by=[ITEM],
+                base="release",
+                risk_tier="high",
+                milestone_id="ms-1",
+            )
+            assert api.ws("POST", "/items", "operator", asked).status == 201
+            second = api.ws("POST", "/items", "operator", body("ITEM-2", blocked_by=["ITEM-1"]))
+            assert second.status == 201, second.body
+            read = api.ws("GET", "/items/ITEM-1", "viewer")
+            assert read.status == 200, read.body
+            admitted_with = {
+                **asked,
+                # The repository is stored as a need too; admitting the list again is the same.
+                "needs": ["repository:walwarden/app", "secret:MODEL_API_KEY"],
+            }
+            assert {key: read.body[key] for key in admitted_with} == admitted_with
+            assert (read.body["blocked_by"], read.body["blocks"]) == ([ITEM], ["ITEM-2"])
+            assert read.body["workflow_id"] == workflow_id(WS, "ITEM-1")
+            # Not started yet: no state. Once its workflow records one, the read shows it,
+            # from the projection.
+            assert (read.body["state"], read.body["state_kind"], read.body["detail"]) == (
+                None,
+                None,
+                {},
+            )
+            owners = Owners(script={"admitted": [SILENT, SILENT]})
+            registry = Registry()
+            by_owner = {s.owner: owners.owner for s in shipped().states.values() if s.owner}
+            register(registry, owners=by_owner, decide=owners.decide, record=Ledger(connect).record)
+            worker = asyncio.create_task(engine.run_worker(registry))
+            try:
+                await until(
+                    lambda: asyncio.to_thread(Items(connect).open_stays),
+                    lambda stays: {stay["item"] for stay in stays} == {"ITEM-1", "ITEM-2"},
+                    "both items in the queue",
+                )
+            finally:
+                worker.cancel()
+                await asyncio.gather(worker, return_exceptions=True)
+            now = api.ws("GET", "/items/ITEM-1", "conductor").body
+            table = shipped().state("admitted")
+            assert (now["state"], now["state_kind"], now["owner"], now["reason"]) == (
+                "admitted",
+                "queue",
+                table.owner,
+                table.reason,
+            )
+            assert now["limit"] == "none" and now["entered_at"]
+            # What was read is what admission takes: the same item is filed under a new id
+            # from the read alone, and reads back the same.
+            keys = set(asked) - {"id"}
+            refiled = {"id": "ITEM-1b", **{key: now[key] for key in keys}}
+            assert api.ws("POST", "/items", "operator", refiled).status == 201
+            again = api.ws("GET", "/items/ITEM-1b", "viewer").body
+            assert {key: again[key] for key in keys} == {key: now[key] for key in keys}
+            # An item this workspace does not have is not found, and a role outside the
+            # operation's set reads nothing.
+            assert api.ws("GET", "/items/NOPE", "viewer").status == 404
+            assert api.ws("GET", "/items/ITEM-1", "sensor").status == 403
+            assert api.ws("GET", "/items/ITEM-1").status == 401
+
+    asyncio.run(scenario())
+
+
+@requires_postgres
 def test_admitting_the_same_item_again_changes_nothing_and_another_spec_is_refused() -> None:
     """Admission is idempotent on the item id: the same content again answers the item and
     writes nothing; other content under the id is refused, and what is stored stays."""

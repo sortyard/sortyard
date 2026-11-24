@@ -7,7 +7,8 @@ blocked_by link resolves to an item of the same tenant, and the risk tier is one
 table has limits for. `check` gives every reason an item fails, not the first. `admit` writes
 the item, its links and its spec in the caller's transaction, or nothing: a refused item
 leaves no row. Admitting an id again with the same content changes nothing; with other
-content it is refused, since a spec is written once.
+content it is refused, since a spec is written once. An id that was withdrawn is refused too:
+the work comes back under a new id.
 
 Starting the item's workflow is the caller's next step (`sortyard.kernel.item.start_item`),
 inside the same transaction, so an item is never stored without one being started.
@@ -24,7 +25,7 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from sortyard.kernel.capabilities import REPOSITORY, CapabilityError, Lane, Need
-from sortyard.kernel.states import StateTable, shipped
+from sortyard.kernel.states import StateTable, merged_states, shipped
 
 Conn = psycopg.Connection[Any]
 
@@ -164,14 +165,17 @@ def admit(
     stored = conn.execute(
         "SELECT i.project_id, i.title, i.risk_tier, i.milestone_id, s.lane, s.repository,"
         "       s.base, s.needs, s.spec, ARRAY(SELECT l.blocked_by FROM sortyard.item_link AS l"
-        "         WHERE (l.workspace_id, l.item_id) = (i.workspace_id, i.id) ORDER BY 1)"
+        "         WHERE (l.workspace_id, l.item_id) = (i.workspace_id, i.id) ORDER BY 1),"
+        "       i.state_kind = 'terminal' AND NOT i.state = ANY(%s), i.state"
         " FROM sortyard.item AS i LEFT JOIN sortyard.item_spec AS s"
         "   ON (s.workspace_id, s.item_id) = (i.workspace_id, i.id)"
         " WHERE i.workspace_id = %s AND i.id = %s",
-        (asked.tenant, asked.item),
+        (merged_states(table), asked.tenant, asked.item),
     ).fetchone()
     if stored is not None:
-        if tuple(stored) != wanted:
+        if stored[10]:
+            raise Refused([f"ended-item: {asked.item!r} is {stored[11]}; admit it under a new id"])
+        if tuple(stored[:10]) != wanted:
             raise Different(
                 [f"different-item: {asked.item!r} is already admitted with other content"]
             )

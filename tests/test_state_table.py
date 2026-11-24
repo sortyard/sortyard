@@ -33,6 +33,9 @@ SECTION_3_1 = {
     "waiting": "need",
     "decision": "decision-service",
     "merged": None,
+    # Not a section 3.1 state: the terminal state of an item the kernel stopped driving
+    # (SY-V3-ITEM-WITHDRAW).
+    "withdrawn": None,
 }
 
 
@@ -176,7 +179,16 @@ def test_the_shipped_table_declares_every_section_3_1_state_and_no_blocked_state
     assert {name: state.owner for name, state in table.states.items()} == SECTION_3_1
     assert "blocked" not in {name.lower() for name in table.states}
     assert table.initial == "admitted"
-    assert [name for name, state in table.states.items() if state.terminal] == ["merged"]
+    terminal = {name: state.lifecycle for name, state in table.states.items() if state.terminal}
+    # Two ways to end, and only one of them is a merged change.
+    assert terminal == {"merged": "merged", "withdrawn": None}
+    # withdrawn is reached from the decision state and from nowhere else.
+    assert [
+        (state.name, answer)
+        for state in table.states.values()
+        for answer, target in state.next.items()
+        if target == "withdrawn" or (state.default and state.default.to == "withdrawn")
+    ] == [("decision", "withdraw")]
 
     for state in table.states.values():
         assert state.reason in table.reasons
@@ -221,7 +233,7 @@ def test_the_shipped_table_declares_every_section_3_1_state_and_no_blocked_state
     assert decision.default.on_repeat == "wait" and decision.next["wait"] == "waiting"
     assert [state.kind for state in table.states.values()] == [
         *["queue", "work", "work", "work", "work", "work", "work", "need", "decision"],
-        "terminal",
+        *["terminal", "terminal"],
     ]
 
 

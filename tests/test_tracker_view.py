@@ -292,6 +292,7 @@ def test_no_endpoint_writes_item_state() -> None:
     }
     assert item_ops == {
         "getProjectQueue": "GET",
+        "getItem": "GET",
         "getItemTimeline": "GET",
         "requestItemChange": "POST",
         "admitItem": "POST",

@@ -153,8 +153,8 @@ A request-body field that is not a §3 schema property is marked `x-sortyard-api
 in `openapi.json` and explained here (held by `spec/test_openapi.py`).
 
 - `answer` (`requestItemChange`): the decision a person asks an item's workflow for. It is
-  one of the answers of the kernel state table's decision state (`resume`, `rebuild`, `wait` in
-  the shipped table), not a field of a §3 object: items are the workflow kernel's projection
+  one of the answers of the kernel state table's decision state (`resume`, `rebuild`, `wait`,
+  `withdraw` in the shipped table), not a field of a §3 object: items are the workflow kernel's projection
   (HARNESS-V3 section 3.2) and have no §3 schema.
 - `reason` (`requestItemChange`): why the change is asked for. It is recorded with the request
   on the item's timeline.

@@ -425,6 +425,8 @@ def test_the_lifecycle_mapping_covers_every_move_of_the_shipped_table() -> None:
         ("need", "decision"): "handback",
         ("decision", "work"): None,
         ("decision", "need"): "readiness_hold",
+        # withdrawn: the item ended without a merged change, and v1 has no kind for that.
+        ("decision", "terminal"): None,
     }
     # A person's request is put to the decision too; it is not work handed back.
     asked = {"state_kind": "decision", "from_kind": "work", "lifecycle": None, "cause": "request"}

@@ -17,8 +17,9 @@ from typing import Any, TypeVar
 
 import pytest
 
-from sortyard.engine import Engine, Recorded, Registry
+from sortyard.engine import Engine, Recorded, Registry, WorkflowNotFound
 from sortyard.engine.testing import TestClock, time_skipping_engine
+from sortyard.kernel import policy
 from sortyard.kernel.item import (
     INPUT_SIGNAL,
     register,
@@ -26,6 +27,7 @@ from sortyard.kernel.item import (
     send_request,
     start_item,
 )
+from sortyard.kernel.ledger import lifecycle_kind
 from sortyard.kernel.states import StateTable, load, shipped, shipped_text
 
 DEADLINE = 60.0
@@ -759,3 +761,147 @@ def test_an_item_cannot_start_on_a_risk_tier_the_table_has_no_limit_for() -> Non
             assert (await k.result(low))["state"] == "merged"
 
     asyncio.run(scenario())
+
+
+class Ruled(Fakes):
+    """The fakes, with the decision step on the shipped decision policy."""
+
+    def decide(self, question: Mapping[str, Any]) -> Reply:
+        self.questions.append(question)
+        return policy.shipped().decide(question)
+
+
+# How an item comes to rest in each state an item can stay in: the owners' script.
+PARKED: dict[str, dict[str, list[Reply]]] = {
+    "admitted": {"admitted": [SILENT]},
+    "preflight": {"preflight": [SILENT]},
+    "building": {"building": [SILENT]},
+    "checking": {"checking": [SILENT]},
+    "reviewing": {"reviewing": [SILENT]},
+    "fixing": {"checking": [{"outcome": "red", "detail": {"finding": "lint"}}], "fixing": [SILENT]},
+    "merging": {"merging": [SILENT]},
+    "waiting": {"preflight": [{"outcome": "gap", "detail": {"need": "secret:X"}}]},
+}
+OPERATOR = {"kind": "operator", "id": "op-1", "role": "operator"}
+
+
+async def withdraw(k: Kernel, identifier: str, request_id: str, by: Mapping[str, Any]) -> None:
+    await send_request(
+        k.engine, identifier, request_id=request_id, answer="withdraw", reason="moving", by=by
+    )
+
+
+def test_an_operator_withdraw_request_takes_an_item_from_any_state_to_withdrawn() -> None:
+    """An operator withdraw request takes an item from any state to withdrawn and nothing
+    drives it afterwards."""
+    stays = {s.name for s in shipped().states.values() if not (s.terminal or s.decision)}
+    assert set(PARKED) == stays  # any state: a state added to the table must be added here
+    fakes = Ruled()
+
+    def mine(item: str, entries: list[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+        return [entry for entry in entries if entry["item"] == item]
+
+    async def scenario() -> None:
+        async with kernel(fakes) as k:
+            ended = {}
+            for state, script in PARKED.items():
+                item = f"FROM-{state}"
+                fakes.script.update({f"{item}/{at}": list(does) for at, does in script.items()})
+                identifier = await k.start(item)
+                await k.idle_in(identifier, state)
+                calls = len(mine(item, fakes.calls))
+                await withdraw(k, identifier, "req-1", OPERATOR)
+                await withdraw(k, identifier, "req-1", OPERATOR)  # delivered twice
+                assert (await k.result(identifier))["state"] == "withdrawn"
+                events = mine(item, fakes.events)
+                asked, last = events[-2], events[-1]
+                assert (asked["from_state"], asked["state"], asked["cause"]) == (
+                    state,
+                    "decision",
+                    "request",
+                )
+                assert (last["state"], last["state_kind"], last["owner"]) == (
+                    "withdrawn",
+                    "terminal",
+                    None,
+                )
+                # The record says who asked, what was answered and where the answer came from.
+                decision = last["decision"]
+                assert (decision["answer"], decision["source"]) == ("withdraw", "policy")
+                assert decision["question"]["request"]["by"] == OPERATOR
+                assert decision["reverse"].strip()
+                # No owner was dispatched for the request, and the item never merged: no
+                # transition of it carries the merged lifecycle kind.
+                assert len(mine(item, fakes.calls)) == calls
+                assert "merged" not in [event["state"] for event in events]
+                assert "merged" not in [lifecycle_kind(event) for event in events]
+                assert lifecycle_kind(last) is None
+                ended[identifier] = (state, len(events), calls)
+            # Afterwards: what the owners report late, a second withdrawal, another request
+            # and every limit passing reach nothing. The workflows have ended.
+            for identifier, (state, _, _) in ended.items():
+                late = next(iter(shipped().state(state).next))
+                with pytest.raises(WorkflowNotFound):
+                    await send_outcome(k.engine, identifier, state=state, outcome=late)
+                with pytest.raises(WorkflowNotFound):
+                    await withdraw(k, identifier, "req-2", OPERATOR)
+            await k.clock.advance(timedelta(days=30))
+            for identifier, (state, recorded_then, called_then) in ended.items():
+                item = f"FROM-{state}"
+                recorded = await k.engine.recorded(identifier)
+                assert (recorded.status, recorded.pending_timers) == ("completed", ())
+                assert len(mine(item, fakes.events)) == recorded_then
+                assert len(mine(item, fakes.calls)) == called_then
+
+    asyncio.run(scenario())
+
+
+def test_a_withdraw_request_from_any_other_role_is_not_honoured_and_a_merged_item_stays_merged() -> (  # noqa: E501
+    None
+):
+    """A withdraw request from a role other than operator changes nothing: the stay it
+    interrupted carries on. Withdrawing a merged item changes nothing either."""
+    fakes = Ruled(script={"building": [SILENT]})
+    others: list[dict[str, Any]] = [
+        {"kind": "operator", "id": "op-2", "role": role}
+        for role in ("admin", "viewer", "conductor", "grooming-agent", "build-worker", "sensor")
+    ]
+    # Who it is or says it is does not count: only the role the API wrote does.
+    others += [{"kind": "operator", "id": "operator"}, {"kind": "operator", "role": ["operator"]}]
+
+    async def scenario() -> Any:
+        async with kernel(fakes) as k:
+            identifier = await k.start()
+            await k.idle_in(identifier, "building")
+            for number, by in enumerate(others):
+                await withdraw(k, identifier, f"req-{number}", by)
+            await until(
+                lambda: asyncio.sleep(0, fakes.questions),
+                lambda asked: len(asked) == len(others),
+                "every request decided",
+            )
+            await k.idle_in(identifier, "building")
+            # A request for another answer by an operator is not a withdrawal either.
+            await send_request(
+                k.engine, identifier, request_id="resume", answer="resume", reason="", by=OPERATOR
+            )
+            await until(
+                lambda: asyncio.sleep(0, fakes.questions),
+                lambda asked: len(asked) == len(others) + 1,
+                "the resume request decided",
+            )
+            await k.idle_in(identifier, "building")
+            await send_outcome(k.engine, identifier, state="building", outcome="built")
+            result = await k.result(identifier)
+            with pytest.raises(WorkflowNotFound):
+                await withdraw(k, identifier, "late", OPERATOR)
+            return result
+
+    assert asyncio.run(scenario())["state"] == "merged"
+    answers = [e["decision"] for e in fakes.events if e["cause"] == "decision"]
+    assert [(d["answer"], d["source"]) for d in answers] == [("resume", "table")] * (
+        len(others) + 1
+    )
+    # The one build was never dispatched again, and the item went on to merge.
+    assert len(fakes.calls_for("building")) == 1
+    assert "withdrawn" not in fakes.states() and fakes.states()[-1] == "merged"

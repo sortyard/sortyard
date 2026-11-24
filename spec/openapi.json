@@ -15525,7 +15525,7 @@
         "tags": [
           "Work"
         ],
-        "description": "The tracker view of the workflow kernel (HARNESS-V3 section 3.2): a read of the projection the item workflow writes. An item comes after every item it is blocked by; items no link orders keep their creation order. Each item carries its state, owner, limit, reason and age. A project with no items, or one that does not exist, has an empty queue.",
+        "description": "The tracker view of the workflow kernel (HARNESS-V3 section 3.2): a read of the projection the item workflow writes. An item comes after every item it is blocked by; items no link orders keep their creation order. Each item carries its state, owner, limit, reason and age. An item blocked by an item that ended without merging (a withdrawn one) stays queued: that blocker stays in `blocked_by` and is named with its state in `ended_blockers`. A project with no items, or one that does not exist, has an empty queue.",
         "responses": {
           "200": {
             "description": "OK",
@@ -15554,7 +15554,8 @@
                           "reason",
                           "entered_at",
                           "age_seconds",
-                          "blocked_by"
+                          "blocked_by",
+                          "ended_blockers"
                         ],
                         "properties": {
                           "id": {
@@ -15614,10 +15615,17 @@
                             "minimum": 0
                           },
                           "blocked_by": {
-                            "description": "Items of this queue the item is linked as blocked by.",
+                            "description": "Items the item is linked as blocked by and still waits on: those of this queue, and those that ended without merging.",
                             "type": "array",
                             "items": {
                               "$ref": "common.schema.json#/$defs/id"
+                            }
+                          },
+                          "ended_blockers": {
+                            "description": "The blockers that ended without merging, each with the terminal state it is in (withdrawn). Such a link is never cleared by the kernel.",
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
                             }
                           }
                         }
@@ -15684,7 +15692,7 @@
         "tags": [
           "Work"
         ],
-        "description": "The one way an item enters the workflow kernel (HARNESS-V3 section 3.5, step 4). The item is checked before anything is created: its spec states an outcome and names at least one acceptance test, its lane is known and declares its repository and every need, every blocked_by link resolves to an item of this workspace, and its risk tier is one the state table has limits for. An item that fails is refused with every reason (`reasons`) and nothing is created. Otherwise the item, its links and its spec are stored and its workflow is started; the scheduler dispatches it when everything it is blocked by is merged and its lane has a free slot. Admitting the same id again with the same content changes nothing and answers 200; with other content it is refused (409), since a spec is written once.",
+        "description": "The one way an item enters the workflow kernel (HARNESS-V3 section 3.5, step 4). The item is checked before anything is created: its spec states an outcome and names at least one acceptance test, its lane is known and declares its repository and every need, every blocked_by link resolves to an item of this workspace, and its risk tier is one the state table has limits for. An item that fails is refused with every reason (`reasons`) and nothing is created. Otherwise the item, its links and its spec are stored and its workflow is started; the scheduler dispatches it when everything it is blocked by is merged and its lane has a free slot. Admitting the same id again with the same content changes nothing and answers 200; with other content it is refused (409), since a spec is written once. An id that was withdrawn is refused (422, `ended-item`): the work is admitted again under a new id.",
         "requestBody": {
           "required": true,
           "content": {
@@ -15955,6 +15963,229 @@
         "x-sortyard-mcp-tool": "admit_item"
       }
     },
+    "/v1/workspaces/{workspace_id}/items/{item_id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/workspace_id"
+        },
+        {
+          "name": "item_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "common.schema.json#/$defs/id"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getItem",
+        "summary": "One item: what it was admitted with, and where it is",
+        "tags": [
+          "Work"
+        ],
+        "description": "A read of the kernel's projection (HARNESS-V3 section 3.2): the item's spec, lane, repository, base branch, needs and links as admitted, which is what filing it again elsewhere needs, and its state with the owner, limit, reason and the detail it entered the state with. Nothing here is read from the engine: an item whose workflow has ended (merged, withdrawn) is read the same way.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "project_id",
+                    "milestone_id",
+                    "title",
+                    "risk_tier",
+                    "lane",
+                    "repository",
+                    "base",
+                    "needs",
+                    "spec",
+                    "blocked_by",
+                    "blocks",
+                    "state",
+                    "state_kind",
+                    "owner",
+                    "limit",
+                    "reason",
+                    "entered_at",
+                    "detail",
+                    "workflow_id"
+                  ],
+                  "properties": {
+                    "id": {
+                      "$ref": "common.schema.json#/$defs/id"
+                    },
+                    "project_id": {
+                      "$ref": "common.schema.json#/$defs/id"
+                    },
+                    "milestone_id": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "risk_tier": {
+                      "type": "string"
+                    },
+                    "lane": {
+                      "description": "The lane capability file the item was admitted against; null for an item that was not admitted with a spec.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "repository": {
+                      "description": "The item's one repository, owner/name.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "base": {
+                      "description": "The base branch.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "needs": {
+                      "description": "The needs as stored at admission: the repository need first, then the ones the item listed. Admitting them again as they are stores the same list.",
+                      "type": [
+                        "array",
+                        "null"
+                      ],
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "spec": {
+                      "description": "The spec as admitted.",
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    },
+                    "blocked_by": {
+                      "description": "Every item this one is linked as blocked by, whatever its state.",
+                      "type": "array",
+                      "items": {
+                        "$ref": "common.schema.json#/$defs/id"
+                      }
+                    },
+                    "blocks": {
+                      "description": "Every item linked as blocked by this one.",
+                      "type": "array",
+                      "items": {
+                        "$ref": "common.schema.json#/$defs/id"
+                      }
+                    },
+                    "state": {
+                      "description": "The state the item's workflow last recorded; null before its first transition.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "state_kind": {
+                      "description": "queue, work, need, decision or terminal.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "owner": {
+                      "description": "The service that owns the item in this state; null in a terminal state.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "limit": {
+                      "description": "The state's limit, in words.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "reason": {
+                      "description": "The state's typed reason.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "entered_at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    },
+                    "detail": {
+                      "description": "What the item entered its state with. For a withdrawn item, `left_open` names its repository, its branch and the number of its open pull request (null when it has none).",
+                      "type": "object"
+                    },
+                    "workflow_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "security": [
+          {
+            "operatorSession": [
+              "admin"
+            ]
+          },
+          {
+            "operatorSession": [
+              "operator"
+            ]
+          },
+          {
+            "operatorSession": [
+              "viewer"
+            ]
+          },
+          {
+            "serviceAccountToken": [
+              "conductor"
+            ]
+          },
+          {
+            "serviceAccountToken": [
+              "grooming-agent"
+            ]
+          }
+        ],
+        "x-sortyard-roles": [
+          "admin",
+          "operator",
+          "viewer",
+          "conductor",
+          "grooming-agent"
+        ],
+        "x-sortyard-mcp-tool": "get_item"
+      }
+    },
     "/v1/workspaces/{workspace_id}/items/{item_id}/timeline": {
       "parameters": [
         {
@@ -16066,7 +16297,7 @@
         "tags": [
           "Work"
         ],
-        "description": "Nothing writes an item's state but its workflow. This sends the workflow a request, as a signal; the workflow puts it to the decision service, and the request, the answer and its source appear on the item's timeline. Accepted means the engine has the signal, not that the answer was the one asked for: an answer the item's decision state does not have is not granted, and a request that arrives as the item finishes is not acted on. The request is written to the audit log.",
+        "description": "Nothing writes an item's state but its workflow. This sends the workflow a request, as a signal; the workflow puts it to the decision service, and the request, the answer and its source appear on the item's timeline. Accepted means the engine has the signal, not that the answer was the one asked for: an answer the item's decision state does not have is not granted, and a request that arrives as the item finishes is not acted on. The shipped decision policy grants one request by itself: the answer `withdraw` sent with the role operator, which ends the item in the terminal state withdrawn (its worker Jobs and per-job secrets are deleted, its pull request is left open, its lane slot is freed). The request is written to the audit log.",
         "requestBody": {
           "required": true,
           "content": {
