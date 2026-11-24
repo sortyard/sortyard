@@ -380,6 +380,6 @@ def test_a_pull_request_is_opened_only_by_a_token_that_reads_contents() -> None:
         ]
         assert repo.pulls == []
         enough = port.token(REPO, {"pull_requests": "write", "contents": "read"})
-        opened = port.open_pull(enough, REPO, branch="sortyard/ITEM-1", base="main", title="x")
+        opened = port.open_pull(enough, REPO, branch="sortyard/ITEM-1", base="main", title="ITEM-1")
         assert [pull.number for pull in repo.pulls] == [opened.number]
         fake.verify()

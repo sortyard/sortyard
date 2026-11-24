@@ -551,7 +551,8 @@ def test_an_outcome_observed_for_an_earlier_stay_of_the_same_state_is_not_applie
 def test_the_pull_request_is_opened_with_a_token_github_lets_open_it() -> None:
     """The token `ensure_pull` mints is one GitHub opens a pull request with: GitHub refuses
     pull_requests:write alone ("not all refs are readable", SORTYARD-178), so it reads contents
-    too, and nothing more is asked for than finding and opening one needs."""
+    too. The minted permissions are checked as well, so that it asks for no more than finding
+    and opening one needs."""
     fake = FakeGitHub(APP_ID, KEY.public_key())
     with serving(fake) as url:
         repo = fake.repo(REPO)
