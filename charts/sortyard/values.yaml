@@ -73,7 +73,9 @@ migrations:
 engine:
   enabled: false
   # The server, pinned by version and digest. The tag is also the version the schema Job
-  # records the schema as ready for; the server waits for that record.
+  # records the schema as ready for; the server waits for that record. Tag and digest change
+  # together: the render fails for a new tag under this digest (set the new digest, or clear
+  # it), and for a toolsImage tag that is not this tag.
   image:
     repository: temporalio/server
     tag: "1.32.2"
@@ -117,10 +119,15 @@ engine:
   # The schema Job: creates and upgrades the engine databases with the upstream schema tool,
   # then creates the namespace. Safe to run again; it reruns whenever its inputs change.
   schema:
-    # How long each step waits for Postgres, then for the server, to answer.
+    # How long each step waits for Postgres, then for the server, to answer; and how long the
+    # server's init container waits for this Job's record before it fails and is restarted.
     waitSeconds: 300
     backoffLimit: 3
     activeDeadlineSeconds: 900
+    # A finished Job, failed or not, is removed after this long, and the next install or
+    # upgrade of the release makes it again (running it again is safe). A failed Job therefore
+    # never has to be deleted by hand.
+    ttlSecondsAfterFinished: 600
     resources:
       requests:
         cpu: 10m

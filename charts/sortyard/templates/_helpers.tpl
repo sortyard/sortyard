@@ -57,10 +57,22 @@ reference), otherwise the same server as the API's.
 {{- printf "%s:%v" (include "sortyard.engine.fullname" .) .Values.engine.service.port -}}
 {{- end -}}
 
+{{- /* An engine image reference: a version tag (never a moving one such as latest or main),
+and its digest. A digest this chart knows belongs to one version; under another tag it is a
+stale pin, and the render fails. */ -}}
 {{- define "sortyard.engine.image" -}}
-{{- $tag := required "an engine image needs a tag (a pinned version)" .tag -}}
-{{- if eq (toString $tag) "latest" }}{{ fail "an engine image must be pinned to a version, not latest" }}{{ end -}}
-{{- printf "%s:%s" .repository (toString $tag) -}}
+{{- $tag := toString (required "an engine image needs a tag (a pinned version)" .tag) -}}
+{{- if not (regexMatch "^[0-9]+\\.[0-9]+\\.[0-9]+([.-][A-Za-z0-9.-]+)?$" $tag) -}}
+{{- fail (printf "an engine image must be pinned to a version such as 1.32.2, not %q" $tag) -}}
+{{- end -}}
+{{- $known := dict "sha256:7bf69188a6232fea14869b9cef3d94aa82a1601d99517f7e86c71f22da4e0670" "1.32.2" "sha256:4a95866efba29d7e17ab012df5232795e8b0ad0f7d5f9d1ec4df321f7792a754" "1.32.2" -}}
+{{- with .digest -}}
+{{- $of := get $known . -}}
+{{- if and $of (ne $of $tag) -}}
+{{- fail (printf "engine image %s: tag %s is pinned to the digest of %s; change the digest with the tag, or clear it" $.repository $tag $of) -}}
+{{- end -}}
+{{- end -}}
+{{- printf "%s:%s" .repository $tag -}}
 {{- with .digest }}@{{ . }}{{ end -}}
 {{- end -}}
 

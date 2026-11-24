@@ -1,210 +1,31 @@
-{{- if .Values.engine.enabled }}
+{{- /* What the schema Job records once the schema is ready for a server version (the argument). */ -}}
+{{- define "sortyard.engine.mark" -}}
+CREATE TABLE IF NOT EXISTS sortyard_engine_schema (
+    server_version TEXT PRIMARY KEY,
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO sortyard_engine_schema (server_version) VALUES ('{{ . }}')
+    ON CONFLICT (server_version) DO UPDATE SET applied_at = now();
+{{- end -}}
 {{- /*
-The workflow engine server (HARNESS-V3 section 3.1; docs/decisions/workflow-engine.md): the
-upstream server image, all four of its services in one process, storing to Postgres only
-(persistence and visibility). Its settings are the environment variables the image's built-in
-configuration reads; the database password comes in by Secret reference. Rendered from these
-templates rather than the upstream chart: the decision record weighs both.
-
-Order on install and upgrade: the schema Job creates and upgrades the engine's databases with
-the upstream schema tool and records the server version the schema is ready for; the server's
-init container waits for that record; the Job's last step waits for the server and creates the
-namespace. The Job is named by its content, so it runs again whenever what it does changes.
+The schema Job's spec, as its own template: the Job is named by a hash of exactly this text (and
+of the files it mounts), because a Job's pod template cannot be changed in place. Whatever
+changes the spec, a value, the script or the chart version in the labels, makes a new Job.
 */ -}}
+{{- define "sortyard.engine.schemaJob.spec" -}}
 {{- $e := .Values.engine }}
 {{- $name := include "sortyard.engine.fullname" . }}
-{{- $selector := dict "root" . "component" "engine" }}
 {{- $version := toString $e.image.tag }}
-{{- if not (regexMatch "^[A-Za-z0-9._-]+$" $version) }}
-{{- fail "engine.image.tag must be pinned to a plain version tag" }}
-{{- end }}
-{{- $serverImage := include "sortyard.engine.image" $e.image }}
 {{- $toolsImage := include "sortyard.engine.image" $e.toolsImage }}
 {{- $dbHost := include "sortyard.engine.database.host" . }}
 {{- $dbPort := include "sortyard.engine.database.port" . }}
 {{- $dbUser := include "sortyard.engine.database.username" . }}
 {{- $dbSecret := include "sortyard.engine.database.secretName" . }}
-{{- $setup := .Files.Get "engine/setup.sh" }}
-{{- $jobHash := list $serverImage $toolsImage $dbHost $dbPort $dbUser $dbSecret (toJson $e.database) (toJson $e.namespace) $setup | join "\n" | sha256sum | trunc 10 }}
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ $name }}
-  labels:
-    {{- include "sortyard.labels" . | nindent 4 }}
-    app.kubernetes.io/component: engine
-data:
-  setup.sh: |
-    {{- $setup | nindent 4 }}
-  # What the schema Job records once the schema is ready for this server version.
-  mark.sql: |
-    CREATE TABLE IF NOT EXISTS sortyard_engine_schema (
-        server_version TEXT PRIMARY KEY,
-        applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-    INSERT INTO sortyard_engine_schema (server_version) VALUES ('{{ $version }}')
-        ON CONFLICT (server_version) DO UPDATE SET applied_at = now();
-  # The server's dynamic configuration file (it requires one; it re-reads it every minute).
-  dynamicconfig.yaml: |
-    {{- toYaml $e.dynamicConfig | nindent 4 }}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ $name }}
-  labels:
-    {{- include "sortyard.labels" . | nindent 4 }}
-    app.kubernetes.io/component: engine
-spec:
-  type: ClusterIP
-  ports:
-    - name: grpc
-      port: {{ $e.service.port }}
-      targetPort: grpc
-  selector:
-    {{- include "sortyard.selector" $selector | nindent 4 }}
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: {{ $name }}
-  labels:
-    {{- include "sortyard.labels" . | nindent 4 }}
-    app.kubernetes.io/component: engine
-spec:
-  replicas: {{ $e.replicas }}
-  selector:
-    matchLabels:
-      {{- include "sortyard.selector" $selector | nindent 6 }}
-  template:
-    metadata:
-      labels:
-        {{- include "sortyard.labels" . | nindent 8 }}
-        app.kubernetes.io/component: engine
-    spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      automountServiceAccountToken: false
-      securityContext:
-        runAsNonRoot: true
-      initContainers:
-        # The server starts only on a schema the schema Job has made ready for its version.
-        - name: wait-schema
-          image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}"
-          imagePullPolicy: {{ .Values.postgres.image.pullPolicy }}
-          command: ["sh", "/engine/setup.sh", "wait-schema"]
-          env:
-            - name: PGHOST
-              value: {{ $dbHost | quote }}
-            - name: PGPORT
-              value: {{ $dbPort | quote }}
-            - name: PGDATABASE
-              value: {{ $e.database.name | quote }}
-            - name: PGUSER
-              value: {{ $dbUser | quote }}
-            - name: PGPASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $dbSecret }}
-                  key: password
-            - name: SORTYARD_ENGINE_SERVER_VERSION
-              value: {{ $version | quote }}
-          securityContext:
-            # The postgres user of the (alpine) Postgres image.
-            runAsUser: 70
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop: ["ALL"]
-          resources:
-            {{- toYaml $e.schema.resources | nindent 12 }}
-          volumeMounts:
-            - name: engine
-              mountPath: /engine
-              readOnly: true
-      containers:
-        - name: engine
-          image: {{ $serverImage | quote }}
-          imagePullPolicy: {{ $e.image.pullPolicy }}
-          ports:
-            - name: grpc
-              containerPort: 7233
-          env:
-            # The store: Postgres for persistence and for visibility, and nothing else.
-            - name: DB
-              value: postgres12
-            - name: POSTGRES_SEEDS
-              value: {{ $dbHost | quote }}
-            - name: DB_PORT
-              value: {{ $dbPort | quote }}
-            - name: POSTGRES_USER
-              value: {{ $dbUser | quote }}
-            - name: POSTGRES_PWD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $dbSecret }}
-                  key: password
-            - name: DBNAME
-              value: {{ $e.database.name | quote }}
-            - name: VISIBILITY_DBNAME
-              value: {{ $e.database.visibilityName | quote }}
-            - name: NUM_HISTORY_SHARDS
-              value: {{ $e.historyShards | quote }}
-            - name: BIND_ON_IP
-              value: "0.0.0.0"
-            - name: TEMPORAL_BROADCAST_ADDRESS
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.podIP
-            - name: DYNAMIC_CONFIG_FILE_PATH
-              value: /engine/dynamicconfig.yaml
-            # No authorizer: the Service is cluster-internal (decision record, known gaps).
-            - name: TEMPORAL_ALLOW_NO_AUTH
-              value: "true"
-            - name: LOG_LEVEL
-              value: {{ $e.logLevel | quote }}
-          startupProbe:
-            tcpSocket:
-              port: grpc
-            periodSeconds: 2
-            failureThreshold: 60
-          readinessProbe:
-            tcpSocket:
-              port: grpc
-            periodSeconds: 5
-          livenessProbe:
-            tcpSocket:
-              port: grpc
-            periodSeconds: 10
-          securityContext:
-            # The temporal user of the server image.
-            runAsUser: 1000
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop: ["ALL"]
-          resources:
-            {{- toYaml $e.resources | nindent 12 }}
-          volumeMounts:
-            - name: engine
-              mountPath: /engine
-              readOnly: true
-      volumes:
-        - name: engine
-          configMap:
-            name: {{ $name }}
----
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: {{ $name }}-schema-{{ $jobHash }}
-  labels:
-    {{- include "sortyard.labels" . | nindent 4 }}
-    app.kubernetes.io/component: engine-schema
 spec:
   backoffLimit: {{ $e.schema.backoffLimit }}
+  # A finished Job is removed after this long, failed or not, so the next install or upgrade
+  # of the release makes it again: a failed run needs no one to delete it.
+  ttlSecondsAfterFinished: {{ $e.schema.ttlSecondsAfterFinished }}
   activeDeadlineSeconds: {{ $e.schema.activeDeadlineSeconds }}
   template:
     metadata:
@@ -299,4 +120,215 @@ spec:
             name: {{ $name }}
         - name: tmp
           emptyDir: {}
+{{- end -}}
+{{- if .Values.engine.enabled }}
+{{- /*
+The workflow engine server (HARNESS-V3 section 3.1; docs/decisions/workflow-engine.md): the
+upstream server image, all four of its services in one process, storing to Postgres only
+(persistence and visibility). Its settings are the environment variables the image's built-in
+configuration reads; the database password comes in by Secret reference. Rendered from these
+templates rather than the upstream chart: the decision record weighs both.
+
+Order on install and upgrade: the schema Job creates and upgrades the engine's databases with
+the upstream schema tool and records the server version the schema is ready for; the server's
+init container waits for that record; the Job's last step waits for the server and creates the
+namespace. The Job is named by its content, so it runs again whenever what it does changes.
+*/ -}}
+{{- $e := .Values.engine }}
+{{- $name := include "sortyard.engine.fullname" . }}
+{{- $selector := dict "root" . "component" "engine" }}
+{{- $version := toString $e.image.tag }}
+{{- if ne $version (toString $e.toolsImage.tag) }}
+{{- fail (printf "engine.toolsImage.tag (%v) must be engine.image.tag (%s): the schema tool carries the schema of its own server version" $e.toolsImage.tag $version) }}
+{{- end }}
+{{- if or $e.database.username $e.database.existingSecret }}
+{{- if not $e.database.host }}
+{{- fail "engine.database.username and engine.database.existingSecret apply only with engine.database.host; without it the engine uses the Postgres settings of `postgres`" }}
+{{- end }}
+{{- end }}
+{{- $serverImage := include "sortyard.engine.image" $e.image }}
+{{- $toolsImage := include "sortyard.engine.image" $e.toolsImage }}
+{{- $dbHost := include "sortyard.engine.database.host" . }}
+{{- $dbPort := include "sortyard.engine.database.port" . }}
+{{- $dbUser := include "sortyard.engine.database.username" . }}
+{{- $dbSecret := include "sortyard.engine.database.secretName" . }}
+{{- $setup := .Files.Get "engine/setup.sh" }}
+{{- $mark := include "sortyard.engine.mark" $version }}
+{{- $jobSpec := include "sortyard.engine.schemaJob.spec" . }}
+{{- $jobHash := list $jobSpec $setup $mark | join "\n" | sha256sum | trunc 10 }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "sortyard.labels" . | nindent 4 }}
+    app.kubernetes.io/component: engine
+data:
+  setup.sh: |
+    {{- $setup | nindent 4 }}
+  # What the schema Job records once the schema is ready for this server version.
+  mark.sql: |
+    {{- $mark | nindent 4 }}
+  # The server's dynamic configuration file (it requires one; it re-reads it every minute).
+  dynamicconfig.yaml: |
+    {{- toYaml $e.dynamicConfig | nindent 4 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "sortyard.labels" . | nindent 4 }}
+    app.kubernetes.io/component: engine
+spec:
+  type: ClusterIP
+  ports:
+    - name: grpc
+      port: {{ $e.service.port }}
+      targetPort: grpc
+  selector:
+    {{- include "sortyard.selector" $selector | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "sortyard.labels" . | nindent 4 }}
+    app.kubernetes.io/component: engine
+spec:
+  replicas: {{ $e.replicas }}
+  selector:
+    matchLabels:
+      {{- include "sortyard.selector" $selector | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sortyard.labels" . | nindent 8 }}
+        app.kubernetes.io/component: engine
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+      initContainers:
+        # The server starts only on a schema the schema Job has made ready for its version.
+        - name: wait-schema
+          image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}"
+          imagePullPolicy: {{ .Values.postgres.image.pullPolicy }}
+          command: ["sh", "/engine/setup.sh", "wait-schema"]
+          env:
+            - name: PGHOST
+              value: {{ $dbHost | quote }}
+            - name: PGPORT
+              value: {{ $dbPort | quote }}
+            - name: PGDATABASE
+              value: {{ $e.database.name | quote }}
+            - name: PGUSER
+              value: {{ $dbUser | quote }}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $dbSecret }}
+                  key: password
+            - name: SORTYARD_ENGINE_SERVER_VERSION
+              value: {{ $version | quote }}
+            - name: SORTYARD_ENGINE_WAIT_SECONDS
+              value: {{ $e.schema.waitSeconds | quote }}
+          securityContext:
+            # The postgres user of the (alpine) Postgres image.
+            runAsUser: 70
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            {{- toYaml $e.schema.resources | nindent 12 }}
+          volumeMounts:
+            - name: engine
+              mountPath: /engine
+              readOnly: true
+      containers:
+        - name: engine
+          image: {{ $serverImage | quote }}
+          imagePullPolicy: {{ $e.image.pullPolicy }}
+          ports:
+            - name: grpc
+              containerPort: 7233
+          env:
+            # The store: Postgres for persistence and for visibility, and nothing else.
+            - name: DB
+              value: postgres12
+            - name: POSTGRES_SEEDS
+              value: {{ $dbHost | quote }}
+            - name: DB_PORT
+              value: {{ $dbPort | quote }}
+            - name: POSTGRES_USER
+              value: {{ $dbUser | quote }}
+            - name: POSTGRES_PWD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $dbSecret }}
+                  key: password
+            - name: DBNAME
+              value: {{ $e.database.name | quote }}
+            - name: VISIBILITY_DBNAME
+              value: {{ $e.database.visibilityName | quote }}
+            - name: NUM_HISTORY_SHARDS
+              value: {{ $e.historyShards | quote }}
+            - name: BIND_ON_IP
+              value: "0.0.0.0"
+            - name: TEMPORAL_BROADCAST_ADDRESS
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: DYNAMIC_CONFIG_FILE_PATH
+              value: /engine/dynamicconfig.yaml
+            # No authorizer: the Service is cluster-internal (decision record, known gaps).
+            - name: TEMPORAL_ALLOW_NO_AUTH
+              value: "true"
+            - name: LOG_LEVEL
+              value: {{ $e.logLevel | quote }}
+          startupProbe:
+            tcpSocket:
+              port: grpc
+            periodSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket:
+              port: grpc
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: grpc
+            periodSeconds: 10
+          securityContext:
+            # The temporal user of the server image.
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            {{- toYaml $e.resources | nindent 12 }}
+          volumeMounts:
+            - name: engine
+              mountPath: /engine
+              readOnly: true
+      volumes:
+        - name: engine
+          configMap:
+            name: {{ $name }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}-schema-{{ $jobHash }}
+  labels:
+    {{- include "sortyard.labels" . | nindent 4 }}
+    app.kubernetes.io/component: engine-schema
+{{ $jobSpec }}
 {{- end }}

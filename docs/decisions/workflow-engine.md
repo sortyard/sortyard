@@ -165,11 +165,32 @@ Job's last step waits for the server and creates the `default` namespace (the on
 one that exists. Run a second time against the same Postgres, every step skipped what was
 there (the tool reported "found zero updates from current version 1.19") and exited 0.
 
-The Job is an ordinary Job, not a Helm hook, and its name ends in a hash of what it does.
-A post-install hook would deadlock `helm upgrade --wait`: Helm would wait for the server, which
-waits for the Job, which a hook only starts after the wait. A pre-install hook (what the
-upstream chart uses) cannot reach a Postgres that the same release installs. The hash makes a
-new server version a new Job, since a Job cannot be changed in place.
+The Job is an ordinary Job, not a Helm hook, and its name ends in a hash of its whole rendered
+spec and of the files it mounts. A post-install hook would deadlock `helm upgrade --wait`: Helm
+would wait for the server, which waits for the Job, which a hook only starts after the wait. A
+pre-install hook (what the upstream chart uses) cannot reach a Postgres that the same release
+installs. A Job's pod template cannot be changed in place, so anything that changes the spec (a
+value, the script, the server version, the chart version in its labels) has to make a new Job;
+hashing the rendered spec itself is what guarantees that, and `tests/test_chart.py` holds it
+over every value that reaches the Job and a chart version bump.
+
+**When the schema Job fails.** Nothing waits on a person to delete it. The Job retries within
+its `backoffLimit` and `activeDeadlineSeconds`. Finished, failed or not, it is removed after
+`engine.schema.ttlSecondsAfterFinished` (10 minutes), so the next install or upgrade of the
+release finds no Job and makes it again; running it again is safe. Meanwhile the server's init
+container waits `engine.schema.waitSeconds` for the record, then fails with a message naming
+what it waited for; the Deployment restarts it, so the pod shows as failing rather than
+waiting, and starts by itself once a Job has succeeded. What this does not do: Helm has no
+loop of its own, so with plain `helm upgrade` the Job is made again only at the next upgrade;
+whatever applies the release on a schedule is what closes that. The cost of the ttl is that a
+Job that succeeded is also made again, and runs again, on the first upgrade after it expires.
+That the ttl removal and the re-creation happen on a cluster was not run; the wait's limit is
+tested against a real Postgres in the merge gate.
+
+**The two images move together.** Rendering fails when `engine.toolsImage.tag` is not
+`engine.image.tag` (the schema tool carries the schema of its own server version), when a tag
+is not a full version (`latest`, `main`, `1.32`), and when a tag is changed while its digest is
+still the one this chart ships for 1.32.2.
 
 ### Rendered from our own templates, not the upstream chart
 
@@ -245,6 +266,9 @@ Differences from the SORTYARD-158 run, all in the tests and none in `src/sortyar
   back unchanged after the server container was restarted (finished step kept, still waiting),
   then took its signal and finished on a new worker. The server keeps nothing outside Postgres
   in this deployment (read-only root filesystem, no volume).
+- **`engine.database.create=false` is tested at render only.** The script then skips
+  `create-database`; that path was not run against a Postgres whose user cannot create databases
+  (run by hand, `create-database` as such a user exits 1 with "permission denied").
 - **The cluster path stops at kind.** The kind replica (`replica/replica.sh`, slow workflow job
   `replica`) enables the engine and checks that the server rolls out behind its schema Job and
   answers the API pod through `sortyard.engine`. The failure tests themselves run against the

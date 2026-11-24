@@ -14,7 +14,10 @@
 #                Connection: SQL_HOST, SQL_PORT, SQL_USER, SQL_PASSWORD (the tool reads them).
 #   wait-schema  In the Postgres image. Returns once `schema` has recorded the schema as ready
 #                for SORTYARD_ENGINE_SERVER_VERSION: the server never starts on a database that
-#                is missing or older than it needs. Connection: the libpq PG* variables.
+#                is missing or older than it needs. After SORTYARD_ENGINE_WAIT_SECONDS without
+#                the record it fails, saying what it waited for; the pod restarts it, so it
+#                keeps trying and nothing is left waiting unseen.
+#                Connection: the libpq PG* variables.
 #   namespace    In the admin-tools image. Waits for the server at TEMPORAL_ADDRESS, then
 #                creates the namespace SORTYARD_ENGINE_NAMESPACE, or sets the retention of the
 #                one that exists, and returns once the namespace answers a query.
@@ -71,10 +74,18 @@ wait-schema)
 SELECT 1 FROM sortyard_engine_schema WHERE server_version = :'version';
 SQL
     }
-    # No limit of its own: the schema Job has one, and its failure is what the operator sees.
+    waited=0
     until ready 2>/dev/null; do
+        if [ "$waited" -ge "$wait_seconds" ]; then
+            echo "engine: no schema for server $SORTYARD_ENGINE_SERVER_VERSION after" \
+                "${wait_seconds}s: the engine schema Job has not finished (see its pods' logs)." \
+                "This container is restarted and waits again; a failed Job is removed after" \
+                "its ttl and made again by the next install or upgrade of the release." >&2
+            exit 1
+        fi
         echo "engine: waiting for the schema Job (schema for server $SORTYARD_ENGINE_SERVER_VERSION)"
         sleep 2
+        waited=$((waited + 2))
     done
     echo "engine: schema ready for server $SORTYARD_ENGINE_SERVER_VERSION"
     ;;

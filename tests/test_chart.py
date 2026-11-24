@@ -6,10 +6,14 @@ import os
 import pathlib
 import shutil
 import subprocess
+import time
+from collections.abc import Iterator
 from typing import Any
 
 import pytest
 import yaml
+
+from tests import pg
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CHART = ROOT / "charts" / "sortyard"
@@ -21,10 +25,10 @@ if HELM is None:
     pytestmark = pytest.mark.skip(reason="helm not on PATH (CI sets SORTYARD_REQUIRE_HELM)")
 
 
-def render(*args: str) -> list[dict[str, Any]]:
+def render(*args: str, chart: pathlib.Path = CHART) -> list[dict[str, Any]]:
     assert HELM is not None
     out = subprocess.run(
-        [HELM, "template", "sy", str(CHART), *args],
+        [HELM, "template", "sy", str(chart), *args],
         check=True,
         capture_output=True,
         text=True,
@@ -250,6 +254,20 @@ EXTERNAL_ENGINE_DATABASE = (
     "engine.database.existingSecret=engine-db",
 )
 # Every setting name the server image reads for a store that is not Postgres.
+NO_DIGESTS = ("--set", "engine.image.digest=", "--set", "engine.toolsImage.digest=")
+
+
+def version(tag: str) -> tuple[str, ...]:
+    """The values of a move to another engine version: both tags, and no stale digest."""
+    return (
+        "--set",
+        f"engine.image.tag={tag}",
+        "--set",
+        f"engine.toolsImage.tag={tag}",
+        *NO_DIGESTS,
+    )
+
+
 OTHER_STORES = ("CASSANDRA", "KEYSPACE", "MYSQL", "SQLITE", "ENABLE_ES", "ES_")
 
 
@@ -365,12 +383,15 @@ def test_the_engine_stores_to_postgres_only() -> None:
 def test_the_engine_server_waits_for_the_schema_job_of_its_own_version() -> None:
     """must_catch: the server rendered without its schema Job, or the Job not safe to run
     twice (that it is safe on a real Postgres is the slow workflow's to show)."""
-    docs = render(*ENGINE, "--set", "engine.image.tag=9.9.9", "--set", "engine.image.digest=")
+    docs = render(*ENGINE, *version("9.9.9"))
     assert component(docs, "Job", "engine-schema")["metadata"]["name"].startswith(
         "sy-sortyard-engine-schema-"
     )
     server = containers(component(docs, "Deployment", "engine"))
     assert server["engine"]["image"] == "temporalio/server:9.9.9"
+    assert containers(component(docs, "Job", "engine-schema"))["schema"]["image"] == (
+        "temporalio/admin-tools:9.9.9"
+    )
     # The server's pod starts with a wait for the record the Job writes for this version.
     assert list(server) == ["wait-schema", "engine"]
     wait = server["wait-schema"]
@@ -393,9 +414,8 @@ def test_the_engine_server_waits_for_the_schema_job_of_its_own_version() -> None
     # Named by what it does: a new server version is a new Job (a Job cannot be changed in
     # place), and an upgrade that changes nothing of the engine's leaves it alone.
     name = job["metadata"]["name"]
-    no_digest = ("--set", "engine.image.digest=")
-    same = render(*ENGINE, "--set", "engine.image.tag=9.9.9", *no_digest, "--set", "api.replicas=2")
-    newer = render(*ENGINE, "--set", "engine.image.tag=9.9.10", *no_digest)
+    same = render(*ENGINE, *version("9.9.9"), "--set", "api.replicas=2")
+    newer = render(*ENGINE, *version("9.9.10"))
     assert component(same, "Job", "engine-schema")["metadata"]["name"] == name
     assert component(newer, "Job", "engine-schema")["metadata"]["name"] != name
     # Nothing in the script drops or overwrites what is there.
@@ -489,9 +509,9 @@ def test_rendering_fails_when_the_external_database_secret_reference_is_missing(
 
 
 def test_an_engine_image_must_be_pinned_to_a_version() -> None:
-    for image in ("image", "toolsImage"):
-        assert "pinned" in render_fails(*ENGINE, "--set", f"engine.{image}.tag=latest")
-        assert "pinned" in render_fails(*ENGINE, "--set", f"engine.{image}.tag=")
+    for moving in ("latest", "main", "1.32", ""):
+        both = ("--set", f"engine.image.tag={moving}", "--set", f"engine.toolsImage.tag={moving}")
+        assert "pinned" in render_fails(*ENGINE, *both, *NO_DIGESTS), moving
     values = yaml.safe_load((CHART / "values.yaml").read_text())["engine"]
     for image in ("image", "toolsImage"):
         assert values[image]["digest"].startswith("sha256:") and len(values[image]["digest"]) == 71
@@ -520,6 +540,8 @@ def test_engine_enabled_false_renders_the_same_manifests_as_before() -> None:
         "engine.image.tag=9.9.9",
         "--set",
         "engine.database.host=pg.example",
+        "--set",
+        "engine.database.existingSecret=unused",
         "--set",
         "engine.namespace.retention=1d",
         "--set",
@@ -559,3 +581,145 @@ def test_engine_enabled_false_renders_the_same_manifests_as_before() -> None:
     }
     off = {(d["kind"], d["metadata"]["name"]): d for d in docs}
     assert [key for key in off if on[key] != off[key]] == [("Deployment", "sy-sortyard-api")]
+
+
+def test_whatever_changes_the_schema_job_changes_its_name(tmp_path: pathlib.Path) -> None:
+    """A Job's pod template cannot be changed in place, so `helm upgrade` is refused when a
+    Job keeps its name and changes its spec. Over every value that reaches the Job, and a chart
+    version bump: two renders with the same Job name have the same Job."""
+    bumped = tmp_path / "sortyard"
+    shutil.copytree(CHART, bumped)
+    chart_yaml = yaml.safe_load((bumped / "Chart.yaml").read_text())
+    chart_yaml["version"] = "99.0.0"
+    (bumped / "Chart.yaml").write_text(yaml.safe_dump(chart_yaml))
+    script = tmp_path / "script" / "sortyard"
+    shutil.copytree(CHART, script)
+    with (script / "engine" / "setup.sh").open("a") as setup:
+        setup.write("# changed\n")
+
+    variants: dict[str, list[dict[str, Any]]] = {
+        "default": render(*ENGINE),
+        "unrelated": render(*ENGINE, "--set", "api.replicas=3", "--set", "engine.replicas=2"),
+        "chart version": render(*ENGINE, chart=bumped),
+        "script": render(*ENGINE, chart=script),
+        "engine version": render(*ENGINE, *version("9.9.9")),
+        "external": render(*EXTERNAL_ENGINE_DATABASE),
+    }
+    for value in (
+        "engine.schema.waitSeconds=7",
+        "engine.schema.backoffLimit=9",
+        "engine.schema.activeDeadlineSeconds=77",
+        "engine.schema.ttlSecondsAfterFinished=7",
+        "engine.schema.resources.limits.memory=300Mi",
+        "engine.schema.resources.requests.cpu=11m",
+        "engine.toolsImage.pullPolicy=Always",
+        "engine.toolsImage.repository=mirror.example/admin-tools",
+        "engine.toolsImage.digest=",
+        "imagePullSecrets[0].name=pull",
+        "engine.namespace.retention=3d",
+        "engine.service.port=7000",
+        "engine.database.name=other",
+        "engine.database.visibilityName=other_visibility",
+        "engine.database.create=false",
+        "postgres.auth.username=someone",
+    ):
+        variants[value] = render(*ENGINE, "--set", value)
+
+    def job(docs: list[dict[str, Any]]) -> tuple[str, dict[str, Any], dict[str, str]]:
+        doc = component(docs, "Job", "engine-schema")
+        files = component(docs, "ConfigMap", "engine")["data"]
+        mounted = {name: files[name] for name in ("setup.sh", "mark.sql")}
+        return doc["metadata"]["name"], doc["spec"], mounted
+
+    default_name, default_spec, default_files = job(variants["default"])
+    names: dict[str, tuple[dict[str, Any], dict[str, str]]] = {}
+    for label, docs in variants.items():
+        name, spec, files = job(docs)
+        assert names.setdefault(name, (spec, files)) == (spec, files), label
+        # Each of these does change the Job or what it runs, so each must have changed the name;
+        # the unrelated values change neither.
+        changed = (spec, files) != (default_spec, default_files)
+        assert changed == (label not in ("default", "unrelated")), label
+        assert (name != default_name) == changed, label
+
+
+def test_a_failed_schema_job_needs_no_hand_to_recover() -> None:
+    """A finished Job is removed after its ttl, so the next install or upgrade makes it again,
+    and the server's wait for it has a limit, after which the pod fails visibly and retries."""
+    docs = render(*ENGINE, "--set", "engine.schema.waitSeconds=120")
+    job = component(docs, "Job", "engine-schema")
+    assert job["spec"]["ttlSecondsAfterFinished"] > 0
+    assert job["spec"]["activeDeadlineSeconds"] > 0
+    wait = containers(component(docs, "Deployment", "engine"))["wait-schema"]
+    assert env_of(wait)["SORTYARD_ENGINE_WAIT_SECONDS"]["value"] == "120"
+
+
+@pytest.fixture
+def engine_database() -> Iterator[pg.Database]:
+    yield from pg.fresh_database()
+
+
+@pg.requires_postgres
+def test_the_server_waits_for_the_schema_record_and_gives_up_at_its_limit(
+    engine_database: pg.Database,
+) -> None:
+    """The init container's command, run for real: it returns once the record the schema Job
+    writes for its version is there, and without it fails at its limit instead of waiting on."""
+    setup = CHART / "engine" / "setup.sh"
+    mark = component(render(*ENGINE), "ConfigMap", "engine")["data"]["mark.sql"]
+    tag = yaml.safe_load((CHART / "values.yaml").read_text())["engine"]["image"]["tag"]
+
+    def wait(server_version: str) -> subprocess.CompletedProcess[str]:
+        env = {
+            **engine_database.env,
+            "SORTYARD_ENGINE_SERVER_VERSION": server_version,
+            "SORTYARD_ENGINE_WAIT_SECONDS": "2",
+        }
+        return subprocess.run(
+            ["sh", str(setup), "wait-schema"], env=env, capture_output=True, text=True, timeout=60
+        )
+
+    started = time.monotonic()
+    missing = wait(tag)
+    assert missing.returncode != 0 and tag in missing.stderr
+    assert time.monotonic() - started < 30
+    # The Job's record, written twice (the Job is safe to run again): the wait is over.
+    engine_database.run(mark)
+    engine_database.run(mark)
+    assert engine_database.value("SELECT server_version FROM sortyard_engine_schema") == tag
+    assert wait(tag).returncode == 0
+    # A record for one version is not a record for the next: an upgraded server still waits.
+    assert wait("99.0.0").returncode != 0
+
+
+def test_the_engine_images_move_together() -> None:
+    """The schema tool carries the schema of its own server version, and a digest pins one
+    version: a server tag without its tools tag, or a new tag under the old digest, is refused."""
+    assert "must be engine.image.tag" in render_fails(
+        *ENGINE, "--set", "engine.image.tag=1.33.0", *NO_DIGESTS
+    )
+    assert "must be engine.image.tag" in render_fails(
+        *ENGINE, "--set", "engine.toolsImage.tag=1.33.0", *NO_DIGESTS
+    )
+    both = ("--set", "engine.image.tag=1.33.0", "--set", "engine.toolsImage.tag=1.33.0")
+    for stale in ("engine.toolsImage.digest=", "engine.image.digest="):
+        # One digest cleared, the other still the default version's.
+        assert "digest" in render_fails(*ENGINE, *both, "--set", stale)
+    assert "digest" in render_fails(*ENGINE, *both)
+    new = "sha256:" + "ab" * 32
+    docs = render(
+        *ENGINE,
+        *both,
+        "--set",
+        f"engine.image.digest={new}",
+        "--set",
+        f"engine.toolsImage.digest={new}",
+    )
+    server = containers(component(docs, "Deployment", "engine"))["engine"]
+    assert server["image"] == f"temporalio/server:1.33.0@{new}"
+    render(*ENGINE, *version("1.33.0"))
+
+
+def test_engine_database_settings_that_would_be_ignored_are_refused() -> None:
+    for ignored in ("engine.database.username=engine", "engine.database.existingSecret=engine-db"):
+        assert "engine.database.host" in render_fails(*ENGINE, "--set", ignored)
