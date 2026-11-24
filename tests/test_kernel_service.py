@@ -171,9 +171,10 @@ def test_sortyard_kernel_is_a_console_script_of_the_package() -> None:
 
 def test_the_decision_policy_answers_what_a_rule_covers_and_nothing_else() -> None:
     """The decision step answers from the first matching rule; a question no rule covers gets
-    no answer, so the item's default and then the table's apply. The shipped policy has no
-    rules. A file that cannot be read in full is refused."""
-    assert policy.shipped().rules == ()
+    no answer, so the item's default and then the table's apply. The shipped policy has one
+    rule, for an operator's withdraw request (below), and answers nothing else. A file that
+    cannot be read in full is refused."""
+    assert len(policy.shipped().rules) == 1
     assert policy.shipped().decide({"state": "building", "cause": "limit"}) is None
     loaded = policy.load(
         """
@@ -207,6 +208,34 @@ reverse = "ask to resume"
     assert answer(state="fixing", cause="limit", action="narrow-or-split") == "wait"
     assert answer(state="fixing", cause="limit") is None
     assert answer(state="merging", cause="request") is None
+    # The shipped rule: a withdraw request with the role operator, and nothing near it.
+    shipped_rule = policy.shipped().decide
+
+    def asked(answer: str, **by: Any) -> dict[str, Any]:
+        request = {"id": "req-1", "answer": answer, "reason": "moving", "by": by}
+        return {"state": "building", "cause": "request", "request": request}
+
+    granted = shipped_rule(asked("withdraw", kind="operator", id="op-1", role="operator"))
+    assert granted is not None and granted["answer"] == "withdraw" and granted["reverse"]
+    assert shipped().state("decision").next["withdraw"] == "withdrawn"
+    for refused in (
+        asked("withdraw", kind="operator", id="op-1", role="admin"),
+        asked("withdraw", kind="agent", id="sa-1", role="conductor"),
+        asked("withdraw", kind="operator", id="operator"),
+        asked("resume", kind="operator", id="op-1", role="operator"),
+        {**asked("withdraw", role="operator"), "cause": "limit"},
+        {"state": "building", "cause": "request", "request": "withdraw", "role": "operator"},
+        {"state": "building", "cause": "request", "request": {"answer": "withdraw", "by": 7}},
+    ):
+        assert shipped_rule(refused) is None, refused
+    # The two request keys work in any policy file, beside the others.
+    by_role = policy.load(
+        'version = 1\n[[rules]]\nrole = "admin"\nrequest = "rebuild"\nstate = "fixing"\n'
+        'answer = "rebuild"\nreverse = "ask to resume"\n'
+    )
+    assert by_role.decide({**asked("rebuild", role="admin"), "state": "fixing"}) is not None
+    assert by_role.decide(asked("rebuild", role="admin")) is None
+    assert by_role.decide({**asked("rebuild", role="operator"), "state": "fixing"}) is None
     for broken in (
         "not toml [",
         "version = 2\nrules = []",

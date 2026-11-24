@@ -3,7 +3,8 @@
 `load` reads the rules (`decision_policy.toml`, shipped next to the state table, shows the
 format) and refuses a file it cannot read in full. `Policy.decide` is the item workflow's
 decision step: the first rule that matches the question answers it; when none does it returns
-nothing, and the item's own default and then the table's apply.
+nothing, and the item's default, then the table's, apply. A rule may match a request's answer
+(`request`) and its sender's role (`role`).
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ from dataclasses import dataclass
 from importlib import resources
 from typing import Any
 
-MATCH_KEYS = ("state", "cause", "outcome", "action")
+MATCH_KEYS = ("state", "cause", "outcome", "action", "request", "role")
 _RULE_KEYS = frozenset({*MATCH_KEYS, "answer", "reverse"})
 
 
@@ -23,8 +24,13 @@ class Policy:
     rules: tuple[Mapping[str, str], ...] = ()
 
     def decide(self, question: Mapping[str, Any]) -> dict[str, str] | None:
+        request = question.get("request")
+        request = request if isinstance(request, Mapping) else {}
+        by = request.get("by")
+        role = by.get("role") if isinstance(by, Mapping) else None
+        asked = {**question, "request": request.get("answer"), "role": role}
         for rule in self.rules:
-            if all(question.get(key) == rule[key] for key in MATCH_KEYS if key in rule):
+            if all(asked.get(key) == rule[key] for key in MATCH_KEYS if key in rule):
                 return {"answer": rule["answer"], "reverse": rule["reverse"]}
         return None
 

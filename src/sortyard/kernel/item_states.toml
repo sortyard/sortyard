@@ -39,8 +39,11 @@
 # and may carry action = "..", a word handed to the owner that is dispatched next.
 #
 # A state may also name lifecycle = "..": the harness.lifecycle.v1 kind recorded when an item
-# enters it. Only a state that means a merged change says "merged"; a terminal state added later
-# for a cancelled item would not.
+# enters it. Only a state that means a merged change says "merged". withdrawn does not: it is
+# the terminal state of an item the kernel stopped driving (so a lane can move back to another
+# system and its open items be filed there), reached only as an answer of the decision state.
+# Its Jobs and per-job secrets are deleted when it is recorded, its pull request is left open,
+# its lane slot is free again, and what it blocks stays queued (and is reported as such).
 #
 # Where the numbers come from. checking 10m, reviewing 30m and merging 30m are the limits of
 # HARNESS-V3 section 3.1. That section gives preflight as "minutes" and building as "by risk
@@ -68,6 +71,7 @@ merge-in-progress = "The merge adapter is landing the change."
 waiting-on-need = "The item waits on a named need that has its own owner and limit."
 decision-required = "A limit passed or an owner could not proceed; the decision service answers."
 done = "The change is merged. Terminal for the item; the release workflow owns what follows."
+withdrawn = "Withdrawn by a decision. Terminal: the kernel no longer drives the item; its pull request, if any, is left open."
 
 [states.admitted]
 initial = true
@@ -133,9 +137,13 @@ owner = "decision-service"
 limit = "same-pass"
 default = { answer = "resume", reverse = "Send the item a decision request with a different answer.", on-repeat = "wait" }
 reason = "decision-required"
-next = { resume = "@origin", rebuild = "building", wait = "waiting" }
+next = { resume = "@origin", rebuild = "building", wait = "waiting", withdraw = "withdrawn" }
 
 [states.merged]
 terminal = true
 reason = "done"
 lifecycle = "merged"
+
+[states.withdrawn]
+terminal = true
+reason = "withdrawn"

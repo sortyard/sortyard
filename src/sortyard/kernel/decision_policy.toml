@@ -10,10 +10,13 @@
 #   cause    why: "outcome", "limit", "owner-failed", "unknown-outcome", "request"
 #   outcome  the outcome that led here, for cause "outcome"
 #   action   the word the state's default handed on, for cause "limit"
+#   request  the answer a request asked for, for cause "request"
+#   role     the role of whoever sent the request (admin, operator), for cause "request"
 #
 # and gives:
 #
-#   answer   one of the decision state's answers in the state table (resume, rebuild, wait)
+#   answer   one of the decision state's answers in the state table (resume, rebuild, wait,
+#            withdraw)
 #   reverse  how to reverse it; recorded with the decision
 #
 # The first matching rule answers. An example:
@@ -24,8 +27,17 @@
 #   answer = "wait"
 #   reverse = "Send the item a decision request with the answer rebuild."
 #
-# The shipped policy has no rules: which answer a question deserves is the operator's to
-# write, and until a rule is written the table's defaults decide.
+# The shipped policy has one rule: an operator's request to withdraw an item is honoured, so a
+# lane can be moved back to another system (HARNESS-V3 section 6). Nothing else is covered:
+# which answer any other question deserves is the operator's to write, and until a rule is
+# written the table's defaults decide. A policy file that replaces this one must carry the rule
+# itself, or no request can withdraw an item.
 
 version = 1
-rules = []
+
+[[rules]]
+cause = "request"
+request = "withdraw"
+role = "operator"
+answer = "withdraw"
+reverse = "A withdrawn item is not resumed. Admit the work again under a new item id."

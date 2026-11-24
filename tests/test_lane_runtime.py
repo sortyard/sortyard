@@ -35,9 +35,11 @@ from sortyard.kernel.item import workflow_id
 from sortyard.kernel.preflight import close_gap
 from sortyard.kernel.store import Items, PgGapRegistry
 from sortyard.lane.github import GitHubError, HttpGitHub, branch_of
+from sortyard.lane.jobs import ITEM_LABEL
 from sortyard.lane.runtime import ensure_pull
+from sortyard.lane.worker import item_label
 from sortyard.services import kernel
-from tests.api_harness import WS
+from tests.api_harness import ITEM, WS
 from tests.fake_github import APP_ID, PEM
 from tests.kernel_harness import until
 from tests.pg import requires_postgres
@@ -237,6 +239,201 @@ def test_the_service_is_stopped_mid_build_and_mid_check_and_every_item_still_mer
             assert len(job_creates(w)) == len(set(job_creates(w))) == 6
             assert len(w.fake.seen("pulls/create")) == 3
             assert all(pull.merged and pull.merges == 1 for pull in w.repo.pulls)
+
+    asyncio.run(scenario())
+
+
+def left_in_cluster(w: World, item: str) -> dict[str, list[str]]:
+    """What the cluster still holds for the item: its Jobs, and the per-job secrets and briefs
+    named after any Job the launcher ever created for it."""
+    label = item_label(WS, item)
+    made = {
+        exchange.response["metadata"]["name"]
+        for exchange in w.cluster.exchanges
+        if exchange.method == "POST"
+        and exchange.path.endswith("/jobs")
+        and exchange.status == 201
+        and exchange.response["metadata"]["labels"][ITEM_LABEL] == label
+    }
+    return {
+        kind: sorted(made & set(w.cluster.names(kind))) for kind in ("job", "secret", "configmap")
+    }
+
+
+GONE: dict[str, list[str]] = {"job": [], "secret": [], "configmap": []}
+
+
+@requires_postgres
+def test_withdrawing_an_item_mid_build_deletes_its_job_and_per_job_secret_and_leaves_its_pull_request_open(  # noqa: E501
+    tmp_path: pathlib.Path,
+) -> None:
+    """Withdrawing an item mid-build deletes its Job and per-job secret and leaves its pull
+    request open. The cleanup needs no hand action and is finished by a restarted service."""
+
+    def ask(w: World, item: str, role: str = "operator") -> Any:
+        body = {"answer": "withdraw", "reason": "the lane moves back"}
+        return w.api.ws("POST", f"/items/{item}/requests", role, body)
+
+    def decided(w: World, item: str) -> list[tuple[str, str]]:
+        found = [event["facts"]["decision"] for event in w.timeline(item)]
+        return [(d["answer"], d["source"]) for d in found if d]
+
+    async def scenario() -> None:
+        async with world(tmp_path) as w:
+            # W waits on a need: its repository is not on GitHub, so preflight opened a
+            # capability-gap item. Withdrawn there, it stops waiting on the gap item, and the
+            # record says its pull request could not be read instead of failing to end.
+            assert w.admit("W", repository=OTHER_REPO).status == 201
+            service = Service(w)
+            await drive(w, service, lambda: w.states() == {"W": "waiting"}, "W waiting")
+            (gap,) = PgGapRegistry(w.connect).all()
+            assert gap.open and gap.items == ("W",)
+            assert ask(w, "W").status == 202
+            await drive(w, service, lambda: w.states() == {"W": "withdrawn"}, "W withdrawn")
+            await until(
+                lambda: asyncio.to_thread(PgGapRegistry(w.connect).all),
+                lambda gaps: gaps[0].items == (),
+                "W unlinked from the gap item",
+            )
+            await service.kill()
+            waited = w.api.ws("GET", "/items/W", "viewer").body["detail"]["left_open"]
+            assert (waited["repository"], waited["branch"]) == (OTHER_REPO, branch_of("W"))
+            assert isinstance(waited["pull_request"], str) and "404" in waited["pull_request"]
+
+            for item in ("A", "B"):
+                assert w.admit(item).status == 201
+            # Two slots. A stays mid-build (its first Job runs and does not finish). B's
+            # first head fails the check and its fix Job does not finish: B is mid-build of
+            # its fix, with a pull request open. Then C and D are admitted, and queue.
+            w.held, w.red_once = {"A", "B:fix"}, {"B"}
+            service = Service(w)
+            parked = {"W": "withdrawn", "A": "building", "B": "fixing"}
+            await drive(
+                w,
+                service,
+                lambda: (
+                    w.states() == parked
+                    # Each has its one Job, with the secret and the brief made after it.
+                    and all(map(len, left_in_cluster(w, "A").values()))
+                    and all(len(names) == 1 for names in left_in_cluster(w, "B").values())
+                ),
+                "A mid-build, B mid-fix",
+            )
+            assert w.admit("C").status == 201
+            assert w.admit("D", blocked_by=["A"]).status == 201
+            parked.update(C="admitted", D="admitted")
+            await drive(w, service, lambda: w.states() == parked, "C and D queued")
+            running = {item: left_in_cluster(w, item) for item in "AB"}
+            assert all(len(names) == 1 for held in running.values() for names in held.values())
+            pull = w.repo.pull_of(branch_of("B"))
+            assert pull.open and len(w.repo.pulls) == 1
+
+            # An admin asks: the shipped policy honours the operator role only. The request
+            # is decided (resume, the table's default) and A's build carries on untouched.
+            assert ask(w, "A", "admin").status == 202
+            await drive(w, service, lambda: len(decided(w, "A")) == 1, "the admin's request")
+            assert decided(w, "A") == [("resume", "table")]
+            await drive(w, service, lambda: w.states()["A"] == "building", "A building again")
+            assert left_in_cluster(w, "A") == running["A"]
+            assert ask(w, "A", "viewer").status == 403
+
+            # An operator asks. A is withdrawn: its Job, its per-job secret and its brief
+            # are deleted by the service itself, and its slot goes to C.
+            assert ask(w, "A").status == 202
+            await drive(
+                w,
+                service,
+                lambda: w.states()["A"] == "withdrawn" and left_in_cluster(w, "A") == GONE,
+                "A withdrawn and cleaned up",
+            )
+            assert decided(w, "A")[-1] == ("withdraw", "policy")
+
+            # B is withdrawn while the cluster refuses to delete Jobs, and the service is
+            # stopped before the cleanup can finish.
+            stale = stays(w)["B"]  # what a pass that started before the withdrawal read
+            w.cluster.refuse[("DELETE", "job")] = 500
+            assert ask(w, "B").status == 202
+            await drive(w, service, lambda: w.states()["B"] == "withdrawn", "B withdrawn")
+            await until(
+                lambda: asyncio.sleep(0, w.cluster.exchanges),
+                lambda seen: any(e.method == "DELETE" and e.status == 500 for e in seen),
+                "a refused delete",
+            )
+            await service.kill()
+            assert left_in_cluster(w, "B")["job"] == running["B"]["job"]
+            del w.cluster.refuse[("DELETE", "job")]
+            # A new service finishes it: nothing was kept in the one that died.
+            service = Service(w)
+            try:
+                await drive(w, service, lambda: left_in_cluster(w, "B") == GONE, "B cleaned up")
+                # The outside world carries on, nothing held back. C takes the freed slot
+                # and merges. Nothing drives A or B: no Job, no check, no merge.
+                w.held = set()
+                await drive(w, service, lambda: w.states()["C"] == "merged", "C merged")
+                for _ in range(5):
+                    await service.run_pass()
+                    await w.turn()
+            finally:
+                await service.kill()
+            ended = dict.fromkeys("ABW", "withdrawn")
+            assert w.states() == {**ended, "C": "merged", "D": "admitted"}
+            assert left_in_cluster(w, "A") == left_in_cluster(w, "B") == GONE
+            # A look made now with the stay read before B was withdrawn does nothing: it
+            # reaches neither the cluster nor GitHub.
+            engine = await Engine.connect(w.target)
+            quiet = (len(w.cluster.exchanges), len(w.fake.seen("pulls/create")))
+            assert await kernel.assemble(w.settings()).observer(engine).look(stale) is None
+            assert (len(w.cluster.exchanges), len(w.fake.seen("pulls/create"))) == quiet
+            assert sorted(brief["item"] + ":" + brief["mode"] for brief in w.ran) == [
+                "B:build",
+                "C:build",
+                "C:review",
+            ]
+            # B's pull request is left open, unmerged, and the record names it. A had none.
+            assert pull.open and not pull.merged and pull.merges == 0
+            assert [p.branch for p in w.repo.pulls if p.merged] == [branch_of("C")]
+            read = {item: w.api.ws("GET", f"/items/{item}", "viewer").body for item in "AB"}
+            assert read["B"]["state"] == read["A"]["state"] == "withdrawn"
+            assert read["B"]["detail"]["left_open"] == {
+                "repository": REPO,
+                "branch": branch_of("B"),
+                "pull_request": pull.number,
+            }
+            assert read["A"]["detail"]["left_open"]["pull_request"] is None
+            # Neither is recorded as merged: no transition of theirs has that lifecycle kind.
+            for item in "AB":
+                kinds = [event["facts"]["lifecycle"]["kind"] for event in w.timeline(item)]
+                assert "merged" not in kinds and kinds[-1] is None
+                assert w.path(item)[-2:] == ["decision", "withdrawn"]
+            # No stay of theirs is open for the observer; D, blocked by A, is still queued,
+            # and the queue says what holds it.
+            assert set(stays(w)) == {"D"}
+            listed = w.api.ws("GET", "/projects/proj-a/queue", "viewer").body["items"]
+            (row,) = [each for each in listed if each["id"] != ITEM]
+            assert (row["id"], row["blocked_by"], row["ended_blockers"]) == (
+                "D",
+                ["A"],
+                {"A": "withdrawn"},
+            )
+            # Withdrawing twice, or withdrawing a merged item, changes nothing: once the
+            # engine has closed the workflow (a moment after its last record) the request
+            # is refused; one sent in that moment is accepted and never read.
+            before = {item: w.path(item) for item in "ABCD"}
+            for item in "ABCW":
+                await until(
+                    lambda item=item: w.engine.recorded(workflow_id(WS, item)),  # type: ignore[misc]
+                    lambda recorded: recorded.status == "completed",
+                    f"the workflow of {item} ended",
+                )
+                again = ask(w, item)
+                assert (again.status, again.body["reason_code"]) == (409, "no_workflow")
+            assert {item: w.path(item) for item in "ABCD"} == before
+            # The id is spent: admitting it again is refused, with the reason.
+            refused = w.admit("A")
+            assert refused.status == 422, refused.body
+            assert [reason.split(":")[0] for reason in refused.body["reasons"]] == ["ended-item"]
+            assert "withdrawn" in refused.body["reasons"][0]
+            assert w.admit("C").status == 200  # a merged item admitted again: nothing, as before
 
     asyncio.run(scenario())
 

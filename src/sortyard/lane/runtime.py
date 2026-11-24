@@ -8,7 +8,7 @@ repository, base branch, needs and spec in what admission stored. The result reg
 engine worker (`Runtime.register`, which refuses a table owner it has no function for) and
 gives the observer its looks (`Runtime.observer`).
 
-Two things happen here that no single adapter owns:
+Three things happen here that no single adapter owns:
 
 - **The pull request.** When a build or a fix is observed as done and the item's branch has no
   open pull request, the runtime opens one, with the item's title and a body naming the item,
@@ -17,6 +17,11 @@ Two things happen here that no single adapter owns:
 - **A wait that closed while no one was told.** The need's look asks the gap registry whether
   every gap item the item waits on has closed, so an item whose `closed` was lost (the service
   stopped between closing the gap item and telling the item) still returns to preflight.
+- **An item that ends without merging** (withdrawn). A terminal state has no owner and no open
+  stay, so the record step cleans up: it records the transition, naming the item's branch and
+  open pull request (left open), then deletes the item's Jobs and per-job secrets. The engine
+  retries it until it succeeds, across restarts. And no look is made for a stay the item has
+  left, so a pass that read the stay before the item was withdrawn does not merge it after.
 """
 
 from __future__ import annotations
@@ -36,6 +41,7 @@ from sortyard.kernel.preflight import NEED_OWNER, Preflight, Probe, TaskNeeds
 from sortyard.kernel.scheduler import SCHEDULER_OWNER, Scheduler
 from sortyard.kernel.states import StateTable
 from sortyard.kernel.store import Connect, Items, ItemSpec, PgGapRegistry
+from sortyard.lane import worker
 from sortyard.lane.github import (
     CI_OWNER,
     MERGE_OWNER,
@@ -53,6 +59,7 @@ from sortyard.lane.worker import probes as worker_probes
 
 # The outcomes of a worker that mean a change is on the item's branch.
 PUSHED = frozenset({"built", "fixed"})
+_IN_STATE = "SELECT 1 FROM sortyard.item WHERE (workspace_id, id, state) = (%s, %s, %s)"
 
 
 def ensure_pull(port: GitHub, spec: ItemSpec) -> None:
@@ -170,5 +177,35 @@ def build(
         CI_OWNER: ci,
         MERGE_OWNER: merge,
     }
+    ledger = Ledger(connect)
+
+    def record(transition: Payload) -> None:
+        if transition["state_kind"] != "terminal" or transition.get("lifecycle") == "merged":
+            return ledger.record(transition)
+        tenant, item = str(transition["tenant"]), str(transition["item"])
+        try:
+            spec, branch = items.spec(tenant, item), branch_of(item)
+        except LookupError:  # not admitted with a spec: no branch, no Job
+            return ledger.record(transition)
+        try:
+            token = github.token(spec.repository, {"pull_requests": "read"})
+            found = github.find_pull(token, spec.repository, branch)
+            pull: Any = found.number if found is not None and found.open else None
+        except GitHubError as error:  # the item ends all the same; the record says why not
+            pull = f"not read: {error}"
+        left = {"repository": spec.repository, "branch": branch, "pull_request": pull}
+        ledger.record({**transition, "detail": {**transition["detail"], "left_open": left}})
+        gaps.settle(tenant, item)  # it waits on no capability-gap item any more
+        jobs.delete_earlier(worker.item_label(tenant, item), 2**31)
+
+    def current(look: Look) -> Look:
+        def guarded(stay: Payload) -> Payload | None:
+            with connect() as conn:
+                found = conn.execute(_IN_STATE, [stay[key] for key in ("tenant", "item", "state")])
+            return look(stay) if found.fetchone() else None
+
+        return guarded
+
     decide: Any = (policy or policies.shipped()).decide
-    return Runtime(owners, looks, decide, Ledger(connect).record, items, gaps, table)
+    looks = {owner: current(look) for owner, look in looks.items()}
+    return Runtime(owners, looks, decide, record, items, gaps, table)

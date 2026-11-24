@@ -157,7 +157,9 @@ kernel:
   # mounted as files into the kernel and the API.
   lanes: {}
   # The decision policy file's text (the format: src/sortyard/kernel/decision_policy.toml).
-  # Empty: the policy shipped in the image, which has no rules.
+  # Empty: the policy shipped in the image, whose one rule honours an operator's request to
+  # withdraw an item. Text given here replaces that policy whole: carry the rule over (copy it
+  # from the format file), or no request can withdraw an item and a lane cannot be moved back.
   decisionPolicy: ""
   # How workers run in this deployment; rendered into the worker configuration file.
   worker:

@@ -18,6 +18,8 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from psycopg.rows import dict_row
+
 from sortyard import models
 from sortyard.api import auth, store
 from sortyard.api.auth import Principal
@@ -1158,8 +1160,9 @@ def issue_service_account_token(req: Request) -> Reply:
 # --- the kernel's tracker view (HARNESS-V3 §3.2) --------------------------------------------
 #
 # The item workflow owns item state and sortyard.kernel.ledger records it. These operations
-# read that projection. The one that is not a read sends the workflow a request and writes
-# nothing: no operation here, or anywhere in this module, changes an item's state. Admission
+# read that projection (the queue, one item, its timeline). The one that is not a read sends
+# the workflow a request and writes nothing: no operation here, or anywhere in this module,
+# changes an item's state. Admission
 # creates an item with no state (sortyard.kernel.admission) and starts its workflow.
 
 
@@ -1189,6 +1192,41 @@ def get_item_timeline(req: Request) -> Reply:
     return Reply(200, {"items": ledger.timeline(req.conn, req.workspace_id, item_id) or []})
 
 
+_ITEM = (
+    "SELECT i.id, i.project_id, i.milestone_id, i.title, i.risk_tier, s.lane, s.repository,"
+    "       s.base, s.needs, s.spec, i.state, i.state_kind, i.owner, i.limit_text AS limit,"
+    "       i.reason, i.entered_at, r.detail,"
+    "       ARRAY(SELECT l.blocked_by FROM sortyard.item_link AS l"
+    "         WHERE (l.workspace_id, l.item_id) = (i.workspace_id, i.id) ORDER BY 1) AS blocked_by,"
+    "       ARRAY(SELECT l.item_id FROM sortyard.item_link AS l"
+    "         WHERE (l.workspace_id, l.blocked_by) = (i.workspace_id, i.id) ORDER BY 1) AS blocks"
+    " FROM sortyard.item AS i"
+    " LEFT JOIN sortyard.item_spec AS s ON (s.workspace_id, s.item_id) = (i.workspace_id, i.id)"
+    " LEFT JOIN sortyard.item_run AS r"
+    "   ON (r.workspace_id, r.item_id, r.sequence) = (i.workspace_id, i.id, i.sequence)"
+    " WHERE i.workspace_id = %s AND i.id = %s"
+)
+
+
+@handles("getItem")
+def get_item(req: Request) -> Reply:
+    """One item as it was admitted (enough to file it again elsewhere) and where it is now."""
+    item_id = load_item(req)
+    with req.conn.cursor(row_factory=dict_row) as cursor:
+        found = cursor.execute(_ITEM, (req.workspace_id, item_id)).fetchone()
+    assert found is not None
+    entered = found["entered_at"]
+    return Reply(
+        200,
+        {
+            **found,
+            "entered_at": entered.isoformat() if entered else None,
+            "detail": found["detail"] or {},
+            "workflow_id": workflow_id(req.workspace_id, item_id),
+        },
+    )
+
+
 @handles("requestItemChange")
 def request_item_change(req: Request) -> Reply:
     item_id = load_item(req)
@@ -1207,7 +1245,13 @@ def request_item_change(req: Request) -> Reply:
     request_id = store.new_id("req")
     payload = {
         "kind": "request",
-        "request": {"id": request_id, "answer": answer, "reason": reason, "by": req.actor},
+        # Who asked, with the role the token carries: the decision policy may grant by role.
+        "request": {
+            "id": request_id,
+            "answer": answer,
+            "reason": reason,
+            "by": {**req.actor, "role": req.principal.role},
+        },
     }
     try:
         req.signal_item(workflow_id(req.workspace_id, item_id), INPUT_SIGNAL, payload)

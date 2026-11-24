@@ -453,3 +453,8 @@ def shipped_text() -> str:
 
 def shipped() -> StateTable:
     return load(shipped_text())
+
+
+def merged_states(table: StateTable | None = None) -> list[str]:
+    """The states that mean a merged change: the only ones that clear a blocked_by link."""
+    return [s.name for s in (table or shipped()).states.values() if s.lifecycle == "merged"]

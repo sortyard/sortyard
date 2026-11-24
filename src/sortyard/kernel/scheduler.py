@@ -5,7 +5,8 @@ Among a lane's queued items whose blockers are merged, the one created first goe
 is link order, since an item cannot be dispatched before what it is blocked by.
 
 A lane's slot count is `slots` in its capability file. A slot is held from the grant until the
-item is merged, through every state between, a wait on a named need and a decision included.
+item ends (merged or withdrawn), a wait on a need and a decision included; only a merge clears
+a link, so what a withdrawn item blocks stays queued.
 So a lane never has more than `slots` items out of the queue: a need that fails for the whole
 lane parks at most that many and the rest stay queued, and no build starts beside them. The
 cost is that an item waiting on a need of its own keeps one slot until its wait ends.
@@ -22,7 +23,7 @@ from collections.abc import Mapping
 
 from sortyard.kernel.capabilities import Lane
 from sortyard.kernel.item import Payload
-from sortyard.kernel.states import StateTable, shipped
+from sortyard.kernel.states import StateTable, merged_states
 from sortyard.kernel.store import Connect
 
 SCHEDULER_OWNER = "scheduler"
@@ -41,11 +42,11 @@ _READY = (
     "                     AND NOT COALESCE(b.state = ANY(%(merged)s), false))"
     " ORDER BY i.position LIMIT %(free)s"
 )
-# Grants whose item is not yet merged.
+# Grants whose item has not ended: a merged item and a withdrawn one both free their slot.
 _HELD = (
     "SELECT count(*) FROM sortyard.item_slot AS g JOIN sortyard.item AS i"
     "   ON (i.workspace_id, i.id) = (g.workspace_id, g.item_id)"
-    " WHERE g.lane = %(lane)s AND NOT COALESCE(i.state = ANY(%(merged)s), false)"
+    " WHERE g.lane = %(lane)s AND i.state_kind IS DISTINCT FROM 'terminal'"
 )
 
 
@@ -53,9 +54,7 @@ class Scheduler:
     def __init__(
         self, connect: Connect, lanes: Mapping[str, Lane], table: StateTable | None = None
     ) -> None:
-        self._connect, self._lanes = connect, lanes
-        states = (table or shipped()).states.values()
-        self._merged = [state.name for state in states if state.lifecycle == "merged"]
+        self._connect, self._lanes, self._merged = connect, lanes, merged_states(table)
 
     def __call__(self, call: Payload) -> Payload | None:
         """`dispatched` when the item holds a slot or is given one now; else nothing."""

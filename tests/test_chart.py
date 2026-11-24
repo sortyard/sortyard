@@ -862,7 +862,7 @@ def test_kernel_enabled_renders_the_engine_on_postgres_the_kernel_deployment_and
     assert settings.worker.agents == AGENTS
     assert settings.engine_target == "sy-sortyard-engine:7233"
     assert settings.jobs_namespace == NAMESPACE and settings.kube_url is None
-    assert settings.decisions.rules == () and "SORTYARD_DECISION_POLICY" not in started
+    assert settings.decisions == policy.shipped() and "SORTYARD_DECISION_POLICY" not in started
     # ... and the API admits against the same lane files.
     api_started = as_started(docs, on[("Deployment", "sy-sortyard-api")], "api", tmp_path, secrets)
     assert load_lanes(api_started["SORTYARD_LANES_DIR"]) == settings.lanes
