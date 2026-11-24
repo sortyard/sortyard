@@ -2,10 +2,14 @@
 # the harness's own releases go through CI like everything else).
 #
 # One job, `test`, and it is the one required status check on main: strict, up to date with
-# main (policies/placement-defaults.yaml#gates). main runs no other job, so everything main
-# runs is proven on the pull request first. Keep it one job: a second job here would run on
-# main without gating. The slow suite (the kind replica boot) runs outside the gate, in
-# slow.yml.
+# main (policies/placement-defaults.yaml#gates). Every check main runs is this job, proven on
+# the pull request first. Keep it one job: a second job here would run on main without gating.
+# The slow suite (the kind replica boot) runs outside the gate, in slow.yml.
+#
+# One other job runs on main, and a pull request cannot run it: publish.yml pushes the image to
+# a registry, with credentials a pull request must not hold. It checks nothing new: it builds
+# the Dockerfile this job built and smoke-tested on the pull request. Its push and its pull by
+# digest are not proven before main, and it is not a required check.
 name: ci
 
 on:

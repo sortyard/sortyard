@@ -1,0 +1,124 @@
+# Publishes the one Sortyard image (the repository Dockerfile) for every commit on main, and on
+# demand: <registry>/sortyard/sortyard:<full commit sha>. A deployment names it by the digest
+# this job reports, never by a tag (charts/sortyard: image.digest).
+#
+# The registry is the repository variable ACR_REGISTRY and the login is the Actions secrets
+# ACR_PUSH_USERNAME and ACR_PUSH_PASSWORD: the registry belongs to whoever deploys, so its name
+# is not written in this repository.
+#
+# The two secrets are not repository secrets: they exist only in the environment `publish`,
+# whose deployment branches are limited to main (a repository setting), so a run on any other
+# branch is not given them, whatever its copy of this file says.
+#
+# Never on a pull request: a fork's pull request gets no secrets, and nothing unreviewed may
+# push. So this is the one job main runs that a pull request cannot run first. What it builds
+# is the Dockerfile that ci.yml's `test` built and smoke-tested on the pull request; the push
+# and the pull by digest are first run here. It is not a required check: `test` stays the one.
+name: publish
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One publish per branch at a time; a publish that has started is never cancelled half-pushed.
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  image:
+    name: publish image
+    runs-on: ubuntu-latest
+    # Where the push credentials are, and what limits them to main.
+    environment: publish
+    timeout-minutes: 20
+    outputs:
+      image: ${{ steps.published.outputs.image }}
+      digest: ${{ steps.published.outputs.digest }}
+      commit: ${{ steps.published.outputs.commit }}
+    env:
+      REGISTRY: ${{ vars.ACR_REGISTRY }}
+      REPOSITORY: ${{ vars.ACR_REGISTRY }}/sortyard/sortyard
+      TAGGED: ${{ vars.ACR_REGISTRY }}/sortyard/sortyard:${{ github.sha }}
+      COMMIT: ${{ github.sha }}
+    steps:
+      - name: Only main is published, and the registry settings are there
+        env:
+          ACR_PUSH_USERNAME: ${{ secrets.ACR_PUSH_USERNAME }}
+          ACR_PUSH_PASSWORD: ${{ secrets.ACR_PUSH_PASSWORD }}
+        run: |
+          missing=0
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::publish runs on main only, not on $GITHUB_REF"
+            missing=1
+          fi
+          if [ -z "$REGISTRY" ]; then
+            echo "::error::the repository variable ACR_REGISTRY is empty"
+            missing=1
+          fi
+          if [ -z "$ACR_PUSH_USERNAME" ]; then
+            echo "::error::the Actions secret ACR_PUSH_USERNAME is empty"
+            missing=1
+          fi
+          if [ -z "$ACR_PUSH_PASSWORD" ]; then
+            echo "::error::the Actions secret ACR_PUSH_PASSWORD is empty"
+            missing=1
+          fi
+          exit "$missing"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Container image build
+        run: docker build --label "org.opencontainers.image.revision=$COMMIT" -t "$TAGGED" .
+      - name: Registry login
+        env:
+          ACR_PUSH_USERNAME: ${{ secrets.ACR_PUSH_USERNAME }}
+          ACR_PUSH_PASSWORD: ${{ secrets.ACR_PUSH_PASSWORD }}
+        run: |
+          printf '%s' "$ACR_PUSH_PASSWORD" |
+            docker login "$REGISTRY" --username "$ACR_PUSH_USERNAME" --password-stdin
+      - name: Push
+        run: docker push "$TAGGED"
+      - name: Digest of the pushed image
+        id: published
+        run: |
+          # The digest the local daemon recorded for the pushed name when it pushed. It is not
+          # yet proof of what the registry holds: the pull by this digest, next, is.
+          digests=$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$TAGGED")
+          digest=$(printf '%s\n' "$digests" |
+            awk -v p="$REPOSITORY@" 'index($0, p) == 1 { print substr($0, length(p) + 1); exit }')
+          if ! printf '%s' "$digest" | grep -Eqx 'sha256:[0-9a-f]{64}'; then
+            echo "::error::no sha256 digest found for the pushed image"
+            exit 1
+          fi
+          {
+            echo "image=$REPOSITORY@$digest"
+            echo "digest=$digest"
+            echo "commit=$COMMIT"
+          } >> "$GITHUB_OUTPUT"
+      - name: Pull by digest and smoke
+        env:
+          IMAGE: ${{ steps.published.outputs.image }}
+        run: |
+          # Nothing local is left to answer for the registry: the pull is of what was pushed.
+          docker image rm "$TAGGED"
+          docker pull "$IMAGE"
+          docker run --rm "$IMAGE" sortyard-api --help
+          # With no configuration the kernel names what is missing and exits 2 (as in ci.yml).
+          docker run --rm "$IMAGE" sh -c 'sortyard-kernel; test $? -eq 2'
+      - name: Summary
+        env:
+          IMAGE: ${{ steps.published.outputs.image }}
+        run: |
+          {
+            echo "image=$IMAGE"
+            echo "commit=$COMMIT"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Registry logout
+        if: always()
+        # Never with an empty name: that would log out of the default registry instead.
+        run: if [ -n "$REGISTRY" ]; then docker logout "$REGISTRY" || true; fi

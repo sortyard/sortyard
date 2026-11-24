@@ -18,7 +18,9 @@ SORTYARD_LANES_DIR (`*.toml`, the files the kernel service reads) and starts its
 that engine. Without both settings admission is answered 503.
 
 Operator credential (interim, until OIDC sessions): ``sortyard-api --issue-operator-token
-<role-binding-id>`` prints a bearer token for an admin/operator/viewer RoleBinding.
+<role-binding-id>`` prints a bearer token for an admin/operator/viewer RoleBinding. The binding,
+its operator, the workspace and its projects come from ``sortyard-api --bootstrap FILE``
+(sortyard.api.bootstrap): it creates what a declaration file names and the database lacks.
 """
 
 from __future__ import annotations
@@ -44,11 +46,12 @@ import psycopg
 import psycopg.conninfo
 
 from sortyard import __version__
-from sortyard.api import auth, handlers, routing
+from sortyard.api import auth, bootstrap, handlers, routing
 from sortyard.engine.blocking import BlockingEngine
 from sortyard.kernel import capabilities
 from sortyard.kernel.item import start_item
 from sortyard.services import SERVICES
+from sortyard.services.conductor import provisional_installation
 
 log = logging.getLogger("sortyard.api")
 
@@ -249,13 +252,39 @@ def issue_operator_token(config: Config, role_binding_id: str, ttl_seconds: int)
     return 0
 
 
+def run_bootstrap(config: Config, source: str, env: Mapping[str, str] = os.environ) -> int:
+    """Create what the declaration at `source` (a path, or `-` for standard input) names and
+    the database lacks; print each object created or left as it was. Refused: each reason on
+    standard error, nothing written, exit 1."""
+    installation = provisional_installation(env)
+    try:
+        text = sys.stdin.read() if source == "-" else pathlib.Path(source).read_text()
+        declaration = bootstrap.parse(text, installation["id"])
+        with psycopg.connect(config.conninfo()) as conn:
+            outcome = bootstrap.apply(conn, declaration, installation)
+    except bootstrap.Refused as refused:
+        for reason in refused.reasons:
+            print(f"sortyard-api: refused: {reason}", file=sys.stderr)
+        print("sortyard-api: nothing was written", file=sys.stderr)
+        return 1
+    except (OSError, UnicodeDecodeError, psycopg.Error) as exc:
+        print(f"sortyard-api: {exc}", file=sys.stderr)
+        print("sortyard-api: nothing was written", file=sys.stderr)
+        return 1
+    for verb, names in (("created", outcome.created), ("unchanged", outcome.unchanged)):
+        for name in names:
+            print(f"{verb} {name}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="sortyard-api",
         description="Sortyard API service. Configured by SORTYARD_API_* and "
         "SORTYARD_DATABASE_* environment variables.",
     )
-    parser.add_argument(
+    commands = parser.add_mutually_exclusive_group()
+    commands.add_argument(
         "--issue-operator-token",
         metavar="ROLE_BINDING_ID",
         help="print a bearer token for an admin/operator/viewer RoleBinding and exit "
@@ -268,8 +297,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         metavar="SECONDS",
         help="lifetime of a token from --issue-operator-token (default 43200)",
     )
+    commands.add_argument(
+        "--bootstrap",
+        metavar="FILE",
+        help="create the workspace, projects, operators and role bindings the TOML declaration "
+        "FILE names (- for standard input) where they are missing, and exit; an existing "
+        "object with different content is refused, never overwritten",
+    )
     args = parser.parse_args(argv)
-    if args.issue_operator_token:
+    # `is not None`: an empty value (an unset variable in a Job's args) is a mistake to refuse,
+    # not a reason to start serving.
+    if args.bootstrap is not None:
+        if not args.bootstrap:
+            parser.error("--bootstrap needs a file path (or - for standard input)")
+        return run_bootstrap(Config.from_env(), args.bootstrap)
+    if args.issue_operator_token is not None:
+        if not args.issue_operator_token:
+            parser.error("--issue-operator-token needs a role binding id")
         return issue_operator_token(Config.from_env(), args.issue_operator_token, args.ttl)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     server = make_server(Config.from_env())

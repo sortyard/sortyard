@@ -269,13 +269,14 @@ def audit(
     before: Doc | None,
     after: Doc | None,
     reason: str | None = None,
+    channel: str = "api",
 ) -> Doc:
     entry: Doc = {
         "id": new_id("audit"),
         "workspace_id": workspace_id,
         "ts": now(),
         "actor": actor,
-        "channel": "api",
+        "channel": channel,
         "action": action,
         "object": {"kind": kind, "id": oid},
         "before": before,
@@ -301,9 +302,10 @@ def record(
     reason: str | None = None,
     facts: Doc | None = None,
     refs: Sequence[str] = (),
+    channel: str = "api",
 ) -> Doc:
     """A mutation's paper trail: the AuditLog entry and the ledger Event. Returns the Event."""
-    entry = audit(conn, workspace_id, actor, action, kind, oid, before, after, reason)
+    entry = audit(conn, workspace_id, actor, action, kind, oid, before, after, reason, channel)
     return append_event(
         conn,
         workspace_id,
