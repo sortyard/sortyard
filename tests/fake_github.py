@@ -300,6 +300,8 @@ class FakeGitHub:
         self.slow_updates = False
         # The next reply says it is longer than it is, and the connection closes.
         self.truncate = False
+        # Runs as each request arrives, before it is served: someone acting between two calls.
+        self.arriving: Callable[[Seen], None] | None = None
         self._lock = threading.Lock()
         self._count = 0
 
@@ -337,6 +339,22 @@ class FakeGitHub:
             if pull.open and pull.branch == branch:
                 pull.head = sha
         return sha
+
+    def close(self, repo: FakeRepo, pull: FakePull, *, delete_branch: bool = False) -> None:
+        """A person closes the pull request without merging it, and may delete its branch (the
+        button GitHub offers once it is closed)."""
+        assert pull.open, "only an open pull request is closed"
+        pull.open = False
+        if delete_branch:
+            del repo.refs[f"refs/heads/{pull.branch}"]
+
+    def reopen(self, repo: FakeRepo, pull: FakePull) -> None:
+        """A person reopens a closed pull request. GitHub refuses that when it is merged, when
+        its branch is gone, or when the branch has another open pull request."""
+        assert not pull.open and not pull.merged
+        assert f"refs/heads/{pull.branch}" in repo.refs
+        assert not any(each.open and each.branch == pull.branch for each in repo.pulls)
+        pull.open = True
 
     def land(self, repo: FakeRepo, pull: FakePull) -> str:
         """The branch update lands: a merge of the base into the branch becomes the head."""
@@ -448,6 +466,8 @@ class FakeGitHub:
             self.requests.append(
                 Seen(operation.id, method, path, operation.template, query, body, lowered)
             )
+            if self.arriving is not None:
+                self.arriving(self.requests[-1])
             problems = self.contract.request_errors(operation, query, body)
             if lowered.get("accept") != "application/vnd.github+json":
                 problems.append("no Accept: application/vnd.github+json")
