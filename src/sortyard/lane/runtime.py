@@ -14,7 +14,7 @@ Three things happen here that no single adapter owns:
   open pull request, the runtime opens one, with the item's title and a body naming the item,
   before the outcome is sent. Finding it first, and looking again when GitHub refuses the
   create, keeps that to one pull request however often it runs. One found closed unmerged in
-  checking or merging is opened again in that pass; if GitHub refuses, a finding answers.
+  checking or merging is opened again in that pass, once; closed again or refused, a finding.
 - **A wait that closed while no one was told.** The need's look asks the gap registry whether
   every gap item the item waits on has closed, so an item whose `closed` was lost (the service
   stopped between closing the gap item and telling the item) still returns to preflight.
@@ -126,20 +126,17 @@ def build(
     replaces the repository, secret, service or worker-image probe of the two ports."""
     items, gaps = Items(connect), PgGapRegistry(connect)
 
-    def lane_of(spec: ItemSpec) -> Lane:
-        return lanes[spec.lane]
-
     def needs(tenant: str, item: str) -> TaskNeeds:
         spec = items.spec(tenant, item)
-        return TaskNeeds(lane_of(spec), spec.needs)
+        return TaskNeeds(lanes[spec.lane], spec.needs)
 
     def work(tenant: str, item: str) -> Work:
         spec = items.spec(tenant, item)
-        return Work(lane_of(spec), spec.repository, spec.spec, spec.base)
+        return Work(lanes[spec.lane], spec.repository, spec.spec, spec.base)
 
     def target(tenant: str, item: str) -> Target:
         spec = items.spec(tenant, item)
-        declared = lane_of(spec).repositories[spec.repository]
+        declared = lanes[spec.lane].repositories[spec.repository]
         return Target(spec.repository, spec.base, declared.workflow_files, declared.checks)
 
     preflight = Preflight(
@@ -164,23 +161,23 @@ def build(
             ensure_pull(github, items.spec(str(stay["tenant"]), str(stay["item"])))
         return reply
 
-    def waited(stay: Payload) -> Payload | None:
-        return preflight.wait({**stay, "action": None})
-
     def reopened(adapter: CiAdapter | MergeAdapter, stay: Payload) -> Payload | None:
         if not (now := adapter.observe(stay)).detail.get("closed"):
             return now.reply()
-        try:  # closed unmerged: open one again, and the next pass looks at it
-            ensure_pull(github, items.spec(str(stay["tenant"]), str(stay["item"])))
-        except GitHubError as error:  # 422: GitHub will not open one: a finding (red, conflict)
+        why = "pull request closed unmerged again"  # opened again once only: no third one
+        try:
+            if now.detail["closed"] < 2:  # closed unmerged: opened again for the next pass
+                ensure_pull(github, items.spec(str(stay["tenant"]), str(stay["item"])))
+                return None
+        except GitHubError as error:  # 422: GitHub will not open one (its branch is gone, say)
             if error.status != 422:
                 raise
-            return Observation(now.outcome or "red", {**now.detail, "finding": str(error)}).reply()
-        return None
+            why = str(error)
+        return Observation(now.outcome or "red", {**now.detail, "finding": why}).reply()
 
     looks: dict[str, Look] = {
         SCHEDULER_OWNER: scheduler,
-        NEED_OWNER: waited,
+        NEED_OWNER: lambda stay: preflight.wait({**stay, "action": None}),
         EXECUTOR_OWNER: worked,
         REVIEWER_OWNER: launcher.observe,
         CI_OWNER: lambda stay: reopened(ci, stay),

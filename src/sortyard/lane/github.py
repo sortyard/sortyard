@@ -46,7 +46,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, ClassVar, Protocol, TypeVar
 
 from cryptography.hazmat.primitives import hashes, serialization
@@ -112,6 +112,7 @@ class Pull:
     mergeable: bool | None
     mergeable_state: str
     merge_sha: str | None
+    closed: int = 0  # set by `find_pull`: the branch's pull requests closed unmerged
 
 
 @dataclass(frozen=True)
@@ -321,14 +322,16 @@ class HttpGitHub:
         owner = repository.split("/", 1)[0]
         query = {"head": f"{owner}:{branch}", "state": "all", "per_page": 100}
 
-        def newest(reply: Any) -> int | None:
+        def newest(reply: Any) -> tuple[int | None, int]:
             numbers = sorted((each["state"] == "open", int(each["number"])) for each in reply)
-            return numbers[-1][1] if numbers else None
+            closed = sum(each["state"] == "closed" and not each["merged_at"] for each in reply)
+            return (numbers[-1][1] if numbers else None), closed
 
-        number = self._read(newest, "GET", f"/repos/{repository}/pulls", token, query=query)
+        number, closed = self._read(newest, "GET", f"/repos/{repository}/pulls", token, query=query)
         if number is None:
             return None
-        return self._read(_pull, "GET", f"/repos/{repository}/pulls/{number}", token)
+        pull = self._read(_pull, "GET", f"/repos/{repository}/pulls/{number}", token)
+        return replace(pull, closed=closed)
 
     def open_pull(
         self, token: Token, repository: str, *, branch: str, base: str, title: str, body: str = ""
@@ -471,7 +474,7 @@ class _Adapter:
         if pull.base != target.base:
             return self._stuck(f"pull request targets {pull.base}, not {target.base}", **seen)
         if not pull.open and not pull.merged:
-            return self._stuck("pull request is closed unmerged", closed=True, **seen)
+            return self._stuck("pull request is closed unmerged", closed=pull.closed, **seen)
         return self._look(call, target, token, pull, seen)
 
     def _stuck(self, why: str, **seen: Any) -> Observation:
