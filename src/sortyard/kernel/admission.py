@@ -2,12 +2,13 @@
 
 A machine check before anything is created: the id can be part of a branch name, the project
 (and the milestone, if one is named) exists, the spec has an outcome and at least one named
-acceptance test, the lane is known and declares the item's repository and every need, every
-blocked_by link resolves to an item of the same tenant, and the risk tier is one the state
-table has limits for. `check` gives every reason an item fails, not the first. `admit` writes
-the item, its links and its spec in the caller's transaction, or nothing: a refused item
-leaves no row. Admitting an id again with the same content changes nothing; with other
-content it is refused, since a spec is written once; so is an id that was withdrawn.
+acceptance test, the lane is known, names the item's project if it names any, and declares the
+item's repository and every need, every blocked_by link resolves to an item of the same tenant,
+and the risk tier is one the state table has limits for. `check` gives every reason an item
+fails, not the first. `admit` writes the item, its links and its spec in the caller's
+transaction, or nothing: a refused item leaves no row. Admitting an id again with the same
+content changes nothing; with other content it is refused, since a spec is written once; so is
+an id that was withdrawn.
 
 Starting the item's workflow is the caller's next step (`sortyard.kernel.item.start_item`),
 inside the same transaction, so an item is never stored without one being started.
@@ -114,6 +115,11 @@ def check(
     if lane is None:
         reasons.append(f"unknown-lane: no lane {asked.lane!r} (known: {sorted(lanes)})")
     else:
+        if lane.projects and asked.project not in lane.projects:
+            reasons.append(
+                f"unknown-lane-project: lane {asked.lane!r} takes no item of project "
+                f"{asked.project!r} (its projects: {list(lane.projects)})"
+            )
         needs: list[Need | str] = [Need(REPOSITORY, asked.repository), *asked.needs]
         for need in needs:
             try:

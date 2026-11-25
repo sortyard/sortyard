@@ -148,6 +148,19 @@ def test_a_file_that_breaks_a_rule_is_refused_by_the_rule_name(
     assert refused(changed(old, new)).rule == rule
 
 
+def test_a_lane_may_name_the_projects_whose_items_it_takes() -> None:
+    """Left out, a lane names no project and takes items of any (`projects` is empty)."""
+    assert load(VALID).projects == ()
+    named = load(changed('resolver = "platform"', 'resolver = "platform"\nprojects = ["a", "b"]'))
+    assert named.projects == ("a", "b")
+    assert load(changed('resolver = "platform"', 'resolver = "platform"\nprojects = ["p:1/x"]'))
+    # An empty list would name nothing and take every project: it is refused, as are a
+    # duplicate and an id the API would not accept.
+    for bad in ('"a"', '["a", 1]', '[""]', "true", "[]", '["a", "a"]', '["-a"]', '["a b"]', "[[]]"):
+        text = changed('resolver = "platform"', f'resolver = "platform"\nprojects = {bad}')
+        assert refused(text).rule == "malformed-file", bad
+
+
 def test_text_that_is_not_toml_is_refused() -> None:
     assert refused("lane = ").rule == "malformed-file"
 
@@ -210,4 +223,7 @@ def test_the_shipped_example_file_loads_and_shows_every_part_of_the_format() -> 
     assert lane.worker_image.digest == lane.ci_image.digest
     assert lane.repositories and lane.secrets and lane.services and lane.runner_pool
     assert any(repository.workflow_files for repository in lane.repositories.values())
-    assert len(lane.defaults) > 2 and lane.gap_limit is not None
+    assert len(lane.defaults) > 2 and lane.gap_limit is not None and lane.projects == ()
+    # The projects line it shows, commented out, loads as written.
+    named = example_text().replace('# projects = ["example"]', 'projects = ["example"]')
+    assert load(named).projects == ("example",)
