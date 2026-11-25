@@ -252,11 +252,8 @@ class Preflight:
         missing = sorted(set(KINDS) - set(probes))
         if missing:
             raise ValueError(f"no probe for {missing}")
-        self._lookup = lookup
-        self._probes = dict(probes)
-        self._gaps = gaps
-        self._sink = sink
-        self._resolver = resolver
+        self._lookup, self._probes, self._gaps = lookup, dict(probes), gaps
+        self._sink, self._resolver = sink, resolver
 
     def owners(self) -> dict[str, Owner]:
         """The two owners by the names the state table gives them, for `item.register`."""

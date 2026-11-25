@@ -49,6 +49,7 @@ LIFECYCLE_KINDS = frozenset(
     }
 )
 ACTOR = {"kind": "system", "id": "item-workflow"}
+_APPEND_ONCE = "INSERT INTO sortyard.event (doc) VALUES (%s) ON CONFLICT (id) DO NOTHING"
 
 
 class LinkRefused(ValueError):
@@ -196,6 +197,14 @@ class Ledger:
                 "SELECT sortyard.record_item_transition(%s, %s)",
                 (Jsonb(dict(transition)), Jsonb(event_for(transition))),
             )
+
+    def escalate(self, transition: Mapping[str, Any], facts: Mapping[str, Any]) -> None:
+        """An escalation Event after a recorded transition's, dated as it: appended once."""
+        event = event_for(transition)
+        moved = {"name": "escalation", "from": transition["state"], "to": transition["state"]}
+        event |= {"id": f"{event['id']}-escalation", "transition": moved, "facts": dict(facts)}
+        with self._connect() as conn:
+            conn.execute(_APPEND_ONCE, [Jsonb(event)])
 
 
 # The columns of an item that the queue gives as they are stored.
