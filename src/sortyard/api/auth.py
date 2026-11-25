@@ -15,7 +15,13 @@ A token belongs to one RoleBinding of one workspace and is stored only as its SH
 - **Operator tokens** — the interim operator credential until OIDC sessions land
   (``sortyard-api --issue-operator-token <role-binding>``). The role is always the binding's
   current role (admin, operator or viewer); changing or deleting the binding takes effect on
-  the next request.
+  the next request. No token is issued for a disabled operator, and an operator's token is
+  refused while the operator is disabled.
+
+A binding whose scope is a project names that project (``scope.ref``; the RoleBinding schema
+refuses one without it at creation). One stored without it, from before that rule or written
+directly, is never read as workspace-wide: no token is issued for it and every token of it is
+refused (SY-V3-API-SCOPE-AND-DISABLED).
 """
 
 from __future__ import annotations
@@ -139,6 +145,17 @@ def _binding(conn: Conn, role_binding_id: str, workspace_id: str | None = None) 
     return store.get(conn, "role_binding", workspace_id, role_binding_id)
 
 
+def unnamed_project(binding: Doc) -> bool:
+    """A project scope that names no project: confined to nothing known, never workspace-wide."""
+    scope = binding.get("scope") or {}
+    return scope.get("kind") == "project" and not scope.get("ref")
+
+
+def operator_disabled(conn: Conn, workspace_id: str, principal: Doc) -> bool:
+    operator = store.get(conn, "operator", workspace_id, str(principal.get("id", "")))
+    return operator is not None and operator.get("state") != "active"
+
+
 def issue_operator_token(
     conn: Conn, role_binding_id: str, ttl_seconds: int = DEFAULT_TTL_SECONDS
 ) -> Issued:
@@ -150,6 +167,15 @@ def issue_operator_token(
         raise ValueError(
             f"role binding {role_binding_id!r} is {binding.get('role')!r}, not an operator "
             "role; service accounts get tokens from issueServiceAccountToken"
+        )
+    if unnamed_project(binding):
+        raise ValueError(
+            f"role binding {role_binding_id!r} is scoped to a project but names no project"
+        )
+    if operator_disabled(conn, binding["workspace_id"], binding["principal"]):
+        raise ValueError(
+            f"role binding {role_binding_id!r} is for operator "
+            f"{binding['principal'].get('id')!r}, which is disabled"
         )
     return _store_token(conn, binding, binding["role"], ttl_seconds)
 
@@ -201,6 +227,11 @@ def issue_service_account_token(
             f"role binding {role_binding_id!r} is {binding.get('role')!r}: service-account "
             "tokens are issued only for agent-service-account bindings",
             "not_a_service_account",
+        )
+    if unnamed_project(binding):
+        raise store.unprocessable(
+            f"role binding {role_binding_id!r} is scoped to a project but names no project",
+            "out_of_binding_scope",
         )
     scope = binding.get("scope") or {}
     if scope.get("kind") == "project":
@@ -300,7 +331,7 @@ def authenticate(conn: Conn, token: str) -> Principal | None:
     if row is None:
         return None
     token_id, workspace_id, principal, role, project_id, stage_run_id, binding = row
-    if binding.get("principal") != principal:
+    if binding.get("principal") != principal or unnamed_project(binding):
         return None
     if role in permissions.AGENT_ROLES:
         if binding.get("role") != "agent-service-account":
@@ -312,8 +343,7 @@ def authenticate(conn: Conn, token: str) -> Principal | None:
         scope = binding.get("scope") or {}
         if scope.get("kind") == "project":
             project_id = scope.get("ref")
-        operator = store.get(conn, "operator", workspace_id, principal.get("id", ""))
-        if operator is not None and operator.get("state") != "active":
+        if operator_disabled(conn, workspace_id, principal):
             return None
     return Principal(
         actor=dict(principal),

@@ -1301,12 +1301,18 @@ class RoleBinding(Model):
     updated_at: str | None = None
     principal: Actor
     role: Literal["admin", "operator", "viewer", "agent-service-account"]
+    #: A project scope names its project in ref; with none it would read as no confinement at all,
+    #: so it is refused.
     scope: RoleBindingScope
     granted_by: Actor | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
 class RoleBindingScope(Model):
+    """A project scope names its project in ref; with none it would read as no confinement at all,
+    so it is refused.
+    """
+
     kind: Literal["workspace", "project"]
     ref: str | None = None
 
