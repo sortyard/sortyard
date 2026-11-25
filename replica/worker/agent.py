@@ -28,7 +28,8 @@ def main(argv: list[str]) -> int:
     brief = sys.stdin.read()
     if mode == "review":
         print("Read the change against the spec.")
-        print(json.dumps({"verdict": "approve"}))
+        checked, ran = ["the change against the spec"], ["git diff: read"]
+        print(json.dumps({"verdict": "approve", "checked": checked, "evidence": ran}))
         return 0
     if mode not in ("build", "fix"):
         print("usage: agent.py build|fix [SECONDS] | review", file=sys.stderr)

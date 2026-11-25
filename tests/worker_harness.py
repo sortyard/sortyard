@@ -89,7 +89,8 @@ elif action == "review":
     # Approves once the fix is in, as a reviewer reading the branch would.
     print("I read the change.")
     if pathlib.Path("fix.txt").exists():
-        print(json.dumps({"verdict": "approve"}))
+        print(json.dumps({"verdict": "approve", "checked": ["fix.txt is added"],
+                          "evidence": ["ls: fix.txt"]}))
     else:
         print(json.dumps({"verdict": "findings", "findings": [
             {"key": "Missing fix.txt", "text": "The change does not add fix.txt."},
