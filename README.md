@@ -17,6 +17,11 @@ permission matrix (below), the chart installs the API plus Postgres with the §3
 and the event ledger migrated in, and the conductor can run in shadow mode (below) — observing
 the production conductor's input path and logging what it would claim.
 
+**Phase 1 of HARNESS-V3 ("Kernel to merge") is done.** Its exit test was met on 2026-11-25: one
+Walwarden item went from admitted to merged with no hand action, and then 10 more in a row did the
+same, on the estate kernel. The evidence is in
+[`docs/evidence/phase-1-exit.md`](docs/evidence/phase-1-exit.md) (SORTYARD-180).
+
 Contributors and agents: start with [`AGENTS.md`](AGENTS.md), the repo brief (architecture
 map, build loop, conventions, known gaps).
 
