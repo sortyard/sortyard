@@ -15680,6 +15680,184 @@
         "x-sortyard-mcp-tool": "get_project_queue"
       }
     },
+    "/v1/workspaces/{workspace_id}/projects/{project_id}/items": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/workspace_id"
+        },
+        {
+          "name": "project_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "common.schema.json#/$defs/id"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "listItems",
+        "summary": "Every item of a project, ended ones included",
+        "tags": [
+          "Work"
+        ],
+        "description": "A read of the projection the tracker view reads (HARNESS-V3 section 3.2), for finding an item whatever its state: unlike the queue it keeps the items that ended, merged or withdrawn, so an item withdrawn to move its lane back can always be found and filed again (getItem has what that needs). Items are listed in the order they were created, a page at a time, each with its state, state kind and lane. `state_kind` keeps the items of one kind: `terminal` lists only the items that have ended. Only items of this workspace and this project are listed; a project with no items, or one that does not exist, lists none.",
+        "parameters": [
+          {
+            "name": "state_kind",
+            "in": "query",
+            "required": false,
+            "description": "Keep only the items whose state is of this kind; `terminal` keeps the items that ended.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "queue",
+                "work",
+                "need",
+                "decision",
+                "terminal"
+              ]
+            }
+          },
+          {
+            "$ref": "#/components/parameters/cursor"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "id",
+                          "title",
+                          "milestone_id",
+                          "lane",
+                          "repository",
+                          "state",
+                          "state_kind",
+                          "entered_at"
+                        ],
+                        "properties": {
+                          "id": {
+                            "$ref": "common.schema.json#/$defs/id"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "milestone_id": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "lane": {
+                            "description": "The lane capability file the item was admitted against; null for an item that was not admitted with a spec.",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "repository": {
+                            "description": "The item's one repository, owner/name.",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "state": {
+                            "description": "The state the item's workflow last recorded; null before its first transition.",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "state_kind": {
+                            "description": "queue, work, need, decision or terminal; null before the item's first transition.",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "entered_at": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    },
+                    "next_cursor": {
+                      "$ref": "#/components/schemas/NextCursor"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "security": [
+          {
+            "operatorSession": [
+              "admin"
+            ]
+          },
+          {
+            "operatorSession": [
+              "operator"
+            ]
+          },
+          {
+            "operatorSession": [
+              "viewer"
+            ]
+          },
+          {
+            "serviceAccountToken": [
+              "conductor"
+            ]
+          },
+          {
+            "serviceAccountToken": [
+              "grooming-agent"
+            ]
+          }
+        ],
+        "x-sortyard-roles": [
+          "admin",
+          "operator",
+          "viewer",
+          "conductor",
+          "grooming-agent"
+        ],
+        "x-sortyard-mcp-tool": "list_items"
+      }
+    },
     "/v1/workspaces/{workspace_id}/items": {
       "parameters": [
         {
