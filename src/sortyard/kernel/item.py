@@ -203,13 +203,7 @@ async def send_outcome(
 
 
 async def send_request(
-    engine: Engine,
-    identifier: str,
-    *,
-    request_id: str,
-    answer: str,
-    reason: str,
-    by: Payload,
+    engine: Engine, identifier: str, *, request_id: str, answer: str, reason: str, by: Payload
 ) -> None:
     """Ask the item's workflow for a change: that its next decision be `answer`.
 

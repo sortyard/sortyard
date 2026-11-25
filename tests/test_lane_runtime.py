@@ -750,6 +750,139 @@ def test_the_pull_request_of_an_item_is_opened_once_however_often_it_is_ensured(
     asyncio.run(scenario())
 
 
+def in_checking_with_its_pull_request(w: World, item: str) -> bool:
+    return w.states()[item] == "checking" and bool(w.repo.pulls)
+
+
+@requires_postgres
+def test_a_pull_request_closed_unmerged_while_checking_is_reopened_or_answered_on_the_next_pass(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Acceptance (SY-V3-CLOSED-PULL): someone closes the item's pull request unmerged while it
+    is in checking. The next pass of the observer opens one again for the branch, and the item
+    merges from there, with no limit passed and no decision on the way."""
+
+    async def scenario() -> None:
+        async with world(tmp_path) as w:
+            w.ci_held = True
+            assert w.admit("C").status == 201
+            service = Service(w)
+            try:
+                await drive(w, service, lambda: in_checking_with_its_pull_request(w, "C"), "C")
+                (closed,) = w.repo.pulls
+                closed.open = False
+                await service.run_pass()  # one pass, and nothing outside moves meanwhile
+                assert [(pull.open, pull.branch) for pull in w.repo.pulls] == [
+                    (False, branch_of("C")),
+                    (True, branch_of("C")),
+                ]
+                assert w.states()["C"] == "checking"
+                w.ci_held = False
+                await drive(w, service, lambda: all_merged(w, 1), "C merged")
+            finally:
+                await service.kill()
+            assert w.path("C") == HAPPY
+            assert [(pull.merged, pull.merges) for pull in w.repo.pulls] == [(False, 0), (True, 1)]
+            w.verify()
+
+    asyncio.run(scenario())
+
+
+@requires_postgres
+def test_a_closed_pull_request_that_a_person_reopens_meanwhile_is_not_opened_twice(
+    tmp_path: pathlib.Path,
+) -> None:
+    """must_allow (SY-V3-CLOSED-PULL): the pull request is closed and a person reopens it before
+    the next pass. That pass finds it open, opens no other, and the item merges it."""
+
+    async def scenario() -> None:
+        async with world(tmp_path) as w:
+            w.ci_held = True
+            assert w.admit("R").status == 201
+            service = Service(w)
+            try:
+                await drive(w, service, lambda: in_checking_with_its_pull_request(w, "R"), "R")
+                (pull,) = w.repo.pulls
+                pull.open = False
+                pull.open = True  # reopened by a person before the next pass
+                await service.run_pass()
+                w.ci_held = False
+                await drive(w, service, lambda: all_merged(w, 1), "R merged")
+            finally:
+                await service.kill()
+            assert w.path("R") == HAPPY
+            assert len(w.repo.pulls) == 1 and pull.merged
+            assert len([s for n, s, _ in w.fake.replies if n == "pulls/create" and s == 201]) == 1
+
+    asyncio.run(scenario())
+
+
+@requires_postgres
+def test_a_pull_request_closed_unmerged_during_review_is_opened_again_when_merging_starts(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Closed while the review runs: merging, which used to answer `conflict` (a fix run with
+    nothing to fix), opens it again as it starts and merges the reviewed head."""
+
+    async def scenario() -> None:
+        async with world(tmp_path) as w:
+            w.held = {"M:review"}
+            assert w.admit("M").status == 201
+            service = Service(w)
+            try:
+                await drive(w, service, lambda: w.states()["M"] == "reviewing", "M reviewing")
+                (closed,) = w.repo.pulls
+                closed.open = False
+                w.held = set()
+                await drive(w, service, lambda: all_merged(w, 1), "M merged")
+            finally:
+                await service.kill()
+            assert w.path("M") == HAPPY
+            assert [(pull.merged, pull.head) for pull in w.repo.pulls] == [
+                (False, closed.head),
+                (True, closed.head),
+            ]
+            w.verify()
+
+    asyncio.run(scenario())
+
+
+@requires_postgres
+def test_a_pull_request_closed_unmerged_that_github_will_not_open_again_is_answered_with_a_finding(
+    tmp_path: pathlib.Path,
+) -> None:
+    """must_catch (SY-V3-CLOSED-PULL): closed and its branch deleted, so GitHub refuses a new
+    pull request (422). The next pass answers checking `red` with GitHub's refusal as the
+    finding instead of waiting out the limit; the fix pushes the branch again, the pull request
+    is opened with it, and the item merges."""
+
+    async def scenario() -> None:
+        async with world(tmp_path) as w:
+            w.ci_held, w.held = True, {"G:fix"}
+            assert w.admit("G").status == 201
+            service = Service(w)
+            try:
+                await drive(w, service, lambda: in_checking_with_its_pull_request(w, "G"), "G")
+                (closed,) = w.repo.pulls
+                closed.open = False
+                del w.repo.refs[f"refs/heads/{branch_of('G')}"]
+                await service.run_pass()
+                await drive(w, service, lambda: w.states()["G"] == "fixing", "G fixing")
+                finding = stays(w)["G"]["detail"]["finding"]
+                assert "422" in finding and "Validation Failed" in finding, finding
+                w.ci_held, w.held = False, set()
+                await drive(w, service, lambda: all_merged(w, 1), "G merged")
+            finally:
+                await service.kill()
+            assert w.path("G") == [*HAPPY[:4], "fixing", "checking", *HAPPY[4:]]
+            assert [(pull.open, pull.merged) for pull in w.repo.pulls] == [
+                (False, False),
+                (False, True),
+            ]
+
+    asyncio.run(scenario())
+
+
 @requires_postgres
 def test_the_console_script_is_killed_mid_build_and_a_new_process_merges_the_item(
     tmp_path: pathlib.Path,

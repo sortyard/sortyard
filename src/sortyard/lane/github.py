@@ -471,7 +471,7 @@ class _Adapter:
         if pull.base != target.base:
             return self._stuck(f"pull request targets {pull.base}, not {target.base}", **seen)
         if not pull.open and not pull.merged:
-            return self._stuck("pull request is closed unmerged", **seen)
+            return self._stuck("pull request is closed unmerged", closed=True, **seen)
         return self._look(call, target, token, pull, seen)
 
     def _stuck(self, why: str, **seen: Any) -> Observation:

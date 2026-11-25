@@ -13,7 +13,8 @@ Three things happen here that no single adapter owns:
 - **The pull request.** When a build or a fix is observed as done and the item's branch has no
   open pull request, the runtime opens one, with the item's title and a body naming the item,
   before the outcome is sent. Finding it first, and looking again when GitHub refuses the
-  create, keeps that to one pull request however often it runs.
+  create, keeps that to one pull request however often it runs. One found closed unmerged in
+  checking or merging is opened again in that pass; if GitHub refuses, a finding answers.
 - **A wait that closed while no one was told.** The need's look asks the gap registry whether
   every gap item the item waits on has closed, so an item whose `closed` was lost (the service
   stopped between closing the gap item and telling the item) still returns to preflight.
@@ -51,6 +52,7 @@ from sortyard.lane.github import (
     GitHub,
     GitHubError,
     MergeAdapter,
+    Observation,
     RepositoryProbe,
     Target,
     branch_of,
@@ -165,20 +167,31 @@ def build(
     def waited(stay: Payload) -> Payload | None:
         return preflight.wait({**stay, "action": None})
 
+    def reopened(adapter: CiAdapter | MergeAdapter, stay: Payload) -> Payload | None:
+        if not (now := adapter.observe(stay)).detail.get("closed"):
+            return now.reply()
+        try:  # closed unmerged: open one again, and the next pass looks at it
+            ensure_pull(github, items.spec(str(stay["tenant"]), str(stay["item"])))
+        except GitHubError as error:  # 422: GitHub will not open one: a finding (red, conflict)
+            if error.status != 422:
+                raise
+            return Observation(now.outcome or "red", {**now.detail, "finding": str(error)}).reply()
+        return None
+
     looks: dict[str, Look] = {
         SCHEDULER_OWNER: scheduler,
         NEED_OWNER: waited,
         EXECUTOR_OWNER: worked,
         REVIEWER_OWNER: launcher.observe,
-        CI_OWNER: lambda stay: ci.observe(stay).reply(),
-        MERGE_OWNER: lambda stay: merge.observe(stay).reply(),
+        CI_OWNER: lambda stay: reopened(ci, stay),
+        MERGE_OWNER: lambda stay: reopened(merge, stay),
     }
     owners: dict[str, Owner] = {
         SCHEDULER_OWNER: scheduler,
         **preflight.owners(),
         **launcher.owners(),
-        CI_OWNER: ci,
-        MERGE_OWNER: merge,
+        CI_OWNER: looks[CI_OWNER],  # as its look: a closed pull request is opened again
+        MERGE_OWNER: looks[MERGE_OWNER],
     }
     ledger = Ledger(connect)
 

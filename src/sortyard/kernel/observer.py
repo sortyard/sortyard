@@ -31,10 +31,7 @@ Look = Callable[[Payload], Payload | None]
 
 class Observer:
     def __init__(
-        self,
-        engine: Engine,
-        stays: Callable[[], list[dict[str, Any]]],
-        looks: Mapping[str, Look],
+        self, engine: Engine, stays: Callable[[], list[dict[str, Any]]], looks: Mapping[str, Look]
     ) -> None:
         self._engine, self._stays, self._looks = engine, stays, dict(looks)
 
