@@ -53,6 +53,12 @@
 # building durations again, since the same executor does the work) are provisional and carry
 # no owner decision.
 #
+# fixing: a fix that finds nothing in the change to fix answers no-change and goes back to
+# checking, where a red head behind its base is first brought up to date from the base; the
+# decision answer recheck goes there too (SY-V3-RED-FIXED-ON-BASE). A check whose cause is
+# already fixed on the base so merges with no hand step; one that is still red comes back to
+# fixing with the same finding, which the repeat-finding limit takes to a decision.
+#
 # merging: section 3.1 gives its default as "update the branch and re-arm". That is what each
 # passed limit does, three times; a merge that still has not happened after four half hours
 # (checks on the head that never report, say) then goes to a decision instead of re-arming for
@@ -116,7 +122,7 @@ owner = "executor"
 limit = { by = "repeat-finding", low = "30m", medium = "1h", high = "2h" }
 default = { to = "decision", action = "narrow-or-split" }
 reason = "fix-in-progress"
-next = { fixed = "checking" }
+next = { fixed = "checking", no-change = "checking" }
 
 [states.merging]
 owner = "merge-adapter"
@@ -138,7 +144,7 @@ owner = "decision-service"
 limit = "same-pass"
 default = { answer = "resume", reverse = "Send the item a decision request with a different answer.", on-repeat = "wait" }
 reason = "decision-required"
-next = { resume = "@origin", rebuild = "building", wait = "waiting", withdraw = "withdrawn" }
+next = { resume = "@origin", rebuild = "building", recheck = "checking", wait = "waiting", withdraw = "withdrawn" }
 
 [states.merged]
 terminal = true

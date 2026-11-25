@@ -634,6 +634,8 @@ class FakeGitHub:
             raise Refused(422, "expected head sha didn't match current head ref.")
         if pull.pending or pull.synced == repo.refs[f"refs/heads/{pull.base}"]:
             raise Refused(422, "There are no new commits on the base branch.")
+        if pull.conflict:  # GitHub cannot merge the base into the branch
+            raise Refused(422, "merge conflict between base and head")
         pull.pending = True
         pull.updates += 1
         if not self.slow_updates:

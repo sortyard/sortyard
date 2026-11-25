@@ -905,3 +905,62 @@ def test_a_withdraw_request_from_any_other_role_is_not_honoured_and_a_merged_ite
     # The one build was never dispatched again, and the item went on to merge.
     assert len(fakes.calls_for("building")) == 1
     assert "withdrawn" not in fakes.states() and fakes.states()[-1] == "merged"
+
+
+def test_a_fix_that_changes_nothing_goes_back_to_checking_and_an_operator_recheck_is_honoured() -> (
+    None
+):
+    """SY-V3-RED-FIXED-ON-BASE: a fix that finds nothing in the change to fix answers no-change
+    and the item goes back to checking, where its checks (run again on its base) pass and it
+    merges with no hand step. A red that is still red after a no-change fix comes back to
+    fixing with the same finding and goes to a decision. An operator's request to recheck takes
+    an item waiting on a need back to checking."""
+    red = {"outcome": "red", "detail": {"finding": "checks failed: pr-tests"}}
+    no_change = {"outcome": "no-change", "detail": {"head": "abc"}}
+    fakes = Ruled(
+        script={
+            "GONE/checking": [red],
+            "GONE/fixing": [no_change],
+            "STILL/checking": [red, red],
+            "STILL/fixing": [no_change],
+            "STUCK/preflight": [{"outcome": "gap", "detail": {"need": "secret:X"}}],
+        }
+    )
+
+    async def scenario() -> None:
+        async with kernel(fakes) as k:
+            # Fixed on the base: red, a fix that changes nothing, checked again, green, merged.
+            gone = await k.start("GONE")
+            assert (await k.result(gone))["state"] == "merged"
+            moves = [(e["from_state"], e["state"]) for e in fakes.events if e["item"] == "GONE"]
+            assert ("checking", "fixing") in moves and ("fixing", "checking") in moves
+            assert len([c for c in fakes.calls_for("fixing") if c["item"] == "GONE"]) == 1
+            assert not [q for q in fakes.questions if q["item"] == "GONE"]
+
+            # Still red after a fix that changed nothing: the same finding enters fixing again,
+            # which the repeat-finding limit takes to a decision at once.
+            still = await k.start("STILL")
+            assert (await k.result(still))["state"] == "merged"  # the next fix fixes it
+            asked = [q for q in fakes.questions if q["item"] == "STILL"]
+            assert [(q["state"], q["cause"], q["action"]) for q in asked] == [
+                ("fixing", "limit", "narrow-or-split")
+            ]
+
+            # Waiting on a need: an operator's recheck request goes to checking, and on.
+            stuck = await k.start("STUCK")
+            await k.idle_in(stuck, "waiting")
+            await send_request(
+                k.engine, stuck, request_id="r1", answer="recheck", reason="", by=OPERATOR
+            )
+            assert (await k.result(stuck))["state"] == "merged"
+            decision = next(
+                e["decision"]
+                for e in fakes.events
+                if e["item"] == "STUCK" and e["cause"] == "decision"
+            )
+            assert (decision["answer"], decision["source"]) == ("recheck", "policy")
+            assert ("decision", "checking") in [
+                (e["from_state"], e["state"]) for e in fakes.events if e["item"] == "STUCK"
+            ]
+
+    asyncio.run(scenario())

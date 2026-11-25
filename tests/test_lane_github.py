@@ -173,6 +173,60 @@ def test_the_ci_adapter_answers_green_red_and_nothing_while_pending() -> None:
         assert (ci(checking) or {})["outcome"] == "green"
 
 
+def test_a_red_head_behind_its_base_is_updated_and_checked_again_before_red_is_answered() -> None:
+    """SY-V3-RED-FIXED-ON-BASE: a red head whose branch is behind its base is brought up to date
+    from the base, and the stay waits for the checks of the new head, so a check whose cause is
+    already fixed on the base goes green with no fix. A red head GitHub will not update (up to
+    date, or in conflict with its base) is answered red at once."""
+    with world() as w:
+        w.checks = ("pr-tests",)
+        ci = CiAdapter(w.port, w.target_of)
+        checking = call("checking")
+        pull = w.open()
+        red_head = pull.head
+        w.fake.check(w.repo, red_head, "pr-tests", "failure")
+        # Up to date with its base: GitHub has nothing to update (422), so red at once.
+        red = ci(checking)
+        assert red is not None and red["outcome"] == "red" and red["detail"]["head"] == red_head
+        assert red["detail"]["failed"] == ["pr-tests"] and pull.updates == 0
+
+        # The cause is fixed on the base: the base moves on. The branch is updated and the
+        # stay waits; GitHub takes the update and the head moves only later.
+        w.fake.push(w.repo, "main")
+        w.fake.slow_updates = True
+        look = ci.observe(checking)
+        assert look.outcome is None and "updated from its base" in look.detail["waiting"]
+        assert look.detail["failed"] == ["pr-tests"] and look.detail["head"] == red_head
+        assert pull.updates == 1 and pull.head == red_head
+        assert w.fake.seen("pulls/update-branch")[1].body == {"expected_head_sha": red_head}
+        # A look while the update has not landed: GitHub refuses a second one (422), so it is
+        # red on the old head. That costs a fix round, not a stall: a fix that finds nothing
+        # to change goes back to checking (the item workflow test below).
+        again = ci(checking)
+        assert again is not None and again["outcome"] == "red" and pull.updates == 1
+        landed = w.fake.land(w.repo, pull)
+        # The new head's check has not reported: nothing. Then it passes: green on it.
+        assert ci(checking) is None
+        w.fake.check(w.repo, landed, "pr-tests")
+        green = ci(checking)
+        assert green is not None and green["outcome"] == "green"
+        assert green["detail"]["head"] == landed and pull.updates == 1
+
+        # Still red on the updated head: red, with the same finding as before, so a fix that
+        # changed nothing is told apart by the repeat-finding limit of fixing.
+        w.fake.check(w.repo, landed, "pr-tests", "failure")
+        still = ci(checking)
+        assert still is not None and still["outcome"] == "red"
+        assert still["detail"]["finding"] == red["detail"]["finding"]
+
+        # Behind and in conflict with its base: GitHub cannot update it, so red at once.
+        w.fake.push(w.repo, "main")
+        pull.conflict = True
+        conflicted = ci(checking)
+        assert conflicted is not None and conflicted["outcome"] == "red"
+        assert pull.updates == 1
+
+
 def test_a_base_branch_with_no_protection_takes_every_check_run_of_the_head() -> None:
     """A repository whose base branch has no protection: every check run of the head counts,
     and there must be one; checks the lane names are the ones that count instead."""

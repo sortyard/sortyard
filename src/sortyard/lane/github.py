@@ -11,7 +11,9 @@ Built on the port:
 
 - `CiAdapter`, the `ci-adapter` owner of `checking`: `green` when every check the head must
   pass has passed, `red` with the failing check names as the finding when one failed, nothing
-  while one is pending or has not reported. Which checks: `Target.checks`.
+  while one is pending or has not reported. Which checks: `Target.checks`. A red head behind its
+  base is updated from it first, so a check whose cause is fixed there runs again; when GitHub
+  refuses the update (nothing to update, a conflict) it is red (SY-V3-RED-FIXED-ON-BASE).
 - `MergeAdapter`, the `merge-adapter` owner of `merging`. It merges a pull request whose head
   is the commit the review approved (`detail["head"]`), or that commit with only merges of the
   base branch on top, once that head is green by the ci-adapter's rule, and answers `merged`;
@@ -67,6 +69,8 @@ PASSED = frozenset({"success", "neutral", "skipped"})
 MERGEABLE_STATES = frozenset({"clean", "unstable", "has_hooks"})
 SCRATCH_PREFIX = "refs/heads/sortyard-probe/"
 CHECKS_FAILED = "checks failed: "
+# What the adapters that update or merge a pull request ask for.
+WRITES: Mapping[str, str] = {"contents": "write", "pull_requests": "write", "checks": "read"}
 # How many merges of the base on top of the reviewed commit are followed before giving up.
 BASE_MERGES = 10
 _Read = TypeVar("_Read")
@@ -384,10 +388,8 @@ class HttpGitHub:
         return self._read(shape, "PUT", path, token, body={"sha": head, "merge_method": method})
 
     def parents(self, token: Token, repository: str, sha: str) -> tuple[str, ...]:
-        def shape(reply: Any) -> tuple[str, ...]:
-            return tuple(str(parent["sha"]) for parent in reply["parents"])
-
-        return self._read(shape, "GET", f"/repos/{repository}/git/commits/{sha}", token)
+        path = f"/repos/{repository}/git/commits/{sha}"
+        return self._read(lambda r: tuple(str(p["sha"]) for p in r["parents"]), "GET", path, token)
 
     def on_branch(self, token: Token, repository: str, branch: str, sha: str) -> bool:
         path = f"/repos/{repository}/compare/{branch}...{sha}"
@@ -481,6 +483,16 @@ class _Adapter:
         """A wait nothing on GitHub's side will end."""
         return _waiting(why, **seen)
 
+    def _updated(self, token: Token, repository: str, pull: Pull) -> bool:
+        """Whether GitHub took a branch update from the base (422: nothing to do, a conflict)."""
+        try:
+            self._port.update_branch(token, repository, pull.number, pull.head)
+        except GitHubError as error:
+            if error.status != 422:
+                raise
+            return False
+        return True
+
     def _look(
         self, call: Payload, target: Target, token: Token, pull: Pull, seen: dict[str, Any]
     ) -> Observation:
@@ -507,13 +519,9 @@ class _Adapter:
 
 
 class CiAdapter(_Adapter):
-    """The `ci-adapter` owner of `checking`."""
+    """The `ci-adapter` owner of `checking`. It writes only to update a red head's branch."""
 
-    PERMISSIONS: ClassVar[Mapping[str, str]] = {
-        "contents": "read",
-        "pull_requests": "read",
-        "checks": "read",
-    }
+    PERMISSIONS = WRITES
 
     def _look(
         self, call: Payload, target: Target, token: Token, pull: Pull, seen: dict[str, Any]
@@ -521,6 +529,8 @@ class CiAdapter(_Adapter):
         if pull.merged:
             return _waiting("pull request is already merged", **seen)
         state, names = self._checks(token, target, pull)
+        if state == "red" and self._updated(token, target.repository, pull):
+            return _waiting("red: branch updated from its base", failed=names, **seen)
         if state == "red":
             return Observation(
                 "red", {**seen, "finding": CHECKS_FAILED + ", ".join(names), "failed": names}
@@ -539,11 +549,7 @@ class MergeAdapter(_Adapter):
     repeat-finding limit of `fixing` bounds it.
     """
 
-    PERMISSIONS: ClassVar[Mapping[str, str]] = {
-        "contents": "write",
-        "pull_requests": "write",
-        "checks": "read",
-    }
+    PERMISSIONS = WRITES
 
     def __init__(self, port: GitHub, target_of: TargetLookup, *, method: str = "squash") -> None:
         super().__init__(port, target_of)
@@ -583,13 +589,8 @@ class MergeAdapter(_Adapter):
             return _waiting("GitHub has not said yet whether it merges", **seen)
         behind = pull.mergeable_state == "behind"
         if behind or call.get("action") == UPDATE_BRANCH_ACTION:
-            try:
-                self._port.update_branch(token, repository, pull.number, pull.head)
+            if self._updated(token, repository, pull):
                 return _waiting("branch updated from its base", **seen)
-            except GitHubError as error:
-                if error.status != 422:
-                    raise
-            # 422: nothing to update, or an update is already under way.
             if behind:
                 return _waiting("branch update under way", **seen)
         state, names = self._checks(token, target, pull)
