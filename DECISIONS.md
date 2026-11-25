@@ -504,52 +504,47 @@ provenance; where they conflict, the amendment wins.
     the lane back (`to-legacy`). After a move back, 177 and 188 come back in Backlog; to build
     them under legacy, register noncelogic/walwarden in its control-plane registry.
 - **Amendment (2026-11-25, SORTYARD-235, SY-V3-WALWARDEN-STRANDED-KINDS; origin: harness, not an
-  owner ask; decided under INTENTS I42).** After the move (SORTYARD-179, finished about 03:05Z)
-  `file_item.py check` found five open WALWARDEN items of four kinds with no spec and no owner
-  named above: 14, 190, 194, 195 and 196. Each kind now has one, below. For each, the producer and
-  what it means were read on the item itself on 2026-11-25.
-  - **`<board>: finished builds with no PR (n)`** (14). The producer is the legacy conductor's
-    stranded-build sweep, which plane-sync projects. Fact 1 above says its state stays
-    plane-sync's with build off. It lists legacy builds only, and with build off for walwarden
-    the legacy driver makes no new builds. Kernel builds end in a pull request or a hand-back of
-    their own, so they never appear here.
-    - Owner: plane-sync. It ends the item when the listed builds age out (its 48-hour rule).
-    - The Sortyard side does nothing. 14 lists only COND-170-fix1 of WALWARDEN-170, which is
-      cancelled, so it is closed with a comment. If plane-sync reopens it, its owner is still
-      plane-sync.
-  - **`PREMISE-DECISIONS <board>: owner-gated blockers`** (190). The producer is legacy grooming:
-    its premise-class questions about legacy builds. Both of 190's needs are about building
-    noncelogic/walwarden under the legacy driver: widening the legacy build job's token, and
-    registering the repository in the legacy control-plane registry. Item 176 above already
-    decided the same need: the kernel lane provides access to noncelogic/walwarden. With build
-    off, neither need applies.
-    - Owner: the Sortyard build team, which decides each such item under I42 (no owner gates) and
-      records the decision on the item.
-    - 190 is closed with that decision. A premise that still matters for kernel work is filed
-      as a spec through `file_item.py file`.
-  - **`Serving revision unmeasured: <board>`** (194). The producer is the harness
-    delivery-guarantee audit (DELIVERY-GUARANTEE-CHECK, INTENTS I67). It ignores `tasks: off`
-    (HARNESS-4203). Its subject is noncelogic/walwarden-context's legacy `delivery-train.yaml`.
-    That repository has no production deployment (WW-DEPLOY-QUEUE premise, 2026-11-25), so no
-    serving revision exists to measure.
-    - Owner: the harness audit that files it, under HARNESS-4203. The Sortyard side does not
-      act on it.
-    - 194 stays open with this record, and `file_item.py check` counts it as owned.
-  - **`Defect <product> [<hash>]: <step> fails after merge`** (195, 196). The producer is the
-    legacy triage of deploy-run failures. Both items were filed at 02:47Z, during the move. After
-    the move, a red run on `main` of a walwarden lane repository is answered by the red-main
-    observer (SORTYARD-234, SY-DEC-014): one kernel triage item per red workflow. Read on the
-    items and in the deploy runs:
-    - 195 was the live proof's robots rule.
-    - 196 was a runner timeout.
-    - Deploy runs 45537556238 and 45537732562 on `main` (merges of walwarden 1167 and 1168)
-      succeeded in full, live proof included, at 03:41Z. So neither defect is live.
-    - Owner: the red-main observer.
-    - 195 and 196 are closed with that evidence. A later legacy `Defect` item on a moved board
-      is closed the same way once its run is superseded by a green one.
-  - `file_item.py check` (estate-gitops `sortyard-lane/file_item.py`, `OWNED`) lists these four
-    kinds with this record's id, beside the alert items.
-  - To reverse: a new record here, and the kinds come out of `OWNED`.
+  owner ask; decided under INTENTS I42).**
+  - **Context.** After the move (SORTYARD-179, finished about 03:05Z), `file_item.py check` found five
+    open WALWARDEN items with no spec, of four kinds no record names an owner for: 14, 190, 194, 195
+    and 196.
+  - **The test for each kind.** Does a service exist that would end such an item on a moved board? It
+    has to end the item with a Decision or an Escalation, within a limit. None does:
+    - Fact 2 above: the legacy answers (triage, the stranded-build ship step, grooming) are gated
+      off for a board that is not driven.
+    - The red-main observer (SY-DEC-014) reads GitHub and the kernel, never Plane.
+  - **Choice.** Each kind is closed with a comment that cites this record, because its producer is
+    the legacy side and is off for walwarden.
+  - **No kind goes into `OWNED`.** `OWNED` in estate-gitops `sortyard-lane/file_item.py` means an
+    owner that ends the item. If one of these kinds is filed again on a moved board, the check lists
+    it STRANDED and exits 1, so the item is seen and is not silently counted as owned. It stays that
+    way until the check runs on its own and escalates (filed on the board as a follow-up).
+  - **What was read, 2026-11-25, on the items themselves and on GitHub:**
+    - **`<board>: finished builds with no PR (n)`** (14). The legacy stranded-build sweep, projected
+      by plane-sync. Its one build is COND-170-fix1 of WALWARDEN-170, built 2026-11-22T15:18Z, and
+      WALWARDEN-170 is cancelled. This record recorded 14 as done on 2026-11-24. It was reopened and
+      last updated at 02:47Z on the 25th, during the move. With build off, no legacy builds are made
+      for walwarden, and the kernel's builds end in a pull request or a hand-back of their own.
+      Closed.
+    - **`PREMISE-DECISIONS <board>: owner-gated blockers`** (190). Legacy grooming. Both of its needs
+      are for building noncelogic/walwarden under the legacy driver: widening the legacy build job's
+      token, and registering the repository in the legacy control-plane registry. Item 176 above
+      settled the same need: the kernel lane provides access to that repository. With build off,
+      neither need applies. Closed. A premise that matters to kernel work is filed as a spec through
+      `file_item.py file`.
+    - **`Serving revision unmeasured: <board>`** (194). The harness delivery-guarantee audit
+      (DELIVERY-GUARANTEE-CHECK, INTENTS I67). It asks for a serving revision of
+      noncelogic/walwarden-context. That repository has no deployment: the GitHub deployments API
+      lists 0, and its workflows are only `ci.yml` and `deploy-queue.yml`, which verifies without
+      deploying. So there is no serving revision to measure. The audit acting on a board with
+      `tasks: off` is HARNESS-4203, the harness's own fix. Closed.
+    - **`Defect <product> [<hash>]: <step> fails after merge`** (195, 196). The legacy triage of
+      deploy-run failures, filed at 02:47Z during the move. 195 was the live proof's robots rule.
+      196 was a runner timeout. The deploy runs on `main` for walwarden 1167 and 1168 both succeeded
+      in full, live proof included: 45537556238 finished at 03:21Z and 45537732562 at 03:41Z. So
+      neither defect is live. Closed. On a moved lane, a new red run on `main` is answered by the
+      red-main observer (SORTYARD-234) as a kernel triage item. It is not answered by a board item.
+  - **To reverse:** a new record here.
 
 ## SY-DEC-014 — The red-main observer sits outside the kernel and talks to it through the API (2026-11-24)
 
