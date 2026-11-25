@@ -171,10 +171,10 @@ def test_sortyard_kernel_is_a_console_script_of_the_package() -> None:
 
 def test_the_decision_policy_answers_what_a_rule_covers_and_nothing_else() -> None:
     """The decision step answers from the first matching rule; a question no rule covers gets
-    no answer, so the item's default and then the table's apply. The shipped policy has one
-    rule, for an operator's withdraw request (below), and answers nothing else. A file that
-    cannot be read in full is refused."""
-    assert len(policy.shipped().rules) == 1
+    no answer, so the item's default and then the table's apply. The shipped policy has two
+    rules, for an operator's withdraw and recheck requests (below), and answers nothing else.
+    A file that cannot be read in full is refused."""
+    assert len(policy.shipped().rules) == 2
     assert policy.shipped().decide({"state": "building", "cause": "limit"}) is None
     loaded = policy.load(
         """
@@ -228,6 +228,11 @@ reverse = "ask to resume"
         {"state": "building", "cause": "request", "request": {"answer": "withdraw", "by": 7}},
     ):
         assert shipped_rule(refused) is None, refused
+    # The second shipped rule (SY-V3-RED-FIXED-ON-BASE): an operator's recheck request.
+    recheck = shipped_rule(asked("recheck", kind="operator", id="op-1", role="operator"))
+    assert recheck is not None and recheck["answer"] == "recheck" and recheck["reverse"]
+    assert shipped().state("decision").next["recheck"] == "checking"
+    assert shipped_rule(asked("recheck", kind="operator", id="op-1", role="admin")) is None
     # The two request keys work in any policy file, beside the others.
     by_role = policy.load(
         'version = 1\n[[rules]]\nrole = "admin"\nrequest = "rebuild"\nstate = "fixing"\n'

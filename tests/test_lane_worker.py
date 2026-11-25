@@ -438,7 +438,12 @@ def test_a_finished_build_is_observed_as_built_with_its_head_commit_and_an_uncha
     # A build is never taken as built on the worker's word for a state that has no such
     # outcome, without a head commit, or from a message that is not a result.
     assert outcome_of("fixing", result("built")) is None
-    assert outcome_of("fixing", result("no-change")) is None
+    # A fix that found nothing in the change to fix says so: its checks are looked at again
+    # (SY-V3-RED-FIXED-ON-BASE).
+    assert outcome_of("fixing", result("no-change")) == {
+        "outcome": "no-change",
+        "detail": {"head": HEAD},
+    }
     assert outcome_of("building", result("fixed")) is None
     assert outcome_of("building", '{"outcome":"built"}') is None
     assert outcome_of("building", '{"outcome":"built","head":"main"}') is None

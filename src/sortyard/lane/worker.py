@@ -70,7 +70,7 @@ BUILD, FIX, REVIEW = "build", "fix", "review"
 MODES: Mapping[str, str] = {"building": BUILD, "fixing": FIX, "reviewing": REVIEW}
 OUTCOMES: Mapping[str, frozenset[str]] = {
     "building": frozenset({"built", "no-change"}),
-    "fixing": frozenset({"fixed"}),
+    "fixing": frozenset({"fixed", "no-change"}),
     "reviewing": frozenset({"approved", "findings"}),
 }
 # Where the Job's files are mounted, and the variables that tell the entry point so.
