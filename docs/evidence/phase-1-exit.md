@@ -2,7 +2,8 @@
 
 The phase 1 exit test of HARNESS-V3 (section 6, phase 1 "Kernel to merge") is: one Walwarden item
 goes admitted to merged with no hand action, then 10 in a row. It was met on 2026-11-25 at
-04:45:57Z, when the eleventh consecutive hands-off Walwarden item merged.
+04:45:58Z (ledger time; GitHub's mergedAt is 04:45:57Z), when the eleventh consecutive hands-off
+Walwarden item merged.
 
 - **The first item:** WALWARDEN-177, merged 03:05:44Z.
 - **The ten after it:** WALWARDEN-188 through WW-NAV-OVERLAY-TEST-SETTLES.
@@ -31,14 +32,15 @@ All eleven items are on the estate kernel: namespace `sortyard` on aks-obs-01, w
 | 5 | WW-DEPLOY-QUEUE | [noncelogic/walwarden-context#59](https://github.com/noncelogic/walwarden-context/pull/59) (`0370d92`) | 2026-11-25T03:31:17Z | 2026-11-25T03:48:59Z | no deployment (ci on main green) |
 | 6 | WW-DEPLOY-BATCH | [noncelogic/walwarden-context#60](https://github.com/noncelogic/walwarden-context/pull/60) (`4b46fa0`) | 2026-11-25T03:31:17Z | 2026-11-25T04:12:22Z | no deployment (ci on main green) |
 | 7 | WW-CONTRACTS-AZURE-DEPLOY | [noncelogic/walwarden#1170](https://github.com/noncelogic/walwarden/pull/1170) (`b8d6d5c`) | 2026-11-25T04:09:38Z | 2026-11-25T04:17:00Z | 45545712867 success |
-| 8 | WW-CONTRACTS-LIVE-WORKFLOWS | [noncelogic/walwarden#1171](https://github.com/noncelogic/walwarden/pull/1171) (`d25d953`) | 2026-11-25T04:09:38Z | 2026-11-25T04:23:12Z | 45546417693 in progress at 04:50Z |
+| 8 | WW-CONTRACTS-LIVE-WORKFLOWS | [noncelogic/walwarden#1171](https://github.com/noncelogic/walwarden/pull/1171) (`d25d953`) | 2026-11-25T04:09:38Z | 2026-11-25T04:23:12Z | 45546417693 success (live proof 04:51:20Z) |
 | 9 | WW-CTX-CLI-TESTS | [noncelogic/walwarden-context#61](https://github.com/noncelogic/walwarden-context/pull/61) (`f2884a6`) | 2026-11-25T04:09:38Z | 2026-11-25T04:25:18Z | no deployment (ci on main green) |
 | 10 | WW-CTX-SDK-SURFACE | [noncelogic/walwarden-context#62](https://github.com/noncelogic/walwarden-context/pull/62) (`11a41ee`) | 2026-11-25T04:09:38Z | 2026-11-25T04:32:04Z | no deployment (ci on main green) |
 | 11 | WW-NAV-OVERLAY-TEST-SETTLES | [noncelogic/walwarden#1173](https://github.com/noncelogic/walwarden/pull/1173) (`4d8e535`) | 2026-11-25T04:09:39Z | 2026-11-25T04:45:58Z | 45549002910 cancelled while pending: superseded by the deploy of the next merge (9939241, run 45549233010, pending at 04:50Z); deploy.yml's queue keeps one pending run |
 
-WW-PR-DEPLOY-GATE and WW-MERGE-UNIT-ONLY each went through review fix rounds (reviewing to
-fixing, with no person involved). SY-V3-PHASE1-EXIT allows that (must_allow: "items that went
-through fix rounds ... without a person").
+Six of the eleven went through review fix rounds, reviewing to fixing, with no person involved:
+WW-PR-DEPLOY-GATE, WW-MERGE-UNIT-ONLY, WW-DEPLOY-BATCH, WW-CONTRACTS-AZURE-DEPLOY,
+WW-CONTRACTS-LIVE-WORKFLOWS and WW-CTX-CLI-TESTS. SY-V3-PHASE1-EXIT allows that. Its must_allow
+reads "items that went through fix rounds ... without a person".
 
 ## Report output
 
