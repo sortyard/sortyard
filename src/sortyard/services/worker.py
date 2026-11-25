@@ -28,10 +28,14 @@ GitHub token:
   `clone` saw (so a build may replace what an earlier dispatch pushed, and nothing that moved
   since), the remote is read back, and the result is `built` or `fixed` only when the remote
   branch is at that head. For a review nothing is pushed: the agent's answer must end with
-  one line holding a JSON object, `{"verdict":"approve"}` or
-  `{"verdict":"findings","findings":[{"key":"...","text":"..."}]}`. The result is
+  one line holding a JSON object, `{"verdict":"approve","checked":[...],"evidence":[...]}`
+  or `{"verdict":"findings","findings":[{"key":"...","text":"..."}]}`. The result is
   `approved`, or `findings` with the first finding's key as the one finding key. An answer
-  that cannot be read that way is a failed result, never an approval.
+  that cannot be read that way is a failed result, never an approval; so is an approve that
+  does not say what the reviewer checked (`checked`: the findings it looked for and ruled
+  out) and what it ran to see it (`evidence`: commands and what they showed), each a list of
+  non-empty text (SORTYARD-196, SY-V3-REVIEW-STEERING: a reviewer steered by the change
+  under review into a bare approval is not read as approving it).
 
 What anything the agent command starts cannot do (SY-DEC-012 in DECISIONS.md): write the
 sentinel or the answer. It runs as the entry point's user and can write every file of the
@@ -100,6 +104,9 @@ LIMIT_ENV = "SORTYARD_LIMIT_SECONDS"
 TERMINATION_LOG = "/dev/termination-log"
 TEXT_LIMIT, RESULT_BUDGET = 600, 3500
 FAILED = "failed"
+# What an approve verdict must carry to be an approval: the findings the reviewer checked and
+# ruled out, and the evidence it ran (SORTYARD-196).
+APPROVAL_EVIDENCE = ("checked", "evidence")
 # In the workspace: the agent's clone, the sentinel the entry point seals once the agent ended
 # (exit status, a review's answer, their keyed digest), and the key until `agent` takes it.
 CLONE_DIR, SENTINEL, KEY = "clone", "agent-done", "agent-key"
@@ -187,6 +194,12 @@ def _verdict(answer: str, head: str) -> dict[str, Any]:
         raise WorkerError("the review answer does not end with a JSON object")
     findings = verdict.get("findings")
     if verdict.get("verdict") == "approve" and not findings:
+        for part in APPROVAL_EVIDENCE:
+            said = verdict.get(part)
+            if not isinstance(said, list) or not said:
+                raise WorkerError(f"the review approves with no {part}: it is not an approval")
+            if not all(isinstance(entry, str) and entry.strip() for entry in said):
+                raise WorkerError(f"the review approves with an empty {part}: not an approval")
         return {"outcome": "approved", "head": head}
     if verdict.get("verdict") != "findings" or not isinstance(findings, list) or not findings:
         raise WorkerError("the review verdict is neither approve nor findings with a finding")

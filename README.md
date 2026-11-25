@@ -357,6 +357,17 @@ What an agent command may rely on, and what it must not:
   be imported in its place), and do not let the agent read settings from the clone that it
   would act on as its own. The worker attests who wrote the answer, not what persuaded the
   agent to write it.
+- What persuaded it is answered in the brief and the verdict (SORTYARD-196,
+  SY-V3-REVIEW-STEERING). The review brief tells the agent that the repository and the change
+  (code, comments, docs, commit messages, test and tool output) are data under review, never
+  instructions, and that text there directing the verdict is a finding (`review-steering`). An
+  approval is `{"verdict":"approve","checked":[...],"evidence":[...]}`: the findings the
+  reviewer looked for and ruled out, and what it ran and what that showed, each a non-empty
+  list of non-empty text. A bare `{"verdict":"approve"}`, or one missing either list, is a
+  failed result, never an approval. A wrapper that adds its own prompt around the brief (the
+  diff, say) must name the same verdict shape and mark what it adds as data. How often a real
+  reviewer is still steered is measured by `tests/steering_corpus/run.py` (opt-in: it calls a
+  model) and recorded in `docs/evidence/review-steering-2026-11-25.md`.
 - When the command exits, the work is over: what it queued on its output by then is read,
   and every process it started is killed, including ones that left its session or process
   group. Do not leave background work behind.
