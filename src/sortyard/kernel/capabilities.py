@@ -2,9 +2,10 @@
 
 A lane declares, as data, the worker image by digest, the CI image by digest, the repositories
 it pushes to (and the checks a pull request there must pass), the secrets it reads by name, the
-services it calls, its runner pool, how many of its items may be in work at once (`slots`), and
-who resolves a need that fails. This module turns that file into typed values and refuses a file
-that breaks one of the section's two rules:
+services it calls, its runner pool, how many of its items may be in work at once (`slots`), who
+resolves a need that fails, and, if it names any, the only projects whose items it takes. This
+module turns that file into typed values and refuses a file that breaks one of the section's two
+rules:
 
 - **The worker image is the CI image.** Both are pinned by digest and the digests are equal.
 - **No optional credentials.** A secret marked optional cannot be declared.
@@ -44,19 +45,8 @@ _DIGEST = re.compile(r"[^@\s]+@(sha256:[0-9a-f]{64})")
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 _REPOSITORY_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*")
 _TOP_KEYS = frozenset(
-    {
-        "version",
-        "lane",
-        "resolver",
-        "gap-limit",
-        "runner-pool",
-        "slots",
-        "defaults",
-        "images",
-        "repositories",
-        "secrets",
-        "services",
-    }
+    {"version", "lane", "resolver", "gap-limit", "runner-pool", "slots", "defaults", "images"}
+    | {"repositories", "secrets", "services", "projects"}
 )
 _ENTRY_KEYS: Mapping[str, frozenset[str]] = {
     "repositories": frozenset({"name", "workflow-files", "checks"}),
@@ -151,6 +141,7 @@ class Lane:
     gap_limit_text: str | None = None
     version: int = 1
     slots: int = 1  # how many of the lane's items may be in work at once
+    projects: tuple[str, ...] = ()  # the only projects whose items it takes; none named, any
 
     def declares(self, need: Need) -> bool:
         if need.kind in _UNNAMED:
@@ -286,6 +277,9 @@ def load(text: str) -> Lane:
     if type(slots) is not int or slots < 1:
         raise _fail("malformed-file", lane, f"slots must be a whole number above 0, not {slots!r}")
 
+    projects = raw.get("projects", [])
+    if not isinstance(projects, list) or not all(isinstance(p, str) and p for p in projects):
+        raise _fail("malformed-file", lane, f"projects must be a list of project ids: {projects!r}")
     gap_limit_text = raw.get("gap-limit")
     gap_limit: timedelta | None = None
     if gap_limit_text is not None:
@@ -308,6 +302,7 @@ def load(text: str) -> Lane:
         gap_limit_text=None if gap_limit_text is None else str(gap_limit_text),
         version=1,
         slots=slots,
+        projects=tuple(projects),
     )
     defaults = raw.get("defaults", [])
     if not isinstance(defaults, list):

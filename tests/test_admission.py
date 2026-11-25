@@ -29,6 +29,7 @@ from sortyard.engine import Engine, Registry, WorkflowNotFound
 from sortyard.engine.blocking import BlockingEngine
 from sortyard.engine.testing import local_engine
 from sortyard.kernel.admission import ref_safe
+from sortyard.kernel.capabilities import Lane, load
 from sortyard.kernel.item import register, start_item, workflow_id
 from sortyard.kernel.ledger import Ledger
 from sortyard.kernel.states import shipped
@@ -60,9 +61,9 @@ def body(item: str = "ITEM-1", **over: Any) -> dict[str, Any]:
 
 
 @asynccontextmanager
-async def admitting() -> AsyncIterator[tuple[Api, Engine]]:
-    """The API service on a fresh database, admitting against the walwarden lane and starting
-    workflows in a real engine."""
+async def admitting(lanes: list[Lane] | None = None) -> AsyncIterator[tuple[Api, Engine]]:
+    """The API service on a fresh database, admitting against the walwarden lane (or the lanes
+    given) and starting workflows in a real engine."""
     async with local_engine() as local:
         blocking = BlockingEngine(local.target)
 
@@ -70,7 +71,8 @@ async def admitting() -> AsyncIterator[tuple[Api, Engine]]:
             blocking.call(lambda e: start_item(e, item, tenant=tenant, risk_tier=risk_tier))
 
         apis = running_api(
-            signal_item=blocking.signal, kernel=handlers.Kernel({LANE.name: LANE}, start)
+            signal_item=blocking.signal,
+            kernel=handlers.Kernel({lane.name: lane for lane in lanes or [LANE]}, start),
         )
         try:
             yield next(apis), local.engine
@@ -179,6 +181,41 @@ def test_admit_item_refuses_what_fails_the_check_and_creates_nothing() -> None:
             # Nothing was created: no row, and no workflow in the engine.
             assert rows(api) == before
             assert await unknown(engine, "ITEM-1")
+
+    asyncio.run(scenario())
+
+
+@requires_postgres
+def test_an_item_of_a_project_the_lane_does_not_name_is_refused() -> None:
+    """an item of a project the lane does not name is refused
+
+    The walwarden lane names its project, so an item of the canary project is refused on it
+    (`unknown-lane-project`) and nothing is created; a lane that names no project takes an item
+    of any project of the workspace, as before (SY-DEC-011, fact 3)."""
+    bound = load(LANE_TEXT.replace("slots = 2", 'slots = 2\nprojects = ["walwarden"]'))
+    unbound = load(LANE_TEXT.replace('lane = "walwarden"', 'lane = "open"'))
+    assert (bound.projects, unbound.projects) == (("walwarden",), ())
+
+    async def scenario() -> None:
+        async with admitting([bound, unbound]) as (api, engine):
+            for pid in ("canary", "walwarden"):
+                api.insert("project", project(pid))
+            before = rows(api)
+            canary = body("CANARY-1", project_id="canary")
+            refused = api.ws("POST", "/items", "operator", canary)
+            assert rules(refused) == ["unknown-lane-project"]
+            assert "'walwarden'" in refused.body["reasons"][0]
+            assert rows(api) == before and await unknown(engine, "CANARY-1")
+            # Given with other failures, it is one reason among all of them.
+            also = api.ws("POST", "/items", "operator", {**canary, "needs": ["secret:NOPE"]})
+            assert rules(also) == ["undeclared-need", "unknown-lane-project"]
+            # An item of the project the lane names is admitted on it.
+            own = api.ws("POST", "/items", "operator", body("WAL-1", project_id="walwarden"))
+            assert own.status == 201, own.body
+            # A lane that names no project takes the canary item, as every lane did before.
+            opened = api.ws("POST", "/items", "operator", {**canary, "lane": "open"})
+            assert opened.status == 201, opened.body
+            assert rows(api)["item"] == before["item"] + 2
 
     asyncio.run(scenario())
 
