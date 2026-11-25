@@ -19,6 +19,7 @@ import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import replace
+from datetime import UTC, datetime
 from typing import Any
 
 import psycopg
@@ -371,6 +372,111 @@ def test_get_item_returns_the_spec_lane_repository_links_and_state_of_an_item() 
             assert api.ws("GET", "/items/NOPE", "viewer").status == 404
             assert api.ws("GET", "/items/ITEM-1", "sensor").status == 403
             assert api.ws("GET", "/items/ITEM-1").status == 401
+
+    asyncio.run(scenario())
+
+
+def enter(ledger: Ledger, tenant: str, item: str, sequence: int, state: str) -> None:
+    """Record that `item` entered `state`, as its workflow would."""
+    declared = shipped().state(state)
+    ledger.record(
+        {
+            "item": item,
+            "tenant": tenant,
+            "sequence": sequence,
+            "state": state,
+            "state_kind": declared.kind,
+            "lifecycle": declared.lifecycle,
+            "owner": declared.owner,
+            "limit": declared.limit.text if declared.limit else None,
+            "reason": declared.reason,
+            "entered_at": datetime.now(UTC).isoformat(),
+            "from_state": None if sequence == 1 else "admitted",
+            "from_kind": None if sequence == 1 else "queue",
+            "cause": "start" if sequence == 1 else "outcome",
+        }
+    )
+
+
+def listed(api: Api, project: str, role: str = "viewer", query: str = "") -> list[dict[str, Any]]:
+    """Every item listItems returns for `project`, page after page."""
+    items: list[dict[str, Any]] = []
+    cursor: str | None = None
+    while True:
+        after = f"&cursor={cursor}" if cursor else ""
+        reply = api.ws("GET", f"/projects/{project}/items?limit=2{query}{after}", role)
+        assert reply.status == 200, reply.body
+        assert len(reply.body["items"]) <= 2
+        items += reply.body["items"]
+        cursor = reply.body.get("next_cursor")
+        if cursor is None:
+            return items
+
+
+@requires_postgres
+def test_list_items_returns_every_item_of_the_project_with_its_state() -> None:
+    """listItems returns every item of the project with its state, ended items included, and
+    nothing of another project."""
+
+    async def scenario() -> None:
+        async with admitting() as (api, _engine):
+            ledger = Ledger(functools.partial(psycopg.connect, api.conninfo))
+            for item in ("MERGED", "WITHDRAWN", "BUILDING", "WAITING"):
+                assert api.ws("POST", "/items", "operator", body(item)).status == 201
+            # As their workflows would record them: one merged, one withdrawn, one at work.
+            for item, last in (("MERGED", "merged"), ("WITHDRAWN", "withdrawn")):
+                enter(ledger, WS, item, 1, "admitted")
+                enter(ledger, WS, item, 2, last)
+            enter(ledger, WS, "BUILDING", 1, "admitted")
+            enter(ledger, WS, "BUILDING", 2, "building")
+            # Items of another project and of another workspace, one of them ended too.
+            ledger.create_item(tenant=WS, item="ELSEWHERE", project="proj-b", title="Not ours")
+            enter(ledger, WS, "ELSEWHERE", 1, "admitted")
+            enter(ledger, WS, "ELSEWHERE", 2, "withdrawn")
+            ledger.create_item(tenant=OTHER_WS, item="THEIRS", project="proj-a", title="Theirs")
+            enter(ledger, OTHER_WS, "THEIRS", 1, "admitted")
+            enter(ledger, OTHER_WS, "THEIRS", 2, "merged")
+
+            # The queue leaves the ended items out; the list keeps them.
+            queue = api.ws("GET", "/projects/proj-a/queue", "viewer").body["items"]
+            assert {row["id"] for row in queue} == {ITEM, "BUILDING", "WAITING"}
+            items = listed(api, "proj-a")
+            assert [(row["id"], row["state"], row["state_kind"], row["lane"]) for row in items] == [
+                (ITEM, None, None, None),  # the harness's item, never admitted with a spec
+                ("MERGED", "merged", "terminal", "walwarden"),
+                ("WITHDRAWN", "withdrawn", "terminal", "walwarden"),
+                ("BUILDING", "building", "work", "walwarden"),
+                ("WAITING", None, None, "walwarden"),
+            ]
+            by_id = {row["id"]: row for row in items}
+            assert by_id["WITHDRAWN"]["repository"] == "walwarden/app"
+            assert by_id["WITHDRAWN"]["entered_at"] and by_id["WAITING"]["entered_at"] is None
+            # Each listed item is the one getItem reads.
+            got = api.ws("GET", "/items/WITHDRAWN", "viewer").body
+            assert {key: got[key] for key in by_id["WITHDRAWN"]} == by_id["WITHDRAWN"]
+
+            # Only the items that ended, and only those of one other kind.
+            assert [row["id"] for row in listed(api, "proj-a", query="&state_kind=terminal")] == [
+                "MERGED",
+                "WITHDRAWN",
+            ]
+            assert [row["id"] for row in listed(api, "proj-a", query="&state_kind=work")] == [
+                "BUILDING"
+            ]
+            # Every kind the state table has can be asked for; nothing else can.
+            kinds = {state.kind for state in shipped().states.values()}
+            assert kinds <= set(handlers.STATE_KINDS)
+            bad = api.ws("GET", "/projects/proj-a/items?state_kind=ended", "viewer")
+            assert bad.status == 400, bad.body
+
+            # The other project lists its own item alone; the other workspace's is in neither.
+            assert [row["id"] for row in listed(api, "proj-b", "admin")] == ["ELSEWHERE"]
+            assert listed(api, "no-such-project") == []
+            # A project-confined token lists its own project only; roles outside the set none.
+            assert len(listed(api, "proj-a", "grooming-agent")) == len(items)
+            assert api.ws("GET", "/projects/proj-b/items", "grooming-agent").status == 403
+            assert api.ws("GET", "/projects/proj-a/items", "sensor").status == 403
+            assert api.ws("GET", "/projects/proj-a/items").status == 401
 
     asyncio.run(scenario())
 

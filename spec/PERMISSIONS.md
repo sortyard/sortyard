@@ -43,6 +43,7 @@ claim tasks (§7).
 | `resequenceTask` | POST | `/v1/workspaces/{workspace_id}/tasks/{task_id}/sequence` | `resequence_task` | ✓ | ✓ |  |  |  |  | ✓ |
 | `listTaskDecisionLog` | GET | `/v1/workspaces/{workspace_id}/tasks/{task_id}/decision-log` | `list_task_decision_log` | ✓ | ✓ | ✓ | ✓ |  |  | ✓ |
 | `getProjectQueue` | GET | `/v1/workspaces/{workspace_id}/projects/{project_id}/queue` | `get_project_queue` | ✓ | ✓ | ✓ | ✓ |  |  | ✓ |
+| `listItems` | GET | `/v1/workspaces/{workspace_id}/projects/{project_id}/items` | `list_items` | ✓ | ✓ | ✓ | ✓ |  |  | ✓ |
 | `admitItem` | POST | `/v1/workspaces/{workspace_id}/items` | `admit_item` | ✓ | ✓ |  |  |  |  | ✓ |
 | `getItem` | GET | `/v1/workspaces/{workspace_id}/items/{item_id}` | `get_item` | ✓ | ✓ | ✓ | ✓ |  |  | ✓ |
 | `getItemTimeline` | GET | `/v1/workspaces/{workspace_id}/items/{item_id}/timeline` | `get_item_timeline` | ✓ | ✓ | ✓ | ✓ |  |  | ✓ |

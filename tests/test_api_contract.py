@@ -301,6 +301,7 @@ def test_unauthenticated_calls_are_refused(api: Api, op_id: str) -> None:
 # response is checked against the spec. Roles are the matrix's; ``expect`` is the success code.
 SCENARIO: list[tuple[str, str, int]] = [
     ("getProjectQueue", "grooming-agent", 200),
+    ("listItems", "viewer", 200),
     ("getItem", "conductor", 200),
     ("getItemTimeline", "viewer", 200),
     ("requestItemChange", "operator", 202),

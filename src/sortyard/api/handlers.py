@@ -1160,10 +1160,10 @@ def issue_service_account_token(req: Request) -> Reply:
 # --- the kernel's tracker view (HARNESS-V3 §3.2) --------------------------------------------
 #
 # The item workflow owns item state and sortyard.kernel.ledger records it. These operations
-# read that projection (the queue, one item, its timeline). The one that is not a read sends
-# the workflow a request and writes nothing: no operation here, or anywhere in this module,
-# changes an item's state. Admission
-# creates an item with no state (sortyard.kernel.admission) and starts its workflow.
+# read that projection (the queue, every item, one item, its timeline). The one that is not a
+# read sends the workflow a request and writes nothing: no operation here, or anywhere in
+# this module, changes an item's state. Admission creates an item with no state
+# (sortyard.kernel.admission) and starts its workflow.
 
 
 @handles("getProjectQueue")
@@ -1171,6 +1171,45 @@ def get_project_queue(req: Request) -> Reply:
     project_id = req.params["project_id"]
     in_project_scope(req.principal, project_id)
     return Reply(200, {"items": ledger.queue(req.conn, req.workspace_id, project_id)})
+
+
+#: The kinds of state an item can be in (sortyard.kernel.states.State.kind).
+STATE_KINDS = ("queue", "work", "need", "decision", "terminal")
+
+_ITEMS = (
+    "SELECT i.id, i.title, i.milestone_id, s.lane, s.repository, i.state, i.state_kind,"
+    "       i.entered_at"
+    " FROM sortyard.item AS i"
+    " LEFT JOIN sortyard.item_spec AS s ON (s.workspace_id, s.item_id) = (i.workspace_id, i.id)"
+    " WHERE i.workspace_id = %s AND i.project_id = %s"
+    "   AND (%s::text IS NULL OR i.state_kind = %s::text)"
+    " ORDER BY i.position LIMIT %s OFFSET %s"
+)
+
+
+@handles("listItems")
+def list_items(req: Request) -> Reply:
+    """Every item of a project, ended ones included, in creation order and a page at a time:
+    the read that finds a withdrawn item, which the queue no longer lists."""
+    project_id = req.params["project_id"]
+    in_project_scope(req.principal, project_id)
+    kind = req.query.get("state_kind")
+    if kind is not None and kind not in STATE_KINDS:
+        raise store.bad_request(f"unknown state_kind {kind!r}")
+    paging = store.Page.parse(req.query)
+    with req.conn.cursor(row_factory=dict_row) as cursor:
+        rows = cursor.execute(
+            _ITEMS,
+            (req.workspace_id, project_id, kind, kind, paging.limit + 1, paging.offset),
+        ).fetchall()
+    items = [
+        {**row, "entered_at": row["entered_at"].isoformat() if row["entered_at"] else None}
+        for row in rows[: paging.limit]
+    ]
+    return Reply(
+        200,
+        {"items": items, "next_cursor": paging.cursor_after(len(items), len(rows) > paging.limit)},
+    )
 
 
 def load_item(req: Request) -> str:
