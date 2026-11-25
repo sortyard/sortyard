@@ -3,9 +3,8 @@
 A lane declares, as data, the worker image by digest, the CI image by digest, the repositories
 it pushes to (and the checks a pull request there must pass), the secrets it reads by name, the
 services it calls, its runner pool, how many of its items may be in work at once (`slots`), who
-resolves a need that fails, and, if it names any, the only projects whose items it takes. This
-module turns that file into typed values and refuses a file that breaks one of the section's two
-rules:
+resolves a need that fails, and, if it names any, the only projects whose items it takes. It is
+turned into typed values here, and refused when it breaks one of the section's two rules:
 
 - **The worker image is the CI image.** Both are pinned by digest and the digests are equal.
 - **No optional credentials.** A secret marked optional cannot be declared.
@@ -43,6 +42,7 @@ _UNNAMED = frozenset({WORKER_IMAGE, RUNNER_POOL})
 
 _DIGEST = re.compile(r"[^@\s]+@(sha256:[0-9a-f]{64})")
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+_id = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}").fullmatch  # the API's ID_PATTERN
 _REPOSITORY_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*")
 _TOP_KEYS = frozenset(
     {"version", "lane", "resolver", "gap-limit", "runner-pool", "slots", "defaults", "images"}
@@ -277,9 +277,10 @@ def load(text: str) -> Lane:
     if type(slots) is not int or slots < 1:
         raise _fail("malformed-file", lane, f"slots must be a whole number above 0, not {slots!r}")
 
-    projects = raw.get("projects", [])
-    if not isinstance(projects, list) or not all(isinstance(p, str) and p for p in projects):
-        raise _fail("malformed-file", lane, f"projects must be a list of project ids: {projects!r}")
+    projects = raw.get("projects", ())  # when given, distinct project ids, at least one
+    ids = [p if isinstance(p, str) else "" for p in projects] if isinstance(projects, list) else []
+    if projects != () and (not ids or len({*ids}) < len(ids) or not all(map(_id, ids))):
+        raise _fail("malformed-file", lane, f"projects must be distinct project ids: {projects!r}")
     gap_limit_text = raw.get("gap-limit")
     gap_limit: timedelta | None = None
     if gap_limit_text is not None:

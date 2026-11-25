@@ -153,7 +153,10 @@ def test_a_lane_may_name_the_projects_whose_items_it_takes() -> None:
     assert load(VALID).projects == ()
     named = load(changed('resolver = "platform"', 'resolver = "platform"\nprojects = ["a", "b"]'))
     assert named.projects == ("a", "b")
-    for bad in ('"a"', '["a", 1]', '[""]', "true"):
+    assert load(changed('resolver = "platform"', 'resolver = "platform"\nprojects = ["p:1/x"]'))
+    # An empty list would name nothing and take every project: it is refused, as are a
+    # duplicate and an id the API would not accept.
+    for bad in ('"a"', '["a", 1]', '[""]', "true", "[]", '["a", "a"]', '["-a"]', '["a b"]', "[[]]"):
         text = changed('resolver = "platform"', f'resolver = "platform"\nprojects = {bad}')
         assert refused(text).rule == "malformed-file", bad
 

@@ -30,8 +30,9 @@ runner-pool = "example-runners"
 
 # Optional: the only projects whose items the lane takes, by project id. Admission refuses an
 # item of any other project (unknown-lane-project). Left out, as here, an item of any project of
-# the workspace may be admitted on the lane. The tests and the replica admit items of their own
-# projects on this lane, so it names none.
+# the workspace may be admitted on the lane. Given, it lists at least one id, each once. The ids
+# are not checked against the database at load: a mistyped id makes the lane refuse every item.
+# The tests and the replica admit items of their own projects on this lane, so it names none.
 # projects = ["example"]
 
 # Optional: how many of the lane's items may be out of the queue at once (dispatched and not
