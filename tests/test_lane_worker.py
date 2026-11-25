@@ -374,6 +374,9 @@ def test_the_brief_of_a_fix_carries_the_finding_and_each_job_gets_the_token_its_
         )
         assert (fix["mode"], fix["finding"], fix["agent"]) == ("fix", finding, ["agent", "--fix"])
         assert "missing-fix-txt" in fix["text"] and "does not add fix.txt" in fix["text"]
+        # SORTYARD-240: a finding the change does not cause (fixed on the base) is answered by a
+        # fix that commits nothing, which the worker reports as no-change.
+        assert "if the change does not cause it, commit nothing" in fix["text"]
 
         assert launcher.owners()["reviewer"](call("ITEM-4", "reviewing", 6)) is None
         review = json.loads(

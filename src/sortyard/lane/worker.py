@@ -184,7 +184,7 @@ def brief(mode: str, work: Work, call: Payload, config: WorkerConfig) -> dict[st
     if mode == FIX:
         made["finding"] = detail
         lines += [
-            "Fix this finding, and nothing else:",
+            "Fix this finding and nothing else; if the change does not cause it, commit nothing:",
             json.dumps(detail, indent=2, sort_keys=True),
         ]
     if mode == REVIEW:
