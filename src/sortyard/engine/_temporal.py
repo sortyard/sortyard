@@ -195,8 +195,7 @@ class _WorkflowContext:
     """`Context` on Temporal. Lives inside one workflow run; rebuilt on every replay."""
 
     def __init__(self, steps: dict[str, _Step], signals: dict[str, deque[Any]]) -> None:
-        self._steps = steps
-        self._signals = signals
+        self._steps, self._signals = steps, signals
 
     @property
     def workflow_id(self) -> str:
@@ -349,8 +348,7 @@ class Engine:
     """
 
     def __init__(self, client: Client, task_queue: str = DEFAULT_TASK_QUEUE) -> None:
-        self._client = client
-        self.task_queue = task_queue
+        self._client, self.task_queue = client, task_queue
 
     @classmethod
     async def connect(

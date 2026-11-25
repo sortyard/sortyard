@@ -24,6 +24,8 @@ Three things happen here that no single adapter owns:
   secrets. When GitHub was not read it records after them, so that a retry reads again, until
   `UNREAD_FIRST_AFTER`: then "not read" is recorded first, and the item ends and frees its slot.
   No look is made for a stay the item has left, so a pass that read it before does not merge.
+  A delete refused past `CLEANUP_ESCALATE_AFTER` writes one escalation Event with the error,
+  and the step stops: its Jobs are left to whoever answers it (SY-V3-CLEANUP-ESCALATES).
 """
 
 from __future__ import annotations
@@ -57,13 +59,14 @@ from sortyard.lane.github import (
     Target,
     branch_of,
 )
-from sortyard.lane.jobs import Jobs
+from sortyard.lane.jobs import Jobs, JobsError
 from sortyard.lane.worker import EXECUTOR_OWNER, REVIEWER_OWNER, Launcher, Work, WorkerConfig
 from sortyard.lane.worker import probes as worker_probes
 
 # The outcomes of a worker that mean a change is on the item's branch.
 PUSHED = frozenset({"built", "fixed"})
 UNREAD_FIRST_AFTER = 300.0  # seconds since the withdrawal (see the module's docstring)
+CLEANUP_ESCALATE_AFTER = 900.0  # seconds since it ended: a refused cleanup is escalated, once
 _IN_STATE = "SELECT 1 FROM sortyard.item WHERE (workspace_id, id, state) = (%s, %s, %s)"
 
 
@@ -218,7 +221,12 @@ def build(
         if (read or waited >= UNREAD_FIRST_AFTER) and not done:  # ends while cleanup is retried
             ledger.record({**transition, "left_open": left, "detail": detail})
         gaps.settle(tenant, item)  # it waits on no capability-gap item any more
-        jobs.delete_earlier(worker.item_label(tenant, item), 2**31)
+        try:
+            jobs.delete_earlier(label := worker.item_label(tenant, item), 2**31)
+        except JobsError as error:  # past the limit: escalated once, then no longer retried
+            if waited < max(CLEANUP_ESCALATE_AFTER, UNREAD_FIRST_AFTER):
+                raise
+            return ledger.escalate(transition, {"job_cleanup_refused": str(error), "jobs": label})
         if not done:  # last when GitHub was not read, so that a retried step stores its read
             ledger.record({**transition, "left_open": left, "detail": detail})
 

@@ -126,11 +126,8 @@ class KubeJobs:
         context: ssl.SSLContext | None = None,
         timeout: float = 15.0,
     ) -> None:
-        self.base_url = base_url.rstrip("/")
-        self.namespace = namespace
-        self.token = token
-        self.context = context
-        self._timeout = timeout
+        self.base_url, self.namespace = base_url.rstrip("/"), namespace
+        self.token, self.context, self._timeout = token, context, timeout
         self._core = f"/api/v1/namespaces/{namespace}"
         self._batch = f"/apis/batch/v1/namespaces/{namespace}"
 
@@ -258,10 +255,8 @@ class KubeJobs:
 
     def delete_earlier(self, item: str, dispatch: int) -> None:
         for job in self._labelled(f"{self._batch}/jobs", ITEM_LABEL, item):
-            labels = job["metadata"].get("labels") or {}
-            if str(labels.get(DISPATCH_LABEL, "")).isdigit() and int(labels[DISPATCH_LABEL]) < (
-                dispatch
-            ):
+            number = str((job["metadata"].get("labels") or {}).get(DISPATCH_LABEL, ""))
+            if number.isdigit() and int(number) < dispatch:
                 self.delete(job["metadata"]["name"])
 
     def secret_minted(self, name: str) -> str | None:

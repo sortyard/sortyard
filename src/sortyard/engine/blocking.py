@@ -26,9 +26,7 @@ class BlockingEngine:
         task_queue: str = DEFAULT_TASK_QUEUE,
         timeout_seconds: float = 10.0,
     ) -> None:
-        self._target = target
-        self._namespace = namespace
-        self._task_queue = task_queue
+        self._target, self._namespace, self._task_queue = target, namespace, task_queue
         self._timeout = timeout_seconds
         self._lock = threading.Lock()
         self._loop: asyncio.AbstractEventLoop | None = None

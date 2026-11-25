@@ -308,11 +308,8 @@ class Launcher:
         config: WorkerConfig,
         clock: Callable[[], float] = time.time,
     ) -> None:
-        self._jobs = jobs
-        self._lookup = lookup
-        self._tokens = tokens
-        self._config = config
-        self._clock = clock
+        self._jobs, self._lookup, self._tokens = jobs, lookup, tokens
+        self._config, self._clock = config, clock
 
     def owners(self) -> dict[str, Owner]:
         """The two owners by the names the state table gives them, for `item.register`."""
@@ -322,9 +319,8 @@ class Launcher:
         """The item's work, and how to mint the token a Job of `state` needs."""
         work, mode = self._lookup(tenant, item), MODES[state]
         repository = work.lane.repositories[work.lane.check(Need(REPOSITORY, work.repository)).name]
-        wanted = {"contents": "write"}
-        if mode == REVIEW:
-            wanted = {"contents": "read", "pull_requests": "read"}
+        review = {"contents": "read", "pull_requests": "read"}
+        wanted = review if mode == REVIEW else {"contents": "write"}
         permissions = permissions_for(wanted, repository.workflow_files)
         return work, lambda: self._tokens(work.repository, permissions)
 

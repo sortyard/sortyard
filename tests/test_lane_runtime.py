@@ -580,8 +580,72 @@ def test_a_withdrawn_item_frees_its_slot_while_its_cleanup_is_refused(
                 w.fake.repos[REPO] = hidden
                 del w.cluster.refuse[("DELETE", "job")]
                 await drive(w, service, lambda: left_in_cluster(w, "M") == GONE, "M cleaned")
+                # must_allow (SY-V3-CLEANUP-ESCALATES): refused a few times, then done, inside
+                # the limit: no escalation.
+                assert escalations(w, "R") == escalations(w, "M") == []
             finally:
                 await service.kill()
+
+    asyncio.run(scenario())
+
+
+def escalations(w: World, item: str) -> list[dict[str, Any]]:
+    return [event for event in w.timeline(item) if event["transition"]["name"] == "escalation"]
+
+
+def deletes(w: World) -> int:
+    return sum(exchange.method == "DELETE" for exchange in w.cluster.exchanges)
+
+
+@requires_postgres
+def test_a_job_delete_refused_past_the_limit_writes_one_escalation_event_and_frees_the_slot(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """must_catch (SY-V3-CLEANUP-ESCALATES): a withdrawn item's Job delete that the cluster
+    refuses (403) on every attempt is not retried forever with nothing in the ledger. The item
+    ends and frees its slot at once; past `CLEANUP_ESCALATE_AFTER` its record step writes one
+    escalation Event with the last error and stops, so the cluster is asked no more."""
+    monkeypatch.setattr(runtime, "UNREAD_FIRST_AFTER", 1.0)
+    monkeypatch.setattr(runtime, "CLEANUP_ESCALATE_AFTER", 2.0)
+
+    async def scenario() -> None:
+        async with world(tmp_path) as w:
+            # R and M are mid-fix and hold the lane's two slots; X waits for one.
+            w.held, w.red_once = {"R:fix", "M:fix", "X"}, {"R", "M"}
+            for item in ("R", "M"):
+                assert w.admit(item).status == 201
+            service = Service(w)
+            try:
+                fixing = {"R": "fixing", "M": "fixing"}
+                await drive(w, service, lambda: w.states() == fixing, "R and M mid-fix")
+                assert w.admit("X").status == 201
+                w.cluster.refuse[("DELETE", "job")] = 403
+                assert withdraw(w, "R") == 202
+                await drive(w, service, lambda: "X" in slotted(w), "R withdrawn, X dispatched")
+                await drive(w, service, lambda: bool(escalations(w, "R")), "R escalated")
+                await until(
+                    lambda: w.engine.recorded(workflow_id(WS, "R")),
+                    lambda recorded: recorded.status == "completed",
+                    "the workflow of R ended",
+                )
+                asked = deletes(w)
+                for _ in range(5):
+                    await service.run_pass()
+                    await w.turn()
+                assert deletes(w) == asked  # no longer retried
+            finally:
+                await service.kill()
+            (escalated,) = escalations(w, "R")
+            assert w.states()["R"] == "withdrawn" and left_in_cluster(w, "R") != GONE
+            assert escalated["transition"] == {
+                "name": "escalation",
+                "from": "withdrawn",
+                "to": "withdrawn",
+            }
+            assert "answered 403" in escalated["facts"]["job_cleanup_refused"]
+            assert escalated["facts"]["jobs"] == item_label(WS, "R")
+            assert w.timeline("R")[-2]["transition"]["to"] == "withdrawn"
+            assert escalations(w, "M") == []
 
     asyncio.run(scenario())
 

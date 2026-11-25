@@ -278,8 +278,7 @@ class _Inputs:
     """
 
     def __init__(self, ctx: Context, take_requests: bool) -> None:
-        self._ctx = ctx
-        self._take_requests = take_requests
+        self._ctx, self._take_requests = ctx, take_requests
         self._kept: list[Any] = []
         self._seen: set[str] = set()
         self.requests: list[dict[str, Any]] = []
