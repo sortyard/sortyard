@@ -42,7 +42,14 @@ slots = 2
 # Needs every task of the lane has, beyond worker-image and runner-pool.
 defaults = ["repository:example/app"]
 
+# Optional: ci = "checks" says the lane's CI is not an image but the checks its repositories name
+# (each repository's checks below, or its base branch's required checks), run on its runner
+# pool. [images] then gives the worker image only, and naming a CI image too is refused.
+# Left out, as here, the lane names its CI image.
+# ci = "checks"
+
 # The worker image is the CI image: both are pinned by digest and the digests must be equal.
+# With ci = "checks" above, [images] gives worker only.
 [images]
 worker = "registry.example/lanes/example-worker@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 ci = "registry.example/lanes/example-ci@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
