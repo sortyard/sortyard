@@ -8,6 +8,8 @@ scheduler's only inputs are rows.
 
 from __future__ import annotations
 
+import random
+import threading
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
@@ -17,7 +19,7 @@ import pytest
 
 from sortyard.kernel.capabilities import CapabilityError, Lane, example_text, load
 from sortyard.kernel.ledger import queue
-from sortyard.kernel.scheduler import Scheduler
+from sortyard.kernel.scheduler import FIRST_RECORD_WINDOW, Scheduler
 from tests.api_harness import OTHER_WS, WS
 from tests.kernel_db import Connect, admitted, database, enter
 from tests.pg import requires_postgres
@@ -263,3 +265,110 @@ def test_a_lane_declares_its_slots_and_the_checks_of_a_repository() -> None:
         with pytest.raises(CapabilityError):
             load(text.replace('checks = ["test"]', broken))
     assert isinstance(example, Lane)
+
+
+ROUNDS, AT_ONCE = 10, 5
+
+
+@requires_postgres
+def test_items_admitted_at_the_same_moment_are_dispatched_in_the_order_they_were_admitted(
+    connect: Connect,
+) -> None:
+    """Items admitted at the same moment are dispatched in the order they were admitted.
+
+    Round after round, AT_ONCE items are admitted to a one-slot lane at once, each in its own
+    transaction as concurrent API workers admit them. Each item's workflow then records its
+    admitted transition and asks the scheduler on its own thread, as the engine runs
+    independent workflows: the item admitted last first (the order that dispatched it ahead
+    of the rest before SORTYARD-190), then the rest at once. The order admission wrote the
+    items (`position`) is the order they are dispatched, whichever workflow records first; the
+    one exception is an item whose blocker is not merged, which later items pass.
+    """
+    rounds = {f"round-{n}": replace(LANE, name=f"round-{n}", slots=1) for n in range(ROUNDS)}
+    lanes = {**LANES, **rounds}
+    pool = ThreadPoolExecutor(AT_ONCE * 2)
+
+    def together(work: Any, items: list[str]) -> list[Any]:
+        start = threading.Barrier(len(items))
+
+        def one(item: str) -> Any:
+            start.wait()
+            return work(item)
+
+        return list(pool.map(one, items))
+
+    def recorded_and_asked(item: str) -> bool:
+        enter(connect, item, "admitted")  # the workflow's first step: record, then ask
+        return ask(Scheduler(connect, lanes), item)
+
+    try:
+        for lane in rounds:
+            blocker = f"{lane}-blocker"
+            queued(connect, blocker, lane=OTHER.name)
+            items = [f"{lane}-{n}" for n in range(AT_ONCE)]
+            blocked = items[1]
+            together(
+                lambda item, lane=lane, blocker=blocker, blocked=blocked: admitted(
+                    connect,
+                    lanes,
+                    item,
+                    lane=lane,
+                    blocked_by=(blocker,) if item == blocked else (),
+                ),
+                items,
+            )
+            with connect() as conn:
+                rows = conn.execute(
+                    "SELECT id FROM sortyard.item WHERE id = ANY(%s) ORDER BY position", (items,)
+                ).fetchall()
+            admission_order = [row[0] for row in rows]
+            # The engine runs the workflows in an order of its own. The worst one: the item
+            # admitted last records and asks first; then the rest, at once, in any order.
+            latest = [item for item in admission_order if item != blocked][-1]
+            recorded_and_asked(latest)
+            rest = [item for item in items if item != latest]
+            random.shuffle(rest)
+            together(recorded_and_asked, rest)
+            dispatched: list[str] = []
+            while len(dispatched) < AT_ONCE:
+                with connect() as conn:
+                    (held,) = conn.execute(
+                        "SELECT item_id FROM sortyard.item_slot WHERE lane = %s AND NOT"
+                        " item_id = ANY(%s)",
+                        (lane, dispatched),
+                    ).fetchall()
+                dispatched.append(held[0])
+                enter(connect, held[0], "preflight")
+                enter(connect, held[0], "merged")
+                if len(dispatched) == AT_ONCE - 1:
+                    enter(connect, blocker, "preflight")
+                    enter(connect, blocker, "merged")
+                # An observer pass: every item still queued is asked again, at once.
+                waiting = [item for item in items if item not in dispatched]
+                if waiting:
+                    together(lambda item: ask(Scheduler(connect, lanes), item), waiting)
+            # The blocked item is passed by every later one, and goes once its blocker merges.
+            expected = [item for item in admission_order if item != blocked] + [blocked]
+            assert dispatched == expected, f"{lane}: admitted {admission_order}"
+    finally:
+        pool.shutdown()
+
+
+@requires_postgres
+def test_an_admitted_item_that_never_records_holds_its_place_only_for_the_window(
+    connect: Connect,
+) -> None:
+    """An admitted item whose workflow has not recorded `admitted` keeps its place ahead of a
+    later item for FIRST_RECORD_WINDOW; past it the item counts as stuck and the later one goes."""
+    scheduler = Scheduler(connect, LANES)
+    admitted(connect, LANES, "SILENT", lane=OTHER.name)  # no workflow records it
+    queued(connect, "LATER", lane=OTHER.name)
+    assert not ask(scheduler, "LATER")
+    with connect() as conn:
+        conn.execute(
+            "UPDATE sortyard.item SET created_at = now() - %s - interval '1 second'"
+            " WHERE workspace_id = %s AND id = 'SILENT'",
+            (FIRST_RECORD_WINDOW, WS),
+        )
+    assert ask(scheduler, "LATER")
+    assert granted(connect) == ["LATER"]

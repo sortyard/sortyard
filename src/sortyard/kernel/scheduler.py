@@ -1,8 +1,16 @@
 """The scheduler: the owner of `admitted`, the queue (HARNESS-V3 section 3.1).
 
 An item is dispatched when every item it is blocked by is merged and its lane has a free slot.
-Among a lane's queued items whose blockers are merged, the one created first goes first; that
+Among a lane's queued items whose blockers are merged, the one admitted first goes first; that
 is link order, since an item cannot be dispatched before what it is blocked by.
+
+Admission order is `position`, which admission writes with the item, not the order the items'
+workflows record `admitted`: those run apart and record in any order, so an item whose record
+is still to come keeps its place (for FIRST_RECORD_WINDOW), and a later one waits for it.
+`position` is taken at insert, not commit: an item whose admission has not committed is not
+seen, and is not admitted yet. For admissions whose transactions overlap, `position` may
+differ from the order they were answered in; it is the rule, since both were asked for at the
+same moment (SORTYARD-190).
 
 A lane's slot count is `slots` in its capability file. A slot is held from the grant until the
 item ends (merged or withdrawn), a wait on a need and a decision included; only a merge clears
@@ -22,18 +30,25 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from sortyard.kernel.capabilities import Lane
-from sortyard.kernel.item import Payload
+from sortyard.kernel.item import STEP_TIMEOUT, Payload
 from sortyard.kernel.states import StateTable, merged_states
 from sortyard.kernel.store import Connect
 
 SCHEDULER_OWNER = "scheduler"
 DISPATCHED: Payload = {"outcome": "dispatched", "detail": {}}
 
-# The lane's queued items that hold no grant and whose blockers are all merged, oldest first.
+# How long an admitted item with no state yet keeps its place: its workflow, started in
+# admission's transaction, first records `admitted`, a step bounded by STEP_TIMEOUT a try;
+# two tries cover one that timed out. Past that the item is taken as stuck (no workflow, or a
+# dead one), so it cannot hold its lane: it no longer counts until it records.
+FIRST_RECORD_WINDOW = 2 * STEP_TIMEOUT
+# The lane's queued items that hold no grant and whose blockers are all merged, oldest first;
+# an admitted item that has not recorded its first state within the window counts as queued.
 _READY = (
     "SELECT i.workspace_id, i.id FROM sortyard.item AS i JOIN sortyard.item_spec AS s"
     "   ON (s.workspace_id, s.item_id) = (i.workspace_id, i.id)"
-    " WHERE s.lane = %(lane)s AND i.state_kind = 'queue'"
+    " WHERE s.lane = %(lane)s AND (i.state_kind = 'queue'"
+    "        OR i.state IS NULL AND i.created_at > now() - %(window)s)"
     "   AND NOT EXISTS (SELECT 1 FROM sortyard.item_slot AS g"
     "                   WHERE (g.workspace_id, g.item_id) = (i.workspace_id, i.id))"
     "   AND NOT EXISTS (SELECT 1 FROM sortyard.item_link AS l JOIN sortyard.item AS b"
@@ -74,7 +89,7 @@ class Scheduler:
             ).fetchone()
             if granted is not None:
                 return DISPATCHED
-            values = {"lane": lane.name, "merged": self._merged}
+            values = {"lane": lane.name, "merged": self._merged, "window": FIRST_RECORD_WINDOW}
             held = conn.execute(_HELD, values).fetchone()
             assert held is not None
             free = max(0, lane.slots - int(held[0]))
