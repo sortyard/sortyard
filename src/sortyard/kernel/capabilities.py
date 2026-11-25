@@ -1,12 +1,14 @@
 """The lane capability file: what a lane's work needs to run (HARNESS-V3 section 3.3).
 
-A lane declares, as data, the worker image by digest, the CI image by digest, the repositories
+A lane declares, as data, the worker image by digest, its CI (an image by digest, or
+`ci = "checks"`: the checks its repositories name, run on its runner pool), the repositories
 it pushes to (and the checks a pull request there must pass), the secrets it reads by name, the
 services it calls, its runner pool, how many of its items may be in work at once (`slots`), who
 resolves a need that fails, and, if it names any, the only projects whose items it takes. It is
 turned into typed values here, and refused when it breaks one of the section's two rules:
 
 - **The worker image is the CI image.** Both are pinned by digest and the digests are equal.
+  A lane whose CI is checks (`ci = "checks"`) names no CI image (SY-V3-LANE-CI-NOT-AN-IMAGE).
 - **No optional credentials.** A secret marked optional cannot be declared.
 
 A task lists its needs against the file as references (`secret:NAME`, `repository:owner/name`,
@@ -46,7 +48,7 @@ _id = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}").fullmatch  # the API's I
 _REPOSITORY_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*")
 _TOP_KEYS = frozenset(
     {"version", "lane", "resolver", "gap-limit", "runner-pool", "slots", "defaults", "images"}
-    | {"repositories", "secrets", "services", "projects"}
+    | {"repositories", "secrets", "services", "projects", "ci"}
 )
 _ENTRY_KEYS: Mapping[str, frozenset[str]] = {
     "repositories": frozenset({"name", "workflow-files", "checks"}),
@@ -131,7 +133,7 @@ class Lane:
     name: str
     resolver: str
     worker_image: Image
-    ci_image: Image
+    ci_image: Image | None  # None when the lane's CI is checks, not an image
     runner_pool: str
     repositories: Mapping[str, Repository]
     secrets: tuple[str, ...]
@@ -232,44 +234,38 @@ def load(text: str) -> Lane:
 
     images = raw.get("images")
     if not isinstance(images, Mapping):
-        raise _fail("missing-field", lane, "[images] must give worker and ci")
+        raise _fail("missing-field", lane, '[images] must give worker (and ci, or ci = "checks")')
     unknown = sorted(set(images) - {"worker", "ci"})
     if unknown:
         raise _fail("unknown-key", lane, f"images has unknown keys {unknown}")
-    worker, ci = _image(images, "worker", lane), _image(images, "ci", lane)
-    if worker.digest != ci.digest:
-        raise _fail(
-            "worker-image-is-ci-image",
-            lane,
-            f"the worker image digest {worker.digest} differs from the CI image digest "
-            f"{ci.digest}; the worker image is the CI image",
-        )
+    # Its CI is an image (images.ci) or the checks its repositories name (ci = "checks"), not both.
+    ci_is_checks = raw.get("ci") == "checks"
+    if "ci" in raw and (not ci_is_checks or "ci" in images):
+        why = 'ci = "checks" says its CI is checks, and then [images] names no ci'
+        raise _fail("ci-is-checks-or-image", lane, f"ci = {raw['ci']!r}: {why}")
+    worker = _image(images, "worker", lane)
+    ci = None if ci_is_checks else _image(images, "ci", lane)
+    if ci and worker.digest != ci.digest:
+        digests = f"worker {worker.digest}, ci {ci.digest}"
+        raise _fail("worker-image-is-ci-image", lane, f"the image digests differ: {digests}")
 
     for secret in _entries(raw, "secrets", lane):
         optional = secret.get("optional", False)
         if not isinstance(optional, bool):
             raise _fail("malformed-file", lane, f"secret {secret['name']!r}: optional is a boolean")
         if optional:
-            raise _fail(
-                "no-optional-credentials",
-                lane,
-                f"secret {secret['name']!r} is declared optional; a lane either reads a "
-                "secret or does not declare it",
-            )
+            why = "is declared optional; a lane either reads a secret or does not declare it"
+            raise _fail("no-optional-credentials", lane, f"secret {secret['name']!r} {why}")
     repositories: dict[str, Repository] = {}
     for entry in _entries(raw, "repositories", lane):
-        workflow_files = entry.get("workflow-files", False)
+        workflow_files, where = entry.get("workflow-files", False), f"repository {entry['name']!r}"
         if not isinstance(workflow_files, bool):
-            raise _fail(
-                "malformed-file", lane, f"repository {entry['name']!r}: workflow-files is a boolean"
-            )
+            raise _fail("malformed-file", lane, f"{where}: workflow-files is a boolean")
         checks = entry.get("checks")
         if checks is not None and not (
             isinstance(checks, list) and all(isinstance(c, str) and c for c in checks)
         ):
-            raise _fail(
-                "malformed-file", lane, f"repository {entry['name']!r}: checks is a list of names"
-            )
+            raise _fail("malformed-file", lane, f"{where}: checks is a list of names")
         repositories[entry["name"]] = Repository(
             entry["name"], workflow_files, None if checks is None else tuple(checks)
         )

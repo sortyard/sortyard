@@ -7,6 +7,7 @@ held to the same loader, and a task's needs are checked against the file.
 
 from __future__ import annotations
 
+import pathlib
 from datetime import timedelta
 
 import pytest
@@ -74,6 +75,7 @@ def test_a_valid_file_loads_as_typed_values() -> None:
         "walwarden-runners",
     )
     assert lane.worker_image.reference == f"registry.test/walwarden/worker@{DIGEST}"
+    assert lane.ci_image is not None
     assert lane.worker_image.digest == lane.ci_image.digest == DIGEST
     assert lane.repositories == {
         "walwarden/app": Repository("walwarden/app", workflow_files=True),
@@ -99,7 +101,69 @@ def test_loading_fails_when_the_worker_image_digest_differs_from_the_ci_image_di
     same_name = changed(f"walwarden/ci@{DIGEST}", f"walwarden/worker@{OTHER_DIGEST}")
     assert refused(same_name).rule == "worker-image-is-ci-image"
     # Equal digests under different names load: that is the valid file.
-    assert load(VALID).worker_image.reference != load(VALID).ci_image.reference
+    ci_image = load(VALID).ci_image
+    assert ci_image is not None and load(VALID).worker_image.reference != ci_image.reference
+
+
+# The estate canary lane as SORTYARD-187 declared it (noncelogic/estate-gitops
+# sortyard-kernel/values.yaml at 567313c): its CI is a check, and it repeats the worker image
+# as ci. It must load as it is (SY-V3-LANE-CI-NOT-AN-IMAGE).
+ESTATE_IMAGE = f"noncelogicci.azurecr.io/sortyard/walwarden-worker@{DIGEST}"
+CANARY = f"""
+version = 1
+lane = "canary"
+resolver = "platform"
+runner-pool = "aks"
+slots = 1
+projects = ["canary"]
+defaults = ["repository:noncelogic/sortyard-canary", "secret:CLAUDE_CODE_OAUTH_TOKEN"]
+
+[images]
+worker = "{ESTATE_IMAGE}"
+ci = "{ESTATE_IMAGE}"
+
+[[repositories]]
+name = "noncelogic/sortyard-canary"
+checks = ["check"]
+
+[[secrets]]
+name = "CLAUDE_CODE_OAUTH_TOKEN"
+"""
+REPLICA_LANE = pathlib.Path(__file__).resolve().parent.parent / "replica" / "lane.toml"
+
+
+def test_a_lane_whose_ci_is_checks_on_a_runner_pool_needs_no_ci_image() -> None:
+    """A lane whose CI is checks on a runner pool needs no ci image (SY-V3-LANE-CI-NOT-AN-IMAGE).
+
+    `ci = "checks"` says the lane's CI is the checks its repositories name, run on its runner
+    pool; the file then names no CI image. A lane that names a CI image still names the worker
+    image's digest, and a file cannot say both.
+    """
+    ci_line = f'ci = "registry.test/walwarden/ci@{DIGEST}"\n'
+    checks = changed(ci_line, "").replace("\n[images]", '\nci = "checks"\n\n[images]')
+    lane = load(checks)
+    assert lane.ci_image is None and lane.runner_pool == "walwarden-runners"
+    assert lane.worker_image == load(VALID).worker_image
+    assert lane.repositories == load(VALID).repositories
+    # must_catch: a ci image that differs from the worker image, without ci = "checks".
+    assert refused(changed(f"ci@{DIGEST}", f"ci@{OTHER_DIGEST}")).rule == "worker-image-is-ci-image"
+    # A file that says its CI is checks and names a CI image too, equal or not, is refused.
+    for digest in (DIGEST, OTHER_DIGEST):
+        both = checks.replace("[images]\n", f'[images]\nci = "registry.test/w/ci@{digest}"\n')
+        assert refused(both).rule == "ci-is-checks-or-image"
+    # ci takes only "checks"; the worker image is still required.
+    for value in ('"image"', '""', "true", '["gate1"]'):
+        other = checks.replace('ci = "checks"', f"ci = {value}")
+        assert refused(other).rule == "ci-is-checks-or-image"
+    worker_line = f'worker = "registry.test/walwarden/worker@{DIGEST}"\n'
+    assert refused(checks.replace(worker_line, "")).rule == "missing-field"
+    # Without ci = "checks" the CI image is still required.
+    assert refused(changed(ci_line, "")).rule == "missing-field"
+    # must_allow: the canary and replica lanes as they are.
+    canary = load(CANARY)
+    assert canary.ci_image is not None and canary.ci_image.digest == canary.worker_image.digest
+    replica = load(REPLICA_LANE.read_text().replace("__WORKER_IMAGE__", ESTATE_IMAGE))
+    assert replica.ci_image == replica.worker_image
 
 
 def test_loading_fails_for_a_secret_declared_optional() -> None:
@@ -220,10 +284,15 @@ def test_need_references_round_trip() -> None:
 def test_the_shipped_example_file_loads_and_shows_every_part_of_the_format() -> None:
     lane = load(example_text())
     assert lane.resolver == "platform"
-    assert lane.worker_image.digest == lane.ci_image.digest
+    assert lane.ci_image is not None and lane.worker_image.digest == lane.ci_image.digest
     assert lane.repositories and lane.secrets and lane.services and lane.runner_pool
     assert any(repository.workflow_files for repository in lane.repositories.values())
     assert len(lane.defaults) > 2 and lane.gap_limit is not None and lane.projects == ()
     # The projects line it shows, commented out, loads as written.
     named = example_text().replace('# projects = ["example"]', 'projects = ["example"]')
     assert load(named).projects == ("example",)
+    # So does the ci line, once [images] stops naming a CI image.
+    checks = example_text().replace('# ci = "checks"', 'ci = "checks"')
+    assert refused(checks).rule == "ci-is-checks-or-image"
+    ci_line = next(line for line in checks.splitlines() if line.startswith('ci = "registry'))
+    assert load(checks.replace(ci_line, "")).ci_image is None
